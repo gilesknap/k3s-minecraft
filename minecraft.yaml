@@ -1,0 +1,73 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name:  minecraft-one-config
+  namespace: minecraft
+  labels:
+    app: minecraft-one
+data:
+  start.sh: |-
+    #!/bin/bash
+    # Todo dummy stuff
+
+  version.txt: |
+    # version 1.0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: minecraft
+  name: minecraft-one
+spec:
+  type: LoadBalancer
+  selector:
+    app: minecraft-one
+  ports:
+    - port: 25565
+      nodePort: 30300
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-one
+  namespace: minecraft
+  labels:
+    app: minecraft-one
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minecraft-one
+  template:
+    metadata:
+      labels:
+        app: minecraft-one
+    spec:
+      terminationGracePeriodSeconds: 25
+      volumes:
+        - name: minecraft-one-config
+          configMap:
+            name: minecraft-one-config
+      containers:
+      - name: minecraft-one
+        image: itzg/minecraft-server
+        volumeMounts:
+        - name: minecraft-one-config
+          mountPath: /minecraft
+        stdin: true
+        tty: true
+        ports:
+          - containerPort: 25565
+            protocol: TCP
+          - containerPort: 25566
+            protocol: TCP
+        resources:
+          limits:
+            memory: "2048Mi"
+            cpu: "4"
+        imagePullPolicy: Always
+        env:
+        - name: EULA
+          value: "TRUE"
+
