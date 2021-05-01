@@ -2,8 +2,8 @@ Install K3s on the server
 =========================
 install docker and add yourself to docker group
 
-do this with myserver=<your dns name for your server>:
-curl -sfL https://get.k3s.io | K3S_URL=https://myserver:6443 | sh -
+do this with your server's IP address:
+curl -sfL https://get.k3s.io | K3S_URL=https://192.168.86.32:6443 | sh -
 
 sudo cp  /etc/rancher/k3s/k3s.yaml ~/.kube/mcconfig
 sudo chown <your user> ~/.kube/mcconfig
@@ -19,13 +19,22 @@ GITHUB_URL=https://github.com/kubernetes/dashboard/releases
 VERSION_KUBE_DASHBOARD=$(curl -w '%{url_effective}' -I -L -s -S ${GITHUB_URL}/latest -o /dev/null | sed -e 's|.*/||')
 kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/${VERSION_KUBE_DASHBOARD}/aio/deploy/recommended.yaml
 kubectl create -f dashboard-admin.yaml
-kubectl proxy & # Do this on the workstation where you run your browser
+kubectl proxy & # This backgrounded process must be running locally to see the dashboard
 
 get a login token with
 kubectl -n kubernetes-dashboard describe secret admin-user-token | grep '^token'
 
 goto
 http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy
+
+
+Add another node if you like
+============================
+do this on the original server to get a node-token
+sudo cat /var/lib/rancher/k3s/server/node-token
+
+then on the new node (change server ip and mytoken):
+curl -sfL https://get.k3s.io | K3S_URL=https://serverip:6443 K3S_TOKEN=<mytoken> sh -
 
 
 
@@ -48,3 +57,7 @@ to see your old context and switch back:
 kubectl config get-contexts
 
 kubectl apply -f minecraft.yaml
+
+Helm Charts
+===========
+I'm using this https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft for inspiration

@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name:  minecraft-one-config
+  name:  minecraft-two-config
   namespace: minecraft
   labels:
-    app: minecraft-one
+    app: minecraft-two
 data:
   start.sh: |-
     #!/bin/bash
@@ -17,7 +17,7 @@ data:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: minecraft-one
+  name: minecraft-two
   namespace: minecraft
 spec:
   accessModes:
@@ -31,45 +31,46 @@ apiVersion: v1
 kind: Service
 metadata:
   namespace: minecraft
-  name: minecraft-one
+  name: minecraft-two
 spec:
   type: LoadBalancer
   selector:
-    app: minecraft-one
+    app: minecraft-two
   ports:
     - port: 25565
-      nodePort: 30300
+      nodePort: 30400
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: minecraft-one
+  name: minecraft-two
   namespace: minecraft
   labels:
-    app: minecraft-one
+    app: minecraft-two
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: minecraft-one
+      app: minecraft-two
   template:
     metadata:
       labels:
-        app: minecraft-one
+        app: minecraft-two
     spec:
       terminationGracePeriodSeconds: 25
       containers:
-      - name: minecraft-one
+      - name: minecraft-two
         image: itzg/minecraft-server
         volumeMounts:
-        - name: minecraft-one-data
+        - name: minecraft-two-data
           mountPath: /data
+        - name: minecraft-two-loader
+          mountPath: /loader
+          readOnly: true
         stdin: true
         tty: true
         ports:
           - containerPort: 25565
-            protocol: TCP
-          - containerPort: 25566
             protocol: TCP
         resources:
           limits:
@@ -79,9 +80,21 @@ spec:
         env:
         - name: EULA
           value: "TRUE"
+        - name: WORLD
+          value: /loader/2020-12-30.15-06.Science.science_rcon.zip
+        - name: FORCE_WORLD_COPY
+          value: "TRUE"
       volumes:
-      - name: minecraft-one-data
+      - name: minecraft-two-data
         persistentVolumeClaim:
-          claimName: minecraft-one
+          claimName: minecraft-two
+      - name: minecraft-two-loader
+        hostPath:
+          path: /mnt/bigdisk/MinecraftBackups/
+          type: Directory
+
+
+
+
 
 
