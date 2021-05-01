@@ -1,9 +1,0 @@
-apiVersion: v2
-name: k3s-minecraft
-description: |
-    a chart for deploying a minecraft java server to a k3s kubernetes cluster
-
-type: application
-
-version: 0.1
-appVersion: 0.1

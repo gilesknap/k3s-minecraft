@@ -33,7 +33,12 @@ Add another node if you like
 do this on the original server to get a node-token
 sudo cat /var/lib/rancher/k3s/server/node-token
 
-then on the new node (change server ip and mytoken):
+on raspi I needed
+sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+edit /boot/cmdline and make sure the single line contains:
+  cgroup_memory=1 cgroup_enable=memory
+
+on the new node (change server ip and mytoken):
 curl -sfL https://get.k3s.io | K3S_URL=https://serverip:6443 K3S_TOKEN=<mytoken> sh -
 
 

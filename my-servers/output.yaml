@@ -1,0 +1,224 @@
+---
+# Source: minecraft/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pi-science-minecraft
+  labels:
+    app: pi-science-minecraft
+    chart: "minecraft-3.1.5"
+    release: "pi-science"
+    heritage: "Helm"
+type: Opaque
+data:
+  rcon-password: "VE9ETyAtIHN1cHBseSB0aGlzIGFzIGFuIG92ZXJyaWRlIG9uIHRoZSBjb21tYW5kIGxpbmUg"
+---
+# Source: minecraft/templates/datadir-pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pi-science-minecraft-datadir
+  labels:
+    app: pi-science-minecraft
+    chart: "minecraft-3.1.5"
+    release: "pi-science"
+    heritage: "Helm"
+  annotations:
+    volume.alpha.kubernetes.io/storage-class: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "1Gi"
+---
+# Source: minecraft/templates/minecraft-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: pi-science-minecraft
+  labels:
+    app: pi-science-minecraft
+    chart: "minecraft-3.1.5"
+    release: "pi-science"
+    heritage: "Helm"
+  annotations:
+    {}
+spec:
+  type: LoadBalancer
+  ports:
+  - name: minecraft
+    port: 30500
+    targetPort: minecraft
+    protocol: TCP
+  selector:
+    app: pi-science-minecraft
+---
+# Source: minecraft/templates/rcon-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: "pi-science-minecraft-rcon"
+  annotations:
+    {}
+  labels:
+    app: pi-science-minecraft
+    chart: "minecraft-3.1.5"
+    release: "pi-science"
+    heritage: "Helm"
+spec:
+  type: LoadBalancer
+  ports:
+  - name: rcon
+    port: 30501
+    targetPort: rcon
+    protocol: TCP
+  selector:
+    app: pi-science-minecraft
+---
+# Source: minecraft/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pi-science-minecraft
+  labels:
+    app: pi-science-minecraft
+    chart: "minecraft-3.1.5"
+    release: "pi-science"
+    heritage: "Helm"
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pi-science-minecraft
+  template:
+    metadata:
+      labels:
+        app: pi-science-minecraft
+    spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: pi-science-minecraft
+        image: "itzg/minecraft-server:latest"
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          tcpSocket:
+            port: 25565
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        livenessProbe:
+          tcpSocket:
+            port: 25565
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        env:
+        - name: EULA
+          value: "true"
+        - name: TYPE
+          value: "VANILLA"
+        - name: VERSION
+          value: "LATEST"
+        - name: DIFFICULTY
+          value: "easy"
+        - name: WHITELIST
+          value: "TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737"
+        - name: OPS
+          value: "TransformerScorn,DispenserAD11"
+        - name: ICON
+          value: ""
+        - name: MAX_PLAYERS
+          value: "20"
+        - name: MAX_WORLD_SIZE
+          value: "10000"
+        - name: ALLOW_NETHER
+          value: "true"
+        - name: ANNOUNCE_PLAYER_ACHIEVEMENTS
+          value: "true"
+        - name: ENABLE_COMMAND_BLOCK
+          value: "true"
+        - name: FORCE_GAMEMODE
+          value: "false"
+        - name: GENERATE_STRUCTURES
+          value: "true"
+        - name: HARDCORE
+          value: "false"
+        - name: MAX_BUILD_HEIGHT
+          value: "256"
+        - name: MAX_TICK_TIME
+          value: "60000"
+        - name: SPAWN_ANIMALS
+          value: "true"
+        - name: SPAWN_MONSTERS
+          value: "true"
+        - name: SPAWN_NPCS
+          value: "true"
+        - name: VIEW_DISTANCE
+          value: "10"
+        - name: SEED
+          value: ""
+        - name: MODE
+          value: "creative"
+        - name: MOTD
+          value: "Welcome to Noah's Minecraft on Kubernetes!"
+        - name: PVP
+          value: "false"
+        - name: LEVEL_TYPE
+          value: "DEFAULT"
+        - name: GENERATOR_SETTINGS
+          value: ""
+        - name: LEVEL
+          value: "world"
+        - name: WORLD
+          value: "/mnt/bigdisk/MinecraftBackups/2020-12-30.15-06.Science.science_rcon.zip"
+        - name: ONLINE_MODE
+          value: "true"
+        - name: MEMORY
+          value: "1024M"
+        - name: JVM_OPTS
+          value: ""
+        - name: JVM_XX_OPTS
+          value: ""
+        - name: ENABLE_RCON
+          value: "true"
+        - name: RCON_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pi-science-minecraft
+              key: rcon-password
+
+        ports:
+        - name: minecraft
+          containerPort: 25565
+          protocol: TCP
+        - name: rcon
+          containerPort: 30501
+          protocol: TCP
+        volumeMounts:
+        - name: datadir
+          mountPath: /data
+        - mountPath: /mnt/bigdisk
+          name: bigdisk
+          readOnly: true
+      volumes:
+      - name: datadir
+        persistentVolumeClaim:
+          claimName: pi-science-minecraft-datadir
+      - name: bigdisk
+        nfs:
+          path: /mnt/bigdisk
+          server: 192.168.86.32
+      nodeSelector:
+        nodeName: pi1

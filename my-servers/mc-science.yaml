@@ -3,9 +3,9 @@
 
 # to use this file
 # helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-# helm install WORLD_NAME -f THIS_FILE.yaml --set minecraftServer.eula=true,rcon.password=YOUR_PWD minecraft-server-charts/minecraft
+# helm upgrade --install WORLD_NAME -f THIS_FILE.yaml --set minecraftServer.eula=true,rcon.password=YOUR_PWD minecraft-server-charts/minecraft
 
-# this is where I store world backups so mount it in order to start a new
+# this is where I store world backups so mount it read-only in order to start a new
 # server from a backup
 extraVolumes:
   - volumeMounts:
@@ -15,39 +15,40 @@ extraVolumes:
     volumes:
       - name: bigdisk
         nfs:
-          server: 192.168.86.32
+          server: gknuc
           path: /mnt/bigdisk
 
-# Noahs friends get access, Noah and I get ops
 minecraftServer:
-  whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33MINE,89cfd8a6-ebd1-4512-a818-1b5d9b8bacfd
+  # Noahs friends get access, Noah and I get ops
+  whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
   ops: TransformerScorn,DispenserAD11
-  forcegameMode: true
+  forcegameMode: false
   levelSeed:
-  # One of: creative, survival, adventure, spectator
   gameMode: creative
   motd: "Welcome to Noah's Minecraft on Kubernetes!"
   pvp: false
-
-
-rcon:
-  enabled: true
-  password: "TODO - supply this as an override on the command line "
   serviceType: LoadBalancer
-  loadBalancerIP:
+  # restore the world from a backup on first execution
+  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2020-12-30.15-06.Science.science_rcon.zip
+  # external port must be unique across all mc server instances
+  servicePort: 30400
 
+  # enable rcon for remote control - set to false if not required
+  rcon:
+    # external port must be unique across all mc server instances
+    port: 30401
+    enabled: true
+    password: "TODO - supply this as an override on the command line "
+
+# required to save the world in persistant local-path storage
+# by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
+# I beleive this ties the deployment to the first node it goes to
 persistence:
   annotations: {}
-  ## minecraft data Persistent Volume Storage Class
-  ## If defined, storageClassName: <storageClass>
-  ## If set to "-", storageClassName: "", which disables dynamic provisioning
-  ## If undefined (the default) or set to null, no storageClassName spec is
-  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-  ##   GKE, AWS & OpenStack)
-  ##
-  # storageClass: "-"
   dataDir:
-    # Set this to false if you don't care to persist state between restarts.
-    enabled: false
-    # existingClaim: nil
+    enabled: true
     Size: 1Gi
+
+# choose the node to run on (delete if not needed)
+nodeSelector:
+  kubernetes.io/hostname: gknuc
