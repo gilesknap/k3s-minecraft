@@ -2,6 +2,7 @@
 set -e
 
 ns="minecraft"
+backup="/mnt/bigdisk/minecraft-k8s-backup"
 
 deploy=$(kubectl get deploy -n ${ns} -l app="${1}" -o name)
 
@@ -38,7 +39,7 @@ deployment="${1}"
 name=$(date +%Y-%m-%d-%X)-deployment.tz
 kubectl exec -n ${ns} ${pod} -- rcon-cli save-off
 kubectl exec -n ${ns} ${pod} -- rcon-cli save-all
-kubectl exec -n ${ns} ${pod} -- tar -czv --exclude='data/logs' /data > /mnt/bigdisk/minecraft-k8s-backup/${name}
+kubectl exec -n ${ns} ${pod} -- tar -czv --exclude='data/logs' /data > ${backup}/${name}
 kubectl exec -n ${ns} ${pod} -- rcon-cli save-on
 
 if [ "${shutdown}" == "true" ]; then
