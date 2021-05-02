@@ -4,7 +4,8 @@ set -e
 ns="minecraft"
 backup="/mnt/bigdisk/minecraft-k8s-backup"
 
-deploy=$(kubectl get deploy -n ${ns} -l app="${1}" -o name)
+name="${1}"-minecraft
+deploy=$(kubectl get deploy -n ${ns} -l app="${name}" -o name)
 
 if [ -z "${deploy}"  ]; then
     echo ${deploy}
@@ -13,7 +14,7 @@ if [ -z "${deploy}"  ]; then
     exit 1
 fi
 
-pod=$(kubectl get pods -l app=${1} -o name)
+pod=$(kubectl get pods -l app=${name} -o name)
 if [ -z ${pod} ]; then
     # the server is not running, spin it up for the backup only
     kubectl scale -n ${ns} ${deploy} --replicas=1
@@ -25,7 +26,7 @@ if [ -z ${pod} ]; then
     done
 
     shutdown=true
-    pod=$(kubectl get pods -l app=${1} -o name)
+    pod=$(kubectl get pods -l app=${name} -o name)
 
     echo "waiting for minecraft server ..."
     while [[ "$(kubectl exec -n ${ns} ${pod} -- /health.sh 2>/dev/null)" != *"motd"* ]]
@@ -36,10 +37,10 @@ fi
 
 
 deployment="${1}"
-name=$(date +%Y-%m-%d-%X)-deployment.tz
+tarname=$(date +%Y-%m-%d-%X)-${name}.tz
 kubectl exec -n ${ns} ${pod} -- rcon-cli save-off
 kubectl exec -n ${ns} ${pod} -- rcon-cli save-all
-kubectl exec -n ${ns} ${pod} -- tar -czv --exclude='data/logs' /data > ${backup}/${name}
+kubectl exec -n ${ns} ${pod} -- tar -czv --exclude='data/logs' /data > ${backup}/${tarname}
 kubectl exec -n ${ns} ${pod} -- rcon-cli save-on
 
 if [ "${shutdown}" == "true" ]; then
