@@ -46,6 +46,8 @@ minecraftServer:
     password: "TODO - supply this as an override on the command line "
 
 extraEnv:
+  # recommended rolling logs for saving disk
+  ENABLE_ROLLING_LOGS: true
   # if this is true then minecraftServer properties above are always applied
   # on restart, if false they only apply at first run
   OVERRIDE_SERVER_PROPERTIES: false

@@ -61,6 +61,8 @@ minecraftServer:
 #           path: /mnt/bigdisk
 
 extraEnv:
+  # recommended rolling logs for saving disk
+  ENABLE_ROLLING_LOGS: true
   # if this is true then minecraftServer properties above are always applied
   # on every restart, if false they only apply at first run
   OVERRIDE_SERVER_PROPERTIES: true
