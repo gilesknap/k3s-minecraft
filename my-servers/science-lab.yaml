@@ -37,6 +37,8 @@ minecraftServer:
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2020-12-30.11-07.Science.science_rcon.zip
   # external port must be unique across all mc server instances
   servicePort: 30500
+  # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
+  viewDistance: 25
 
   # enable rcon for remote control - set to false if not required
   rcon:
@@ -48,9 +50,10 @@ minecraftServer:
 extraEnv:
   # if this is true then minecraftServer properties above are always applied
   # on restart, if false they only apply at first run
-  OVERRIDE_SERVER_PROPERTIES: false
+  OVERRIDE_SERVER_PROPERTIES: yes
   # if this is true then downloadWorldUrl is always loaded on restart
   # useful for resetting the world but should be reset to false afterwards
+  # WARNING: setting this to true deletes your previous world data
   FORCE_WORLD_COPY: false
 
 # required to save the world in persistant local-path storage (k3s default Storage Class)

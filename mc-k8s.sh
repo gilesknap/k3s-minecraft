@@ -7,9 +7,13 @@ then
   exit 1
 fi
 
-if [ -z "${MCPASSWD}" ]
+if [[ ! -z "${1}" ]]
 then
-  echo "please export MCPASSWD=<your mc rcon password>"
+  MCPASSWD="${1}"
+fi
+if [ -z ${MCPASSWD} ]
+then
+  echo "please supply an rcon password as the first parameter or set MCPASSWD"
   exit 1
 fi
 
@@ -114,3 +118,11 @@ function mclog()
     fi
 }
 
+function mcdeploy()
+{
+    filename="${1}"
+    base=$(basename ${filename})
+    releasename="${base%.*}"
+    helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+    helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=true,rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
+}
