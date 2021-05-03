@@ -1,0 +1,68 @@
+# This is value overrides for the helm chart defined here
+# https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
+
+# to use this file
+# helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+# helm upgrade --install WORLD_NAME -f THIS_FILE.yaml --set minecraftServer.eula=true,rcon.password=YOUR_PWD minecraft-server-charts/minecraft
+
+# this is where I store world backups so mount it read-only in order to start a new
+# server from a backup
+extraVolumes:
+  # define where the volume mounts in the container
+  - volumeMounts:
+      - name: bigdisk
+        mountPath: /mnt/bigdisk
+        readOnly: true
+    # define the remote nfs mount to attach to above
+    volumes:
+      - name: bigdisk
+        nfs:
+          server: 192.168.86.32
+          path: /mnt/bigdisk
+
+minecraftServer:
+  # Noahs friends get access, Noah and I get ops
+  whitelist: TransformerScorn,DispenserAD11
+  ops: TransformerScorn,DispenserAD11
+  # always set game mode when a player connects
+  forcegameMode: true
+  levelSeed:
+  maxWorldSize: 29999984
+  gameMode: creative
+  motd: "Tests for python rcon library and mcwb world builder"
+  pvp: false
+  # this means you get the node IP address on K3s
+  serviceType: LoadBalancer
+  # restore the world from a backup on first execution
+  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-01-03.05-05.Flatworlds.Scorpnok.zip
+  # external port must be unique across all mc server instances
+  servicePort: 31000
+
+  # enable rcon for remote control - set to false if not required
+  rcon:
+    # external port must be unique across all mc server instances
+    port: 31001
+    enabled: true
+    password: "TODO - supply this as an override on the command line "
+
+extraEnv:
+  # if this is true then minecraftServer properties above are always applied
+  # on restart, if false they only apply at first run
+  OVERRIDE_SERVER_PROPERTIES: false
+  # if this is true then downloadWorldUrl is always loaded on restart
+  # useful for resetting the world but should be reset to false afterwards
+  FORCE_WORLD_COPY: false
+
+# required to save the world in persistant local-path storage (k3s default Storage Class)
+# by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
+# NOTE this ties the deployment to the first node it goes to
+# we could perhaps use an NFS mount to avoid this
+persistence:
+  annotations: {}
+  dataDir:
+    enabled: true
+    Size: 1Gi
+
+# choose the node to run on (delete if not needed)
+nodeSelector:
+  kubernetes.io/hostname: gklinux2
