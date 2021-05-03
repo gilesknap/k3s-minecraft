@@ -15,7 +15,7 @@ if you decide to back out.
 # Installation Steps
 
 ## Install K3S lightweight Kubernetes
-Execute this command on your server to set up the K3S cluster Server node:
+Execute this command on your server to set up the cluster master (aka K3S Server node):
 ```
 curl -sfL https://get.k3s.io | sh -
 ```
@@ -29,7 +29,8 @@ sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 Go to the server machine and copy over the kubectl configuration to your
 workstation
 ```
-sudo sudo scp  /etc/rancher/k3s/k3s.yaml <YOUR_ACCOUNT>@<YOUR_WORKSTATION>:.kube/config
+sudo scp  /etc/rancher/k3s/k3s.yaml <YOUR_ACCOUNT>@<YOUR_WORKSTATION>:.kube/config
+# edit the file .kube/config replacing 127.0.0.1 with your server IP Address
 ```
 
 ## Create a minecraft namespace and context
@@ -63,8 +64,8 @@ helm upgrade --install my-first-mc -f my-first-mc.yaml --set minecraftServer.eul
 THAT IS ALL! You should see a minecraft server spin up with your server address
 and the port you specified in myfirst-mc.yaml.
 
-You edit the yaml and repeat the above command to tweak settings without
-deleting your world data. You can remove the minecraft server including world
+You can edit the yaml and repeat the above command to update settings without
+deleting your world data. You can remove the minecraft server,e including world
 data with:
 ```
 helm delete my-first-mc
@@ -74,16 +75,16 @@ helm delete my-first-mc
 
 |description    | link |
 |---------------|------|
-|itgz minecraft image:         |  https://github.com/itzg/docker-minecraft-server |
-|itgz helm chart:          |  https://artifacthub.io/packages/helm/minecraft-server-charts/ |minecraft
-|K3S:           |  https://k3s.io/ |
-|Helm:          |  https://helm.sh |
-|kubectl:       |  https://kubernetes.io/docs/reference/kubectl/overview/
+|itgz minecraft image:          |  https://github.com/itzg/docker-minecraft-server |
+|itgz helm chart:               |  https://artifacthub.io/packages/helm/minecraft-server-charts/ |minecraft
+|K3S:                           |  https://k3s.io/ |
+|Helm:                          |  https://helm.sh |
+|kubectl:                       |  https://kubernetes.io/docs/reference/kubectl/overview/ |
 #
 #
 # Additional Nice to Have Stuff
 
-## Add a worker node to your cluster
+## Add a worker node (aka K3S Agent) to your cluster
 First get the node token on your server:
 ```
 sudo cat /var/lib/rancher/k3s/server/node-token
@@ -106,18 +107,18 @@ get a token for the user
 kubectl create -f dashboard-admin.yaml
 kubectl -n kubernetes-dashboard describe secret admin-user-token | grep '^token'
 ```
-finally start a proxy and goto the Dashboard URL
+Finally, start a proxy and goto the Dashboard URL, use the above token to log in.
 ```
 kubectl proxy &
 browse to http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy
 ```
 
 ## Add a Raspberry Pi to the cluster
-For a raspberry pi make sure you set the imageTag: multiarch in the yaml file.
+For a raspberry pi make sure you set imageTag: multiarch in the yaml file.
 
 It should be possible to
-install the K3S Server node on a pi, but you would need one pi for the K3S
-Server and Pi K3S Agent (worker node)
+install the K3S Server node on a Pi, but you would need one Pi for the K3S
+Server and one Pi K3S Agent (worker node)
 per minecraft server for decent performance.
 
 You need the following changes before installing:
