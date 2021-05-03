@@ -131,3 +131,63 @@ sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
 #  cgroup_memory=1 cgroup_enable=memory
 sudo reboot
 ```
+
+## Do Backups of running servers and more ...
+Use the script included in this repo to do backups and save typing for
+a few other commands. See the functions in mc-k8.sh for details, some examples
+below:
+```
+$ source mc-k8s.sh
+
+$ mclist
+MC SERVER NAME      RUNNING
+the-lockdown-krew   1
+adventure-of-doom   1
+skorponok           1
+science-rpi         1
+science-lab         1
+
+$ mcstop the-lockdown-krew
+localhost:25565 : version=1.16.5 online=0 max=20 motd='Where the Lockdown Krew meet'
+deployment.apps/the-lockdown-krew-minecraft scaled
+
+$ mclist
+MC SERVER NAME      RUNNING
+adventure-of-doom   1
+skorponok           1
+science-rpi         1
+science-lab         1
+the-lockdown-krew   <none>
+
+$ mcbackup science-lab
+science-lab is running
+Automatic saving is now disabled
+Saving the game (this may take a moment!)Saved the game
+tar: removing leading '/' from member names
+data/
+data/world/
+data/world/poi/
+data/world/poi/r.0.-2.mca
+...
+data/white-list.txt.converted
+data/ops.txt.converted
+Automatic saving is now enabled
+
+$ mcdeploy giles-servers/devils-deep.yaml
+"minecraft-server-charts" already exists with the same configuration, skipping
+Release "devils-deep" does not exist. Installing it now.
+NAME: devils-deep
+LAST DEPLOYED: Mon May  3 12:03:53 2021
+NAMESPACE: minecraft
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+Get the IP address of your Minecraft server by running these commands in the
+same shell:
+
+!! NOTE: It may take a few minutes for the LoadBalancer IP to be available. !!
+
+You can watch for EXTERNAL-IP to populate by running:
+  kubectl get svc --namespace minecraft -w devils-deep-minecraft```
+

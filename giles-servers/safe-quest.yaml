@@ -22,7 +22,7 @@ extraVolumes:
 minecraftServer:
   # Noahs friends get access, Noah and I get ops
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
-  ops: TransformerScorn,DispenserAD11
+  ops: TransformerScorn
   forcegameMode: true
   levelSeed:
   gameMode: survival

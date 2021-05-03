@@ -14,30 +14,40 @@ source <(kubectl completion bash)
 
 function mclist()
 {
+    # todo split into running and idle with extra info like node for running severs
     kubectl get deployment -n minecraft -o "custom-columns=MC SERVER NAME:metadata.annotations.meta\.helm\.sh/release-name,RUNNING:status.replicas"
 }
 
 function mccheckname()
 {
-    export pod=""
-    export shortname="${1}"
-    export deployname="${1}"-minecraft
+    if [ -z "${1}" ]; then
+      echo 'please supply an mc server name'
+      return 1
+    fi
+
+    unset pod
+    deployname="${1}"-minecraft
     deploy=$(kubectl get deploy -n minecraft -l app="${deployname}" -o name)
 
     if [ -z "${deploy}"  ]; then
-        echo "please supply one of the following minecraft server names "
+        echo "${1} does not exist. Please use one of the following names:"
         mclist
-        return
+        return 1
     fi
 
-    export pod=$(kubectl get pods -l app=${deployname} -o name)
+    pod=$(kubectl get pods -l app=${deployname} -o name)
+
+    if [ "${pod}" ]; then
+        return 0
+    else
+      # 2 means the server name exists but has no pod running
+      return 2
+    fi
 }
 
 function mccheck ()
 {
-    mccheckname "${1}"
-
-    if [ ${pod} ]; then
+    if mccheckname "${1}" ; then
         output=$(kubectl exec -n minecraft ${pod} -- /health.sh)
         echo "${output}"
         # a good result contains a motd
@@ -53,9 +63,9 @@ function mcstart()
 {
     mccheckname "${1}"
 
-    if [ -z ${pod} ]; then
+    if [ -z "${pod}" ]; then
         # the server is not running, spin it up
-        export was_shutdown=true
+        was_shutdown=true
 
         kubectl scale -n minecraft ${deploy} --replicas=1
 
@@ -65,7 +75,7 @@ function mcstart()
             sleep 1
         done
 
-        export pod=$(kubectl get pods -l app=${deployname} -o name)
+        pod=$(kubectl get pods -l app=${deployname} -o name)
 
         echo "waiting for minecraft server ..."
         while ! mccheck ${1}
@@ -73,8 +83,10 @@ function mcstart()
             sleep 1
         done
     else
-        echo ${1} is running
-        export was_shutdown=false
+        if [ "${deploy}" ]; then
+            echo ${1} is already running
+            export was_shutdown=false
+        fi
     fi
 }
 
@@ -84,8 +96,7 @@ function mcbackup()
 
     mcstart "${1}"
 
-    if [[ ${pod} ]]
-    then
+    if [[ "${pod}" ]]; then
         tarname=$(date +%Y-%m-%d-%X)-${shortname}.tz
 
         kubectl exec -n minecraft ${pod} -- rcon-cli save-off
@@ -100,26 +111,27 @@ function mcbackup()
     fi
 }
 
+function mcexec()
+{
+    if mccheck ${1}; then
+      kubectl exec -it ${deploy} -- bash
+    else
+        echo "${1} is not running"
+    fi
+}
+
 function mcstop()
 {
-    mccheckname "${1}"
-
-    if [[ ${deploy} ]]
-    then
-        if ! mccheck ${1}; then
-          echo "${1} is not running"
-        else
-          kubectl scale --replicas=0 ${deploy}
-        fi
+    if mccheck ${1}; then
+      kubectl scale --replicas=0 ${deploy}
+    else
+        echo "${1} is not running"
     fi
 }
 
 function mclog()
 {
-    mccheckname "${1}"
-
-    if [[ ${deploy} ]]
-    then
+    if mccheckname "${1}"; then
         kubectl logs ${deploy}
     fi
 }

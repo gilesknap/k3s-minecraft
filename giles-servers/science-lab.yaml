@@ -21,13 +21,12 @@ extraVolumes:
           path: /mnt/bigdisk
 
 minecraftServer:
-  # Noahs friends get access, Noah and I get ops
-  whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
+  whitelist: TransformerScorn,DispenserAD11
   ops: TransformerScorn,DispenserAD11
   # always set game mode when a player connects
   forcegameMode: true
   levelSeed:
-  maxWorldSize: 29999984
+  maxWorldSize: 29999983
   gameMode: creative
   motd: "Science Lab, Redstone Museum and Scenic Railway"
   pvp: false
