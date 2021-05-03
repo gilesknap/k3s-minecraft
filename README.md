@@ -49,7 +49,7 @@ bash get_helm.sh
 ```
 
 ## Deploy a Minecraft Server to your Cluster
-Take a copy of the file minecraft-helm.yaml and call it my-first-mc.yaml.
+Take a copy of the file **minecraft-helm.yaml** and call it **my-first-mc.yaml**.
 Edit the file and follow the comments to apply the settings you require for your
 server.
 
@@ -58,6 +58,9 @@ after --install) as the basename
 of the file so you can easily keep track of which file your servers got their
 settings from. You can omit the rcon password if you disabled rcon in the yaml.
 ```
+export HELM_EXPERIMENTAL_OCI=1
+helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+
 helm upgrade --install my-first-mc -f my-first-mc.yaml --set minecraftServer.eula=true,rcon.password=<YOUR_RCON_PWD> minecraft-server-charts/minecraft
 ```
 
@@ -114,7 +117,7 @@ browse to http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/
 ```
 
 ## Add a Raspberry Pi to the cluster
-For a raspberry pi make sure you set imageTag: multiarch in the yaml file.
+For a Raspberry Pi make sure you set imageTag: multiarch in the yaml file.
 
 It should be possible to
 install the K3S Server node on a Pi, but you would need one Pi for the K3S
