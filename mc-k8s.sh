@@ -8,6 +8,8 @@ then
   exit 1
 fi
 
+export THIS_DIR=$(dirname "${BASH_SOURCE[0]}")
+
 export HELM_EXPERIMENTAL_OCI=1
 source <(helm completion bash)
 source <(kubectl completion bash)
@@ -111,6 +113,16 @@ function mcbackup()
     fi
 }
 
+# function mcwait()
+# {
+#     if [[ mccheckname ${1} != 1 ]]; then
+#       while ! mccheck ${1}
+#         do
+#             sleep 1
+#         done
+#     fi
+# }
+
 function mcexec()
 {
     if mccheck ${1}; then
@@ -145,4 +157,11 @@ function mcdeploy()
     MCEULA=${MCEULA:-$(read -p "agree to minecraft EULA? (type 'true'): " IN; echo $IN)}
     helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
     helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
+}
+
+function mctry()
+{
+    backupToTry=${1}
+    helm template -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${backupToTry} minecraft-server-charts/minecraft >/tmp/tmp-output.yaml
+    helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${backupToTry} minecraft-server-charts/minecraft
 }

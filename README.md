@@ -79,7 +79,7 @@ helm delete my-first-mc
 |description    | link |
 |---------------|------|
 |itgz minecraft image:          |  https://github.com/itzg/docker-minecraft-server |
-|itgz helm chart:               |  https://artifacthub.io/packages/helm/minecraft-server-charts/ |minecraft
+|itgz helm chart:               |  https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft |
 |K3S:                           |  https://k3s.io/ |
 |Helm:                          |  https://helm.sh |
 |kubectl:                       |  https://kubernetes.io/docs/reference/kubectl/overview/ |

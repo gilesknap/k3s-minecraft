@@ -63,7 +63,7 @@ minecraftServer:
 extraEnv:
   # if this is true then minecraftServer properties above are always applied
   # on every restart, if false they only apply at first run
-  OVERRIDE_SERVER_PROPERTIES: yes
+  OVERRIDE_SERVER_PROPERTIES: true
   # if this is true then downloadWorldUrl is always loaded on restart
   # useful for resetting the world but should be reset to false afterwards
   # WARNING: setting this to true deletes your previous world data
