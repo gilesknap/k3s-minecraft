@@ -3,27 +3,10 @@
 
 if [  "$0" == "${BASH_SOURCE[0]}" ]
 then
-  echo "this script must be sourced to work"
+  echo "this script must be sourced to work, e.g.:"
+  echo "  source mc-k8s.sh"
   exit 1
 fi
-
-if [[ ! -z "${1}" ]]
-then
-  MCPASSWD="${1}"
-fi
-if [ -z ${MCPASSWD} ]
-then
-  echo "please supply an rcon password as the first parameter or set MCPASSWD"
-  exit 1
-fi
-
-if [ -z "${MCBACKUP}" ]
-then
-  echo "please export MCBACKUP=<your mc backup folder>"
-  exit 1
-fi
-
-ns="minecraft"
 
 export HELM_EXPERIMENTAL_OCI=1
 source <(helm completion bash)
@@ -31,7 +14,7 @@ source <(kubectl completion bash)
 
 function mclist()
 {
-    kubectl get deployment -n ${ns} -o "custom-columns=MC SERVER NAME:metadata.annotations.meta\.helm\.sh/release-name,RUNNING:status.replicas"
+    kubectl get deployment -n minecraft -o "custom-columns=MC SERVER NAME:metadata.annotations.meta\.helm\.sh/release-name,RUNNING:status.replicas"
 }
 
 function mccheckname()
@@ -39,7 +22,7 @@ function mccheckname()
     export pod=""
     export shortname="${1}"
     export deployname="${1}"-minecraft
-    deploy=$(kubectl get deploy -n ${ns} -l app="${deployname}" -o name)
+    deploy=$(kubectl get deploy -n minecraft -l app="${deployname}" -o name)
 
     if [ -z "${deploy}"  ]; then
         echo "please supply one of the following minecraft server names "
@@ -50,6 +33,22 @@ function mccheckname()
     export pod=$(kubectl get pods -l app=${deployname} -o name)
 }
 
+function mccheck ()
+{
+    mccheckname "${1}"
+
+    if [ ${pod} ]; then
+        output=$(kubectl exec -n minecraft ${pod} -- /health.sh)
+        echo "${output}"
+        # a good result contains a motd
+        if [[ "${output}" == *"motd"* ]]; then
+          return 0
+        fi
+    fi
+    return 1
+}
+
+
 function mcstart()
 {
     mccheckname "${1}"
@@ -58,10 +57,10 @@ function mcstart()
         # the server is not running, spin it up
         export was_shutdown=true
 
-        kubectl scale -n ${ns} ${deploy} --replicas=1
+        kubectl scale -n minecraft ${deploy} --replicas=1
 
         echo "starting ${deploy} ..."
-        while [[ $(kubectl get -n ${ns} pods -l app="${deployname}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]
+        while [[ $(kubectl get -n minecraft pods -l app="${deployname}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]
         do
             sleep 1
         done
@@ -69,31 +68,34 @@ function mcstart()
         export pod=$(kubectl get pods -l app=${deployname} -o name)
 
         echo "waiting for minecraft server ..."
-        while [[ "$(kubectl exec -n ${ns} ${pod} -- /health.sh 2>/dev/null)" != *"motd"* ]]
+        while ! mccheck ${1}
         do
             sleep 1
         done
     else
+        echo ${1} is running
         export was_shutdown=false
     fi
 }
 
 function mcbackup()
 {
+    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
+
     mcstart "${1}"
 
-    if [[ ! -z ${pod} ]]
+    if [[ ${pod} ]]
     then
         tarname=$(date +%Y-%m-%d-%X)-${shortname}.tz
 
-        kubectl exec -n ${ns} ${pod} -- rcon-cli save-off
-        kubectl exec -n ${ns} ${pod} -- rcon-cli save-all
-        kubectl exec -n ${ns} ${pod} -- tar -czv --exclude='data/logs' /data > ${MCBACKUP}/${tarname}
-        kubectl exec -n ${ns} ${pod} -- rcon-cli save-on
+        kubectl exec -n minecraft ${pod} -- rcon-cli save-off
+        kubectl exec -n minecraft ${pod} -- rcon-cli save-all
+        kubectl exec -n minecraft ${pod} -- tar -czv --exclude='data/logs' /data > ${MCBACKUP}/${tarname}
+        kubectl exec -n minecraft ${pod} -- rcon-cli save-on
 
         if [ "${was_shutdown}" == "true" ]; then
             echo "stopping ${deploy} ..."
-            kubectl scale -n ${ns} ${deploy} --replicas=0
+            kubectl scale -n minecraft ${deploy} --replicas=0
         fi
     fi
 }
@@ -102,9 +104,13 @@ function mcstop()
 {
     mccheckname "${1}"
 
-    if [[ ! -z ${deploy} ]]
+    if [[ ${deploy} ]]
     then
-        kubectl scale --replicas=0 ${deploy}
+        if ! mccheck ${1}; then
+          echo "${1} is not running"
+        else
+          kubectl scale --replicas=0 ${deploy}
+        fi
     fi
 }
 
@@ -112,7 +118,7 @@ function mclog()
 {
     mccheckname "${1}"
 
-    if [[ ! -z ${deploy} ]]
+    if [[ ${deploy} ]]
     then
         kubectl logs ${deploy}
     fi
@@ -123,6 +129,8 @@ function mcdeploy()
     filename="${1}"
     base=$(basename ${filename})
     releasename="${base%.*}"
+    MCPASSWD=${MCPASSWD:-$(read -p "password for rcon: " IN; echo $IN)}
+    MCEULA=${MCEULA:-$(read -p "agree to minecraft EULA? (type 'true'): " IN; echo $IN)}
     helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-    helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=true,rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
+    helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
 }
