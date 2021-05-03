@@ -68,7 +68,7 @@ THAT IS ALL! You should see a minecraft server spin up with your server address
 and the port you specified in myfirst-mc.yaml.
 
 You can edit the yaml and repeat the above command to update settings without
-deleting your world data. You can remove the minecraft server,e including world
+deleting your world data. You can remove the minecraft server including world
 data with:
 ```
 helm delete my-first-mc
