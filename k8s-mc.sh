@@ -22,39 +22,39 @@ function mclist()
 
 function mccheckname()
 {
+    unset pod deploy
+
     if [ -z "${1}" ]; then
       echo 'please supply an mc server name'
       return 1
     fi
 
-    unset pod
+    shortname="${1}"
     deployname="${1}"-minecraft
     deploy=$(kubectl get deploy -n minecraft -l app="${deployname}" -o name)
 
     if [ -z "${deploy}"  ]; then
         echo "${1} does not exist. Please use one of the following names:"
+        echo
         mclist
         return 1
     fi
 
+    # if there is a pod associated with the app name then set $pod to its name
     pod=$(kubectl get pods -l app=${deployname} -o name)
-
-    if [ "${pod}" ]; then
-        return 0
-    else
-      # 2 means the server name exists but has no pod running
-      return 2
-    fi
 }
 
 function mccheck ()
 {
     if mccheckname "${1}" ; then
-        output=$(kubectl exec -n minecraft ${pod} -- /health.sh)
-        echo "${output}"
-        # a good result contains a motd
-        if [[ "${output}" == *"motd"* ]]; then
-          return 0
+        if [ ${pod} ]; then
+            # the pod is running - check the state of minecraft server
+            output=$(kubectl exec -n minecraft ${pod} -- /health.sh)
+            echo "${output}"
+            # a good result contains a motd
+            if [[ "${output}" == *"motd"* ]]; then
+                return 0
+            fi
         fi
     fi
     return 1
@@ -63,9 +63,12 @@ function mccheck ()
 
 function mcstart()
 {
-    mccheckname "${1}"
 
-    if [ -z "${pod}" ]; then
+    if mccheck "${1}" ; then
+        echo "${1}" is already running
+        export was_shutdown=false
+    else
+      if [ ${pod} ]; then
         # the server is not running, spin it up
         was_shutdown=true
 
@@ -84,26 +87,27 @@ function mcstart()
         do
             sleep 1
         done
-    else
-        if [ "${deploy}" ]; then
-            echo ${1} is already running
-            export was_shutdown=false
-        fi
+        was_shutdown=false
+      fi
     fi
 }
 
 function mcbackup()
 {
+    # TODO WORK IN PROGRESS switching to zip
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
 
     mcstart "${1}"
 
-    if [[ "${pod}" ]]; then
-        tarname=$(date +%Y-%m-%d-%X)-${shortname}.tz
+    if [ "${pod}" ]; then
+        zipname=$(date +%Y-%m-%d-%X)-${shortname}.zip
 
         kubectl exec -n minecraft ${pod} -- rcon-cli save-off
         kubectl exec -n minecraft ${pod} -- rcon-cli save-all
-        kubectl exec -n minecraft ${pod} -- tar -czv --exclude='data/logs' /data > ${MCBACKUP}/${tarname}
+        tmp_dir=$(mktemp -d)
+        kubectl cp -n minecraft ${pod}:/data/ ${tmp_dir}
+        zip ${MCBACKUP}/${zipname} ${tmp_dir}
+        rm -r ${tmp_dir}
         kubectl exec -n minecraft ${pod} -- rcon-cli save-on
 
         if [ "${was_shutdown}" == "true" ]; then

@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../minecraft-server-charts"
+		},
+		{
+			"path": "../docker-minecraft-server"
+		}
+	],
+    "settings": {}
+}
