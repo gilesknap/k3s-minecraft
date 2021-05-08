@@ -14,29 +14,22 @@ export HELM_EXPERIMENTAL_OCI=1
 source <(helm completion bash)
 source <(kubectl completion bash)
 
-format=custom-columns=Name:metadata.labels.app\
-,GameMode:spec.containers[0].env[22].value\
-,Server:spec.nodeName\
-,IP:status.hostIP\
-,Rcon:spec.containers[0].ports[0].containerPort
+format=custom-columns=\
+Name:metadata.labels.release\
+,GameMode:spec.template.spec.containers[0].env[22].value\
+,Server:'spec.template.spec.nodeSelector.kubernetes\.io/hostname'\
+,Rcon:spec.template.spec.containers[0].ports[1].containerPort\
+,Running:status.availableReplicas
 
 function mclist()
 {
     # list the minecraft servers deployed in the cluster with useful status info
-    echo == Running Minecraft Servers ==
-    # filter out svclb pods (which all have pod-template-generation=1
-    # meh - really I should fix the helm chart to label the MC pods)
-    kubectl -n minecraft get pods -l pod-template-generation!=1 -o $format
+
+    kubectl -n minecraft get deploy -o $format
     echo
-    # incredibly I cant see how to filter deployments on no. of replicas so do a loop
-    echo == Idle Minecraft Servers ==
-    for d in $(kubectl -n minecraft get deploy -o name)
-    do
-        if [ "$(kubectl get ${d} -o jsonpath={.status.replicas})" != "1" ]
-        then
-          kubectl get ${d} -o jsonpath='{.metadata.labels.app}{"\n"}'
-        fi
-    done
+        # if [ "$(kubectl get ${d} -o jsonpath={.status.replicas})" != "1"
+        #   kubectl get ${d} -o jsonpath='{.metadata.labels.app}{"\n"}'
+
 }
 
 function mccheckname()
@@ -197,6 +190,21 @@ function mcdeploy()
     MCEULA=${MCEULA:-$(read -p "agree to minecraft EULA? (type 'true'): " IN; echo $IN)}
     helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
     helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
+}
+
+function mcrestore()
+{
+    filename="${1}"
+    backupFile="${2}"
+
+    restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${backupFile},minecraftServer.eula=true"
+
+    echo $restore_settings
+
+    base=$(basename ${filename})
+    releasename="${base%.*}"
+    helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+    helm upgrade ${releasename} -f ${filename} ${restore_settings} minecraft-server-charts/minecraft
 }
 
 function mctry()
