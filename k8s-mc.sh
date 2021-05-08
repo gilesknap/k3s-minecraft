@@ -68,7 +68,7 @@ function mcstart()
         echo "${1}" is already running
         export was_shutdown=false
     else
-      if [ ${pod} ]; then
+      if [ ${deploy} ]; then
         # the server is not running, spin it up
         was_shutdown=true
 
@@ -87,7 +87,6 @@ function mcstart()
         do
             sleep 1
         done
-        was_shutdown=false
       fi
     fi
 }
@@ -105,10 +104,10 @@ function mcbackup()
         kubectl exec -n minecraft ${pod} -- rcon-cli save-off
         kubectl exec -n minecraft ${pod} -- rcon-cli save-all
         tmp_dir=$(mktemp -d)
-        kubectl cp -n minecraft ${pod}:/data/ ${tmp_dir}
-        zip ${MCBACKUP}/${zipname} ${tmp_dir}
+        kubectl -n minecraft cp ${pod#pod/}:/data ${tmp_dir}
+        zip -r ${MCBACKUP}/${zipname} ${tmp_dir}
         rm -r ${tmp_dir}
-        kubectl exec -n minecraft ${pod} -- rcon-cli save-on
+        kubectl -n minecraft exec ${pod} -- rcon-cli save-on
 
         if [ "${was_shutdown}" == "true" ]; then
             echo "stopping ${deploy} ..."
@@ -148,7 +147,8 @@ function mcstop()
 function mclog()
 {
     if mccheckname "${1}"; then
-        kubectl logs ${deploy}
+        shift
+        kubectl logs ${deploy} ${*}
     fi
 }
 

@@ -137,7 +137,7 @@ Use the script included in this repo to do backups and save typing for
 a few other commands. See the functions in mc-k8.sh for details, some examples
 below:
 ```
-$ source mc-k8s.sh
+$ source k8s-mc.sh
 
 $ mclist
 MC SERVER NAME      RUNNING
