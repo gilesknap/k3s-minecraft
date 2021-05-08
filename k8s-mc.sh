@@ -14,14 +14,36 @@ export HELM_EXPERIMENTAL_OCI=1
 source <(helm completion bash)
 source <(kubectl completion bash)
 
+format=custom-columns=Name:metadata.labels.app\
+,GameMode:spec.containers[0].env[22].value\
+,Server:spec.nodeName\
+,IP:status.hostIP\
+,Rcon:spec.containers[0].ports[0].containerPort
+
 function mclist()
 {
-    # todo split into running and idle with extra info like node for running severs
-    kubectl get deployment -n minecraft -o "custom-columns=MC SERVER NAME:metadata.annotations.meta\.helm\.sh/release-name,RUNNING:status.replicas"
+    # list the minecraft servers deployed in the cluster with useful status info
+    echo == Running Minecraft Servers ==
+    # filter out svclb pods (which all have pod-template-generation=1
+    # meh - really I should fix the helm chart to label the MC pods)
+    kubectl -n minecraft get pods -l pod-template-generation!=1 -o $format
+    echo
+    # incredibly I cant see how to filter deployments on no. of replicas so do a loop
+    echo == Idle Minecraft Servers ==
+    for d in $(kubectl -n minecraft get deploy -o name)
+    do
+        if [ "$(kubectl get ${d} -o jsonpath={.status.replicas})" != "1" ]
+        then
+          kubectl get ${d} -o jsonpath='{.metadata.labels.app}{"\n"}'
+        fi
+    done
 }
 
 function mccheckname()
 {
+    # verify that a minecraft server name exists in the cluster
+    # set pod to the name of the pod it is running in if it is active
+    # set deploy to the name of its deployment
     unset pod deploy
 
     if [ -z "${1}" ]; then
@@ -46,6 +68,8 @@ function mccheckname()
 
 function mccheck ()
 {
+    # verify that a minecraft server is running
+    # checks that the pod is active and checks the health of the server
     if mccheckname "${1}" ; then
         if [ ${pod} ]; then
             # the pod is running - check the state of minecraft server
@@ -93,7 +117,7 @@ function mcstart()
 
 function mcbackup()
 {
-    # TODO WORK IN PROGRESS switching to zip
+    # backup a minecraft server to a zip file
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
 
     mcstart "${1}"
@@ -128,6 +152,9 @@ function mcbackup()
 
 function mcexec()
 {
+    # execute bash in the container for server $1
+    # for debugging and also can directly edit server.properties
+
     if mccheck ${1}; then
       kubectl exec -it ${deploy} -- bash
     else
@@ -137,6 +164,7 @@ function mcexec()
 
 function mcstop()
 {
+    # stop the minecraft server named $1
     if mccheck ${1}; then
       kubectl scale --replicas=0 ${deploy}
     else
@@ -146,6 +174,8 @@ function mcstop()
 
 function mclog()
 {
+    # see the server log for server $1
+    # add -f to attach to the log stream
     if mccheckname "${1}"; then
         shift
         kubectl logs ${deploy} ${*}
@@ -154,6 +184,12 @@ function mclog()
 
 function mcdeploy()
 {
+    # deploy a minecraft server based on the helm chart override values in file $1
+    # the release name (used by all mc functions in this script to identify server)
+    # is taken from the basename of the file
+    # To use: copy minecraft-helm.yaml to my-new-server-name.yaml and edit it as
+    # required, then mcdeploy my-new-server-name.yaml
+
     filename="${1}"
     base=$(basename ${filename})
     releasename="${base%.*}"
@@ -165,6 +201,8 @@ function mcdeploy()
 
 function mctry()
 {
+    # try out a world backup in the 'tmp' deployment
+    # overwrites the previous tmp deployment with the world defined in a zip or folder provided in $1
     backupToTry=${1}
     helm template -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${backupToTry} minecraft-server-charts/minecraft >/tmp/tmp-output.yaml
     helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${backupToTry} minecraft-server-charts/minecraft
