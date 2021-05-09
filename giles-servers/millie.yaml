@@ -1,0 +1,40 @@
+minecraftServer:
+  rcon:
+    enabled: false
+    port: 31701
+  version: LATEST
+  servicePort: 31700
+  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
+  motd: "The Soj"
+  gameMode: spectator
+  whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
+  ops: TransformerScorn,DispenserAD11
+  forcegameMode: true
+  maxWorldSize: 29999984
+  serviceType: LoadBalancer
+  viewDistance: 32
+
+extraEnv:
+  ENABLE_ROLLING_LOGS: true
+  OVERRIDE_SERVER_PROPERTIES: true
+  FORCE_WORLD_COPY: false
+
+persistence:
+  annotations: {}
+  dataDir:
+    enabled: true
+    Size: 1Gi
+
+nodeSelector:
+  kubernetes.io/hostname: gknuc
+
+extraVolumes:
+  - volumeMounts:
+      - name: bigdisk
+        mountPath: /mnt/bigdisk
+        readOnly: true
+    volumes:
+      - name: bigdisk
+        nfs:
+          server: 192.168.86.32
+          path: /mnt/bigdisk
