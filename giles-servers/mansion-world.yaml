@@ -1,0 +1,38 @@
+minecraftServer:
+  rcon:
+    enabled: false
+    port: 31301
+  servicePort: 31300
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/mansion-world.zip
+  motd: "Noah and Dads early creative Mansion World, with Iron Golem Grandad"
+  gameMode: creative
+  whitelist: TransformerScorn,DispenserAD11
+  ops: TransformerScorn,DispenserAD11
+  forcegameMode: true
+  maxWorldSize: 29999984
+  serviceType: LoadBalancer
+
+extraEnv:
+  ENABLE_ROLLING_LOGS: true
+  OVERRIDE_SERVER_PROPERTIES: false
+  FORCE_WORLD_COPY: false
+
+persistence:
+  annotations: {}
+  dataDir:
+    enabled: true
+    Size: 1Gi
+
+nodeSelector:
+  kubernetes.io/hostname: gknuc
+
+extraVolumes:
+  - volumeMounts:
+      - name: bigdisk
+        mountPath: /mnt/bigdisk
+        readOnly: true
+    volumes:
+      - name: bigdisk
+        nfs:
+          server: 192.168.86.32
+          path: /mnt/bigdisk

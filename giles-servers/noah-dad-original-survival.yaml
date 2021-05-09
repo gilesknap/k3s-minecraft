@@ -1,0 +1,72 @@
+# Common minecraft server settings
+minecraftServer:
+  # version: 1.14.4
+  whitelist: TransformerScorn,DispenserAD11
+  ops: TransformerScorn
+  # always set game mode when a player connects
+  forcegameMode: true
+  # choose a seed for the starting world
+  levelSeed:
+  # size of the world in blocks radius from spawn point (default is 29999984)
+  maxWorldSize: 29999984
+  # default game mode for players creative,adventure,survival or spectator
+  gameMode: survival
+  # message in the launcher
+  motd: "Noah and Dad's first ever world"
+  # player vs player enabled
+  pvp: false
+  # REQUIRED this means you get the node IP address (with default K3s loadbalancer)
+  serviceType: LoadBalancer
+  # restore the world from a backup on first execution (requires NFS volume - see below)
+  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups//2021-05-01.23-25.DadNoahSurvival.GilesWorld.zip
+  # external port must be unique across all mc server instances on a given node
+  servicePort: 31200
+  # how far from the player are chunks rendered on the server
+  # 10 is default, larger is nice on high spec hardware
+  # I believe 25 is the client max so larger is wasted
+  viewDistance: 25
+
+  rcon:
+    # enable rcon for remote control - set to false if not required
+    enabled: true
+    # external port must be unique across all mc server instances
+    port: 31201
+    password: "TODO - supply this as an override on the command line "
+
+extraVolumes:
+  # define where the volume mounts in the container
+  - volumeMounts:
+      - name: bigdisk
+        mountPath: /mnt/bigdisk
+        readOnly: true
+    # define the remote nfs mount to attach to above
+    volumes:
+      - name: bigdisk
+        nfs:
+          server: 192.168.86.32
+          path: /mnt/bigdisk
+
+extraEnv:
+  # recommended rolling logs for saving disk
+  ENABLE_ROLLING_LOGS: true
+  # if this is true then minecraftServer properties above are always applied
+  # on every restart, if false they only apply at first run
+  OVERRIDE_SERVER_PROPERTIES: true
+  # if this is true then downloadWorldUrl is always loaded on restart
+  # useful for resetting the world but should be reset to false afterwards
+  # WARNING: setting this to true deletes your previous world data
+  FORCE_WORLD_COPY: false
+
+# required to save the world in persistant local-path storage (k3s default Storage Class)
+# by defualt this goes in /var/lib/rancher/k3s/storage on the executing node.
+# NOTE this ties the deployment to the first node it spins up on,
+# we could perhaps use an NFS mount to avoid this
+persistence:
+  annotations: {}
+  dataDir:
+    enabled: true
+    Size: 1Gi
+
+# UNCOMMENT to choose which node to run on
+nodeSelector:
+  kubernetes.io/hostname: gknuc
