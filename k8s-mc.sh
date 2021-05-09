@@ -210,14 +210,18 @@ function mcrestore()
     filename="${1}"
     backupFile="${2}"
 
-    restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${backupFile},minecraftServer.eula=true"
+    if mcvalidyaml ${filename}; then
+        restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${backupFile},minecraftServer.eula=true"
 
-    echo $restore_settings
+        echo $restore_settings
 
-    base=$(basename ${filename})
-    releasename="${base%.*}"
-    helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-    helm upgrade ${releasename} -f ${filename} ${restore_settings} minecraft-server-charts/minecraft
+        base=$(basename ${filename})
+        releasename="${base%.*}"
+        helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+        helm upgrade ${releasename} -f ${filename} ${restore_settings} minecraft-server-charts/minecraft
+    else
+        echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
+    fi
 }
 
 function mctry()
