@@ -360,7 +360,9 @@ function k8s-mchelp()
         -f = attach to the log and monitor it
 
     k8s-mcdeploy <my_server_def.yaml>
-        deploys a server to the cluster with release name my_server_def
+        deploys a server to the cluster with release name my_server_def and
+        with values overrides from my_server_def.yaml
+
         recommended: copy and edit minecraft-helm.yaml for most common options,
         see in file comments for details.
 
