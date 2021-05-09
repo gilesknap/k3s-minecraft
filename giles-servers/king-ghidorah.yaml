@@ -5,7 +5,7 @@ minecraftServer:
   servicePort: 31500
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/king-ghidorah.zip
   motd: "The Three Headed Monster!"
-  gameMode: creative
+  gameMode: survival
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
   ops: TransformerScorn,DispenserAD11
   forcegameMode: true
