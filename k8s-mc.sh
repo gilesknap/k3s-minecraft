@@ -21,6 +21,15 @@ Name:metadata.labels.release\
 ,Rcon:spec.template.spec.containers[0].ports[1].containerPort\
 ,Running:status.availableReplicas
 
+function mcvalidyaml()
+{
+    if [[ $(helm template -f "${1}"  minecraft-server-charts/minecraft) == *NAME-minecraft* ]]
+    then
+      return 0
+    fi
+    return 1
+}
+
 function mclist()
 {
     # list the minecraft servers deployed in the cluster with useful status info
@@ -184,12 +193,16 @@ function mcdeploy()
     # required, then mcdeploy my-new-server-name.yaml
 
     filename="${1}"
-    base=$(basename ${filename})
-    releasename="${base%.*}"
-    MCPASSWD=${MCPASSWD:-$(read -p "password for rcon: " IN; echo $IN)}
-    MCEULA=${MCEULA:-$(read -p "agree to minecraft EULA? (type 'true'): " IN; echo $IN)}
-    helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-    helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
+    if mcvalidyaml ${filename}; then
+        base=$(basename ${filename})
+        releasename="${base%.*}"
+        MCPASSWD=${MCPASSWD:-$(read -p "password for rcon: " IN; echo $IN)}
+        MCEULA=${MCEULA:-$(read -p "agree to minecraft EULA? (type 'true'): " IN; echo $IN)}
+        helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+        helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
+    else
+        echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
+    fi
 }
 
 function mcrestore()
@@ -212,6 +225,5 @@ function mctry()
     # try out a world backup in the 'tmp' deployment
     # overwrites the previous tmp deployment with the world defined in a zip or folder provided in $1
     backupToTry=${1}
-    helm template -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${backupToTry} minecraft-server-charts/minecraft >/tmp/tmp-output.yaml
     helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${backupToTry} minecraft-server-charts/minecraft
 }
