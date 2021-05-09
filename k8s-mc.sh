@@ -23,8 +23,18 @@ Name:metadata.labels.release\
 
 function mcvalidyaml()
 {
+    # verify that a yaml file is a valid helm substitution
     if [[ $(helm template -f "${1}"  minecraft-server-charts/minecraft) == *NAME-minecraft* ]]
     then
+      return 0
+    fi
+    return 1
+}
+
+function mcvalidbackup()
+{
+    # verify that a minecraft backup is valid (or at least looks valid)
+    if grep -iq "level.dat" < <( unzip -l "${1}" 2>/dev/null); then
       return 0
     fi
     return 1
@@ -115,6 +125,13 @@ function mcstart()
         done
       fi
     fi
+}
+
+function mcbackups()
+{
+    # backup a minecraft server to a zip file
+    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
+    ls ${MCBACKUP}
 }
 
 function mcbackup()
@@ -210,8 +227,15 @@ function mcrestore()
     filename="${1}"
     backupFile="${2}"
 
+    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
+
+    if ! mcvalidbackup ${MCBACKUP}/$backupFile; then
+        echo "please name a valid zipped minecraft save from ${MCBACKUP} as a parameter 2"
+        return 1
+    fi
+
     if mcvalidyaml ${filename}; then
-        restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${backupFile},minecraftServer.eula=true"
+        restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${MCBACKUP}/${backupFile},minecraftServer.eula=true"
 
         echo $restore_settings
 
@@ -229,5 +253,12 @@ function mctry()
     # try out a world backup in the 'tmp' deployment
     # overwrites the previous tmp deployment with the world defined in a zip or folder provided in $1
     backupToTry=${1}
-    helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${backupToTry} minecraft-server-charts/minecraft
+
+    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
+
+    if ! mcvalidbackup ${MCBACKUP}/${backupToTry}; then
+        echo "please supply a valid zipped minecraft save as a parameter 2"
+        return 1
+    fi
+    helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${MCBACKUP}/${backupToTry} minecraft-server-charts/minecraft
 }
