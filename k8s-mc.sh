@@ -18,7 +18,7 @@ source <(kubectl completion bash)
 ## Helper Functions
 ###############################################################################
 
-function mccheckname()
+function k8s-mccheckname()
 {
     # verify that a minecraft server name exists in the cluster
     # set pod to the name of the pod it is running in if it is active
@@ -37,7 +37,7 @@ function mccheckname()
     if [ -z "${deploy}"  ]; then
         echo "${1} does not exist. Please use one of the following names:"
         echo
-        mclist
+        k8s-mclist
         return 1
     fi
 
@@ -45,11 +45,11 @@ function mccheckname()
     pod=$(kubectl get pods -l app=${deployname} -o name)
 }
 
-function mccheck ()
+function k8s-mccheck ()
 {
     # verify that a minecraft server is running
     # checks that the pod is active and checks the health of the server
-    if mccheckname "${1}" ; then
+    if k8s-mccheckname "${1}" ; then
         if [ ${pod} ]; then
             # the pod is running - check the state of minecraft server
             output=$(kubectl exec -n minecraft ${pod} -- /health.sh)
@@ -62,7 +62,7 @@ function mccheck ()
     fi
     return 1
 }
-function mcvalidyaml()
+function k8s-mcvalidyaml()
 {
     # verify that a yaml file is a valid helm substitution
     if [[ $(helm template -f "${1}"  minecraft-server-charts/minecraft) == *NAME-minecraft* ]]
@@ -72,25 +72,25 @@ function mcvalidyaml()
     return 1
 }
 
-function mcvalidbackup()
+function k8s-mcvalidbackup()
 {
     # verify that a minecraft backup is valid (or at least has a level.dat file)
-    mcbackupFileName="${1}"
+    k8smcbackupFileName="${1}"
 
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
 
-    case "${mcbackupFileName}" in
+    case "${k8smcbackupFileName}" in
     /*)
         # full path with leading slash - leave it alone
         ;;
     *)
-        mcbackupFileName=${MCBACKUP}/"${mcbackupFileName}"
+        k8smcbackupFileName=${MCBACKUP}/"${k8smcbackupFileName}"
         ;;
     esac
 
-    case "${mcbackupFileName}" in
+    case "${k8smcbackupFileName}" in
     *.zip)
-        if grep -iq "level.dat" < <( unzip -l "${mcbackupFileName}" 2>/dev/null); then
+        if grep -iq "level.dat" < <( unzip -l "${k8smcbackupFileName}" 2>/dev/null); then
             return 0
         fi
         ;;
@@ -105,6 +105,29 @@ function mcvalidbackup()
     return 1
 }
 
+function k8s-mcwait()
+{
+    # block until an mc server has good health
+
+    # first wait for the pod to be active
+    while [[ $(kubectl get -n minecraft pods -l app="${deployname}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]
+    do
+        sleep 1
+    done
+
+    # get the pod name
+    pod=$(kubectl get pods -l app=${deployname} -o name)
+
+    # wait for the mc server to be healthy
+    echo "waiting for minecraft server ${1}"
+    if k8s-mccheckname ${1}; then
+      while ! k8s-mccheck 2>/dev/null ${1}
+        do
+            sleep 1
+        done
+    fi
+}
+
 ###############################################################################
 ## User Functions
 ###############################################################################
@@ -116,32 +139,29 @@ NAME:metadata.labels.release\
 ,SERVER:'spec.template.spec.nodeSelector.kubernetes\.io/hostname'\
 ,RUNNING:status.availableReplicas
 
-function mclist()
+function k8s-mclist()
 {
     # list the minecraft servers deployed in the cluster with useful status info
 
     kubectl -n minecraft get deploy -o $format
     echo
-        # if [ "$(kubectl get ${d} -o jsonpath={.status.replicas})" != "1"
-        #   kubectl get ${d} -o jsonpath='{.metadata.labels.app}{"\n"}'
-
 }
 
 portsformat=custom-columns=\
 PORT:spec.template.spec.containers[0].ports[0].containerPort,\
 NAME:metadata.ownerReferences[0].name
 
-function mcports()
+function k8s-mcports()
 {
   # list all server and rcon ports
   kubectl -n minecraft get daemonsets.apps -o ${portsformat}\
     --sort-by=.spec.template.spec.containers[0].ports[0].containerPort
 }
 
-function mcstart()
+function k8s-mcstart()
 {
 
-    if mccheck "${1}" ; then
+    if k8s-mccheck "${1}" ; then
         echo "${1}" is already running
         export was_shutdown=false
     else
@@ -149,39 +169,90 @@ function mcstart()
         # the server is not running, spin it up
         was_shutdown=true
 
+        echo "starting ${deploy} ..."
         kubectl scale -n minecraft ${deploy} --replicas=1
 
-        echo "starting ${deploy} ..."
-        while [[ $(kubectl get -n minecraft pods -l app="${deployname}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]
-        do
-            sleep 1
-        done
-
-        pod=$(kubectl get pods -l app=${deployname} -o name)
-
-        echo "waiting for minecraft server ..."
-        while ! mccheck ${1}
-        do
-            sleep 1
-        done
+        k8s-mcwait ${1}
       fi
     fi
 }
 
-function mcbackups()
+function k8s-mcstop()
 {
-    # backup a minecraft server to a zip file
+    # stop the minecraft server named $1
+    if k8s-mccheck ${1}; then
+      kubectl scale --replicas=0 ${deploy}
+    else
+        echo "${1} is not running"
+    fi
+}
+
+function k8s-mcexec()
+{
+    # execute bash in the container for server $1
+    # for debugging and also can directly edit server.properties
+
+    if k8s-mccheck ${1}; then
+      kubectl exec -it ${deploy} -- bash
+    else
+        echo "${1} is not running"
+    fi
+}
+
+function k8s-mclog()
+{
+    # see the server log for server $1
+    # add -f to attach to the log stream
+    if k8s-mccheckname "${1}"; then
+        shift
+        kubectl logs ${deploy} ${*}
+    fi
+}
+
+function k8s-mcdeploy()
+{
+    # deploy a minecraft server based on the helm chart override values in file $1
+    # the release name (used by all k8s-mc functions in this script to identify server)
+    # is taken from the basename of the file
+    # To use: copy minecraft-helm.yaml to my-new-server-name.yaml and edit it as
+    # required, then k8s-mcdeploy my-new-server-name.yaml
+
+    filename="${1}"
+    if k8s-mcvalidyaml ${filename}; then
+        base=$(basename ${filename})
+        releasename="${base%.*}"
+        MCPASSWD=${MCPASSWD:-$(read -p "password for rcon: " IN; echo $IN)}
+        MCEULA=${MCEULA:-$(read -p "agree to minecraft EULA? (type 'true'): " IN; echo $IN)}
+        helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+        helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
+        k8s-mcwait $releasename
+    else
+        echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
+    fi
+}
+
+###############################################################################
+## Backup and Restore Functions
+###############################################################################
+
+function k8s-mcbackups()
+{
+    # list the backups in the $MCBACKUP folder
+
+    # you can refer to these in k8s-mcrestore or k8s-mcbackup
+    # without using full path
+
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
     echo "MCBACKUP folder is ${MCBACKUP}"
     ls -R ${MCBACKUP}
 }
 
-function mcbackup()
+function k8s-mcbackup()
 {
     # backup a minecraft server to a zip file
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
 
-    mcstart "${1}"
+    k8s-mcstart "${1}"
 
     if [ "${pod}" ]; then
         zipname=$(date +%Y-%m-%d-%X)-${shortname}.zip
@@ -200,71 +271,7 @@ function mcbackup()
         fi
     fi
 }
-
-# function mcwait()
-# {
-#     if [[ mccheckname ${1} != 1 ]]; then
-#       while ! mccheck ${1}
-#         do
-#             sleep 1
-#         done
-#     fi
-# }
-
-function mcexec()
-{
-    # execute bash in the container for server $1
-    # for debugging and also can directly edit server.properties
-
-    if mccheck ${1}; then
-      kubectl exec -it ${deploy} -- bash
-    else
-        echo "${1} is not running"
-    fi
-}
-
-function mcstop()
-{
-    # stop the minecraft server named $1
-    if mccheck ${1}; then
-      kubectl scale --replicas=0 ${deploy}
-    else
-        echo "${1} is not running"
-    fi
-}
-
-function mclog()
-{
-    # see the server log for server $1
-    # add -f to attach to the log stream
-    if mccheckname "${1}"; then
-        shift
-        kubectl logs ${deploy} ${*}
-    fi
-}
-
-function mcdeploy()
-{
-    # deploy a minecraft server based on the helm chart override values in file $1
-    # the release name (used by all mc functions in this script to identify server)
-    # is taken from the basename of the file
-    # To use: copy minecraft-helm.yaml to my-new-server-name.yaml and edit it as
-    # required, then mcdeploy my-new-server-name.yaml
-
-    filename="${1}"
-    if mcvalidyaml ${filename}; then
-        base=$(basename ${filename})
-        releasename="${base%.*}"
-        MCPASSWD=${MCPASSWD:-$(read -p "password for rcon: " IN; echo $IN)}
-        MCEULA=${MCEULA:-$(read -p "agree to minecraft EULA? (type 'true'): " IN; echo $IN)}
-        helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-        helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
-    else
-        echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
-    fi
-}
-
-function mcrestore()
+function k8s-mcrestore()
 {
     # restore a backup into an exisitng server deployment
 
@@ -278,13 +285,13 @@ function mcrestore()
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
 
-        if ! mcvalidbackup ${2}; then
+        if ! k8s-mcvalidbackup ${2}; then
             echo "please name a valid zipped minecraft save from ${MCBACKUP} as a parameter 2"
             return 1
         fi
 
-        if mcvalidyaml ${filename}; then
-            restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${mcbackupFileName},minecraftServer.eula=true"
+        if k8s-mcvalidyaml ${filename}; then
+            restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${k8smcbackupFileName},minecraftServer.eula=true"
 
             echo $restore_settings
 
@@ -292,20 +299,29 @@ function mcrestore()
             releasename="${base%.*}"
             helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
             helm upgrade ${releasename} -f ${filename} ${restore_settings} minecraft-server-charts/minecraft
+
+            # reset the FORCE_WORLD_COPY so future changes will be preserved on restart
+            k8s-mcwait ${releasename}
+            kubectl set env deployments.apps/${releasename}-minecraft FORCE_WORLD_COPY=false
         else
             echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
         fi
     fi
 }
 
-function mctry()
+###############################################################################
+## Experimental
+###############################################################################
+
+function k8s-mctry()
 {
     # try out a world backup in the 'tmp' deployment
     # overwrites the previous tmp deployment with the world defined in a zip or folder provided in $1
 
-    if ! mcvalidbackup "${1}"; then
+    if ! k8s-mcvalidbackup "${1}"; then
         echo "please supply a valid zipped minecraft save as a parameter 1"
         return 1
     fi
-    helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${mcbackupFileName} minecraft-server-charts/minecraft
+    helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${k8smcbackupFileName} minecraft-server-charts/minecraft
+    k8s-mcwait tmp
 }
