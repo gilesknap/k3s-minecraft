@@ -325,3 +325,55 @@ function k8s-mctry()
     helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${k8smcbackupFileName} minecraft-server-charts/minecraft
     k8s-mcwait tmp
 }
+
+###############################################################################
+## Help
+###############################################################################
+
+function k8s-mchelp()
+{
+    echo """
+    This script adds the following functions to bash. It assumes that your
+    servers have been deployed using:
+        https://itzg.github.io/minecraft-server-charts/minecraft
+
+    In all cases below <server name> is the helm chart release name.
+
+    k8s-mclist
+        list all minecraft servers deployed to the cluster
+
+    k8s-mcports
+        details of the ports exposed by servers and rcon
+
+    k8s-mcstart <server name>
+        start the server (set replicas to 1)
+
+    k8s-mcstop <server name>
+        stop the server (set replicas to 0)
+
+    k8s-mcexec <server name>
+        execute bash in the server's container
+
+    k8s-mclog <server name> [-p] [-f]
+        get logs for the server
+        -p = log for previous instance after a restart of the pod
+        -f = attach to the log and monitor it
+
+    k8s-mcdeploy <my_server_def.yaml>
+        deploys a server to the cluster with release name my_server_def
+        recommended: copy and edit minecraft-helm.yaml for most common options,
+        see in file comments for details.
+
+    k8s-mcbackups
+        List the backups in the folder $MCBACKUP
+
+    k8s-mcbackup <server name>
+        zips up the server data folder to a dated zip file and places it
+        in the folder $MCBACKUP (prompts for MCBACKUP if not set)
+
+    k8s-mcrestore <server name> <backup file name>
+        restore the world from backup for a server, overwriting its
+        current world
+
+    """
+}

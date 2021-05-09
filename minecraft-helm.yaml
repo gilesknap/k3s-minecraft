@@ -11,6 +11,8 @@
 
 # Common minecraft server settings
 minecraftServer:
+  # may be SNAPSHOT or a specific version number
+  version: LATEST
   # allowed players' names comma separated, leave blank to allow any players
   whitelist:
   # comma separated admin players' names

@@ -133,61 +133,51 @@ sudo reboot
 ```
 
 ## Do Backups of running servers and more ...
-Use the script included in this repo to do backups and save typing for
-a few other commands. See the functions in mc-k8.sh for details, some examples
-below:
+Use the script included in this repo to save/restore backups and save typing
+for a few other commands. See details by invoking the following:
 ```
 $ source k8s-mc.sh
+$ k8s-mchelp
 
-$ mclist
-MC SERVER NAME      RUNNING
-the-lockdown-krew   1
-adventure-of-doom   1
-skorponok           1
-science-rpi         1
-science-lab         1
+    This script adds the following functions to bash. It assumes that your
+    servers have been deployed using:
+        https://itzg.github.io/minecraft-server-charts/minecraft
 
-$ mcstop the-lockdown-krew
-localhost:25565 : version=1.16.5 online=0 max=20 motd='Where the Lockdown Krew meet'
-deployment.apps/the-lockdown-krew-minecraft scaled
+    In all cases below <server name> is the helm chart release name.
 
-$ mclist
-MC SERVER NAME      RUNNING
-adventure-of-doom   1
-skorponok           1
-science-rpi         1
-science-lab         1
-the-lockdown-krew   <none>
+    k8s-mclist
+        list all minecraft servers deployed to the cluster
 
-$ mcbackup science-lab
-science-lab is running
-Automatic saving is now disabled
-Saving the game (this may take a moment!)Saved the game
-tar: removing leading '/' from member names
-data/
-data/world/
-data/world/poi/
-data/world/poi/r.0.-2.mca
-...
-data/white-list.txt.converted
-data/ops.txt.converted
-Automatic saving is now enabled
+    k8s-mcports
+        details of the ports exposed by servers and rcon
 
-$ mcdeploy giles-servers/devils-deep.yaml
-"minecraft-server-charts" already exists with the same configuration, skipping
-Release "devils-deep" does not exist. Installing it now.
-NAME: devils-deep
-LAST DEPLOYED: Mon May  3 12:03:53 2021
-NAMESPACE: minecraft
-STATUS: deployed
-REVISION: 1
-TEST SUITE: None
-NOTES:
-Get the IP address of your Minecraft server by running these commands in the
-same shell:
+    k8s-mcstart <server name>
+        start the server (set replicas to 1)
 
-!! NOTE: It may take a few minutes for the LoadBalancer IP to be available. !!
+    k8s-mcstop <server name>
+        stop the server (set replicas to 0)
 
-You can watch for EXTERNAL-IP to populate by running:
-  kubectl get svc --namespace minecraft -w devils-deep-minecraft```
+    k8s-mcexec <server name>
+        execute bash in the server's container
 
+    k8s-mclog <server name> [-p] [-f]
+        get logs for the server
+        -p = log for previous instance after a restart of the pod
+        -f = attach to the log and monitor it
+
+    k8s-mcdeploy <my_server_def.yaml>
+        deploys a server to the cluster with release name my_server_def
+        recommended: copy and edit minecraft-helm.yaml for most common options,
+        see in file comments for details.
+
+    k8s-mcbackups
+        List the backups in the folder /mnt/bigdisk/minecraft-k8s-backup
+
+    k8s-mcbackup <server name>
+        zips up the server data folder to a dated zip file and places it
+        in the folder /mnt/bigdisk/minecraft-k8s-backup (prompts for MCBACKUP if not set)
+
+    k8s-mcrestore <server name> <backup file name>
+        restore the world from backup for a server, overwriting its
+        current world
+```
