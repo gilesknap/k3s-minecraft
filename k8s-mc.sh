@@ -15,11 +15,12 @@ source <(helm completion bash)
 source <(kubectl completion bash)
 
 format=custom-columns=\
-Name:metadata.labels.release\
-,GameMode:spec.template.spec.containers[0].env[22].value\
-,Server:'spec.template.spec.nodeSelector.kubernetes\.io/hostname'\
-,Rcon:spec.template.spec.containers[0].ports[1].containerPort\
-,Running:status.availableReplicas
+NAME:metadata.labels.release\
+,MODE:spec.template.spec.containers[0].env[22].value\
+,VERSION:spec.template.spec.containers[0].env[2].value\
+,SERVER:'spec.template.spec.nodeSelector.kubernetes\.io/hostname'\
+,RCON:spec.template.spec.containers[0].ports[1].containerPort\
+,RUNNING:status.availableReplicas
 
 function mcvalidyaml()
 {
@@ -33,10 +34,34 @@ function mcvalidyaml()
 
 function mcvalidbackup()
 {
-    # verify that a minecraft backup is valid (or at least looks valid)
-    if grep -iq "level.dat" < <( unzip -l "${1}" 2>/dev/null); then
-      return 0
-    fi
+    # verify that a minecraft backup is valid (or at least has a level.dat file)
+    mcbackupFileName="${1}"
+
+    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
+
+    case "${mcbackupFileName}" in
+    /*)
+        # full path with leading slash - leave it alone
+        ;;
+    *)
+        mcbackupFileName=${MCBACKUP}/"${mcbackupFileName}"
+        ;;
+    esac
+
+    case "${mcbackupFileName}" in
+    *.zip)
+        if grep -iq "level.dat" < <( unzip -l "${1}" 2>/dev/null); then
+            return 0
+        fi
+        ;;
+    *)
+        # assume this is a folder
+        if [[ -n $(find  . -name level.dat) ]]; then
+          return 0
+        fi
+        ;;
+    esac
+
     return 1
 }
 
@@ -131,6 +156,7 @@ function mcbackups()
 {
     # backup a minecraft server to a zip file
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
+    echo "MCBACKUP folder is ${MCBACKUP}"
     ls ${MCBACKUP}
 }
 
@@ -225,26 +251,29 @@ function mcdeploy()
 function mcrestore()
 {
     filename="${1}"
-    backupFile="${2}"
 
-    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
+    read -p "WARNING this will overwrite the current world. OK? " -n 1 -r
+    echo
 
-    if ! mcvalidbackup ${MCBACKUP}/$backupFile; then
-        echo "please name a valid zipped minecraft save from ${MCBACKUP} as a parameter 2"
-        return 1
-    fi
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
 
-    if mcvalidyaml ${filename}; then
-        restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${MCBACKUP}/${backupFile},minecraftServer.eula=true"
+        if ! mcvalidbackup ${2}; then
+            echo "please name a valid zipped minecraft save from ${MCBACKUP} as a parameter 2"
+            return 1
+        fi
 
-        echo $restore_settings
+        if mcvalidyaml ${filename}; then
+            restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${mcbackupFileName},minecraftServer.eula=true"
 
-        base=$(basename ${filename})
-        releasename="${base%.*}"
-        helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-        helm upgrade ${releasename} -f ${filename} ${restore_settings} minecraft-server-charts/minecraft
-    else
-        echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
+            echo $restore_settings
+
+            base=$(basename ${filename})
+            releasename="${base%.*}"
+            helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+            helm upgrade ${releasename} -f ${filename} ${restore_settings} minecraft-server-charts/minecraft
+        else
+            echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
+        fi
     fi
 }
 
@@ -252,13 +281,10 @@ function mctry()
 {
     # try out a world backup in the 'tmp' deployment
     # overwrites the previous tmp deployment with the world defined in a zip or folder provided in $1
-    backupToTry=${1}
 
-    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
-
-    if ! mcvalidbackup ${MCBACKUP}/${backupToTry}; then
-        echo "please supply a valid zipped minecraft save as a parameter 2"
+    if ! mcvalidbackup "${1}"; then
+        echo "please supply a valid zipped minecraft save as a parameter 1"
         return 1
     fi
-    helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${MCBACKUP}/${backupToTry} minecraft-server-charts/minecraft
+    helm upgrade --install tmp -f ${THIS_DIR}/giles-servers/tmp.yaml --set minecraftServer.eula=true,minecraftServer.downloadWorldUrl=${mcbackupFileName} minecraft-server-charts/minecraft
 }
