@@ -14,76 +14,9 @@ export HELM_EXPERIMENTAL_OCI=1
 source <(helm completion bash)
 source <(kubectl completion bash)
 
-function mcvalidyaml()
-{
-    # verify that a yaml file is a valid helm substitution
-    if [[ $(helm template -f "${1}"  minecraft-server-charts/minecraft) == *NAME-minecraft* ]]
-    then
-      return 0
-    fi
-    return 1
-}
-
-function mcvalidbackup()
-{
-    # verify that a minecraft backup is valid (or at least has a level.dat file)
-    mcbackupFileName="${1}"
-
-    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
-
-    case "${mcbackupFileName}" in
-    /*)
-        # full path with leading slash - leave it alone
-        ;;
-    *)
-        mcbackupFileName=${MCBACKUP}/"${mcbackupFileName}"
-        ;;
-    esac
-
-    case "${mcbackupFileName}" in
-    *.zip)
-        if grep -iq "level.dat" < <( unzip -l "${mcbackupFileName}" 2>/dev/null); then
-            return 0
-        fi
-        ;;
-    *)
-        # assume this is a folder
-        if [[ -n $(find  ${MCBACKUP} -name level.dat) ]]; then
-          return 0
-        fi
-        ;;
-    esac
-
-    return 1
-}
-
-format=custom-columns=\
-NAME:metadata.labels.release\
-,MODE:spec.template.spec.containers[0].env[22].value\
-,VERSION:spec.template.spec.containers[0].env[2].value\
-,SERVER:'spec.template.spec.nodeSelector.kubernetes\.io/hostname'\
-,RUNNING:status.availableReplicas
-
-function mclist()
-{
-    # list the minecraft servers deployed in the cluster with useful status info
-
-    kubectl -n minecraft get deploy -o $format
-    echo
-        # if [ "$(kubectl get ${d} -o jsonpath={.status.replicas})" != "1"
-        #   kubectl get ${d} -o jsonpath='{.metadata.labels.app}{"\n"}'
-
-}
-
-portsformat=custom-columns=\
-PORT:spec.template.spec.containers[0].ports[0].containerPort,\
-NAME:metadata.ownerReferences[0].name
-
-function mcports()
-{
-  kubectl -n minecraft get daemonsets.apps -o ${portsformat}\
-    --sort-by=.spec.template.spec.containers[0].ports[0].containerPort
-}
+###############################################################################
+## Helper Functions
+###############################################################################
 
 function mccheckname()
 {
@@ -129,7 +62,81 @@ function mccheck ()
     fi
     return 1
 }
+function mcvalidyaml()
+{
+    # verify that a yaml file is a valid helm substitution
+    if [[ $(helm template -f "${1}"  minecraft-server-charts/minecraft) == *NAME-minecraft* ]]
+    then
+      return 0
+    fi
+    return 1
+}
 
+function mcvalidbackup()
+{
+    # verify that a minecraft backup is valid (or at least has a level.dat file)
+    mcbackupFileName="${1}"
+
+    MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
+
+    case "${mcbackupFileName}" in
+    /*)
+        # full path with leading slash - leave it alone
+        ;;
+    *)
+        mcbackupFileName=${MCBACKUP}/"${mcbackupFileName}"
+        ;;
+    esac
+
+    case "${mcbackupFileName}" in
+    *.zip)
+        if grep -iq "level.dat" < <( unzip -l "${mcbackupFileName}" 2>/dev/null); then
+            return 0
+        fi
+        ;;
+    *)
+        # assume this is a folder
+        if [[ -n $(find  ${MCBACKUP} -name level.dat) ]]; then
+          return 0
+        fi
+        ;;
+    esac
+
+    return 1
+}
+
+###############################################################################
+## User Functions
+###############################################################################
+
+format=custom-columns=\
+NAME:metadata.labels.release\
+,MODE:spec.template.spec.containers[0].env[22].value\
+,VERSION:spec.template.spec.containers[0].env[2].value\
+,SERVER:'spec.template.spec.nodeSelector.kubernetes\.io/hostname'\
+,RUNNING:status.availableReplicas
+
+function mclist()
+{
+    # list the minecraft servers deployed in the cluster with useful status info
+
+    kubectl -n minecraft get deploy -o $format
+    echo
+        # if [ "$(kubectl get ${d} -o jsonpath={.status.replicas})" != "1"
+        #   kubectl get ${d} -o jsonpath='{.metadata.labels.app}{"\n"}'
+
+}
+
+portsformat=custom-columns=\
+PORT:spec.template.spec.containers[0].ports[0].containerPort,\
+NAME:metadata.ownerReferences[0].name
+
+function mcports()
+{
+  # list all server and rcon ports
+  kubectl -n minecraft get daemonsets.apps -o ${portsformat}\
+    --sort-by=.spec.template.spec.containers[0].ports[0].containerPort
+}
 
 function mcstart()
 {
@@ -259,6 +266,11 @@ function mcdeploy()
 
 function mcrestore()
 {
+    # restore a backup into an exisitng server deployment
+
+    # IMPORTANT - the backup folder must be mounted read only in the
+    # server pods, see extraVolumes in minecraft-helm.yaml
+
     filename="${1}"
 
     read -p "WARNING this will overwrite the current world. OK? " -n 1 -r
