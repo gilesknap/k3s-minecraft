@@ -14,14 +14,6 @@ export HELM_EXPERIMENTAL_OCI=1
 source <(helm completion bash)
 source <(kubectl completion bash)
 
-format=custom-columns=\
-NAME:metadata.labels.release\
-,MODE:spec.template.spec.containers[0].env[22].value\
-,VERSION:spec.template.spec.containers[0].env[2].value\
-,SERVER:'spec.template.spec.nodeSelector.kubernetes\.io/hostname'\
-,RCON:spec.template.spec.containers[0].ports[1].containerPort\
-,RUNNING:status.availableReplicas
-
 function mcvalidyaml()
 {
     # verify that a yaml file is a valid helm substitution
@@ -50,13 +42,13 @@ function mcvalidbackup()
 
     case "${mcbackupFileName}" in
     *.zip)
-        if grep -iq "level.dat" < <( unzip -l "${1}" 2>/dev/null); then
+        if grep -iq "level.dat" < <( unzip -l "${mcbackupFileName}" 2>/dev/null); then
             return 0
         fi
         ;;
     *)
         # assume this is a folder
-        if [[ -n $(find  . -name level.dat) ]]; then
+        if [[ -n $(find  ${MCBACKUP} -name level.dat) ]]; then
           return 0
         fi
         ;;
@@ -64,6 +56,13 @@ function mcvalidbackup()
 
     return 1
 }
+
+format=custom-columns=\
+NAME:metadata.labels.release\
+,MODE:spec.template.spec.containers[0].env[22].value\
+,VERSION:spec.template.spec.containers[0].env[2].value\
+,SERVER:'spec.template.spec.nodeSelector.kubernetes\.io/hostname'\
+,RUNNING:status.availableReplicas
 
 function mclist()
 {
@@ -74,6 +73,16 @@ function mclist()
         # if [ "$(kubectl get ${d} -o jsonpath={.status.replicas})" != "1"
         #   kubectl get ${d} -o jsonpath='{.metadata.labels.app}{"\n"}'
 
+}
+
+portsformat=custom-columns=\
+PORT:spec.template.spec.containers[0].ports[0].containerPort,\
+NAME:metadata.ownerReferences[0].name
+
+function mcports()
+{
+  kubectl -n minecraft get daemonsets.apps -o ${portsformat}\
+    --sort-by=.spec.template.spec.containers[0].ports[0].containerPort
 }
 
 function mccheckname()
@@ -157,7 +166,7 @@ function mcbackups()
     # backup a minecraft server to a zip file
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
     echo "MCBACKUP folder is ${MCBACKUP}"
-    ls ${MCBACKUP}
+    ls -R ${MCBACKUP}
 }
 
 function mcbackup()
