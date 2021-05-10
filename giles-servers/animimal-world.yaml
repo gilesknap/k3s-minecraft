@@ -1,6 +1,7 @@
 minecraftServer:
+  version: LATEST
   servicePort: 31100
-  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-05-03-world-of-animals.zip
+  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-05-09-world-of-animals-old1.zip
   motd: "World of animals creative playground"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
@@ -18,7 +19,7 @@ minecraftServer:
 
 extraEnv:
   ENABLE_ROLLING_LOGS: true
-  OVERRIDE_SERVER_PROPERTIES: false
+  OVERRIDE_SERVER_PROPERTIES: true
   FORCE_WORLD_COPY: false
 
 persistence:

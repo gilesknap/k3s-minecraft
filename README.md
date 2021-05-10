@@ -141,7 +141,8 @@ $ k8s-mchelp
 
     This script adds the following functions to bash. It assumes that your
     servers have been deployed using:
-        https://itzg.github.io/minecraft-server-charts/minecraft
+        https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
+    or using the k8s-mcdeploy function below.
 
     In all cases below <server name> is the helm chart release name.
 
