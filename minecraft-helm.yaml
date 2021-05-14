@@ -1,5 +1,5 @@
 # These are value overrides for the helm chart defined here
-# https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
+# https://github.com/itzg/minecraft-server-charts
 
 # It contains the most common parameters, but for even more settings, see
 # https://github.com/itzg/minecraft-server-charts/blob/master/charts/minecraft/values.yaml
@@ -7,7 +7,6 @@
 # to use this file execute the following two commands
 # helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
 # helm upgrade --install RELEASE_NAME -f THIS_FILE.yaml --set minecraftServer.eula=true,rcon.password=YOUR_PWD minecraft-server-charts/minecraft
-
 
 # Common minecraft server settings
 minecraftServer:
