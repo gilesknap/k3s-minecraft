@@ -1,8 +1,9 @@
 minecraftServer:
   rcon:
     enabled: false
+    serviceType: NodePort
     port: 31401
-  servicePort: 31400
+  nodePort: 31400
   downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/transformers-best.zip
   motd: "Noah's awesome transformers made in minecraft with two secret bases"
   gameMode: creative
@@ -10,7 +11,7 @@ minecraftServer:
   ops: TransformerScorn,DispenserAD11
   forcegameMode: true
   maxWorldSize: 29999984
-  serviceType: LoadBalancer
+  serviceType: NodePort
 
 extraEnv:
   ENABLE_ROLLING_LOGS: true

@@ -1,9 +1,10 @@
 minecraftServer:
   rcon:
     enabled: false
+    serviceType: NodePort
     port: 31601
   version: 21w05b
-  servicePort: 31600
+  nodePort: 31600
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/weaponsmith.zip
   motd: "smith in 21w05b"
   gameMode: spectator
@@ -11,7 +12,7 @@ minecraftServer:
   ops: TransformerScorn,DispenserAD11
   forcegameMode: true
   maxWorldSize: 29999984
-  serviceType: LoadBalancer
+  serviceType: NodePort
   viewDistance: 32
 
 extraEnv:

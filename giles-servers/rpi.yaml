@@ -25,22 +25,23 @@ extraVolumes:
 minecraftServer:
   # Noahs friends get access, Noah and I get ops
   whitelist:
-  ops:
+  ops: DispenserAD11,TransformerScorn
   forcegameMode: true
   levelSeed:
-  maxWorldSize: 10000
+  maxWorldSize: 29999983
   gameMode: creative
   motd: "The Adventure of Doom (sic)"
   pvp: false
-  serviceType: LoadBalancer
+  serviceType: NodePort
   # restore the world from a backup on first execution
   downloadWorldUrl:
   # external port must be unique across all mc server instances
-  servicePort: 30900
+  nodePort: 30900
 
   # enable rcon for remote control - set to false if not required
   rcon:
     # external port must be unique across all mc server instances
+    serviceType: NodePort
     port: 30901
     enabled: true
     password: "TODO - supply this as an override on the command line "

@@ -31,18 +31,20 @@ minecraftServer:
   motd: "Science Lab, Redstone Museum and Scenic Railway"
   pvp: false
   # this means you get the node IP address on K3s
-  serviceType: LoadBalancer
+  serviceType: NodePort
   # restore the world from a backup on first execution
-  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2020-12-30.11-07.Science.science_rcon.zip
-  # external port must be unique across all mc server instances
-  servicePort: 30500
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2021-05-09-09:31:56-science-lab.zip
+  # external node port must be unique across all mc server instances
+  nodePort: 30500
   # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
-  viewDistance: 25
+  viewDistance: 32
 
   # enable rcon for remote control - set to false if not required
   rcon:
     # external port must be unique across all mc server instances
+    serviceType: NodePort
     port: 30501
+    nodePort: 30501
     enabled: true
     password: "TODO - supply this as an override on the command line "
 

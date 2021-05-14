@@ -7,13 +7,14 @@ minecraftServer:
   gameMode: creative
   motd: "tmp server for viewing backups"
   pvp: false
-  serviceType: LoadBalancer
+  serviceType: NodePort
   downloadWorldUrl:
-  servicePort: 32000
+  nodePort: 32000
   viewDistance: 25
 
   rcon:
     port: 32001
+    serviceType: NodePort
     enabled: true
     password: "TODO - supply this as an override on the command line "
 

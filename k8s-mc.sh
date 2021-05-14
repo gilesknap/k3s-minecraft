@@ -62,6 +62,7 @@ function k8s-mccheck ()
     fi
     return 1
 }
+
 function k8s-mcvalidyaml()
 {
     # verify that a yaml file is a valid helm substitution
@@ -108,24 +109,18 @@ function k8s-mcvalidbackup()
 function k8s-mcwait()
 {
     # block until an mc server has good health
+    deployname="${1}"-minecraft
 
     # first wait for the pod to be active
-    while [[ $(kubectl get -n minecraft pods -l app="${deployname}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]
-    do
-        sleep 1
-    done
+    echo "waiting for ${deployname} pod to start"
+    kubectl  wait deployment ${deployname} --for=condition=available --timeout 60s
 
     # get the pod name
     pod=$(kubectl get pods -l app=${deployname} -o name)
 
     # wait for the mc server to be healthy
     echo "waiting for minecraft server ${1}"
-    if k8s-mccheckname ${1}; then
-      while ! k8s-mccheck 2>/dev/null ${1}
-        do
-            sleep 1
-        done
-    fi
+    kubectl  wait ${pod} --for=condition=ready --timeout 60s
 }
 
 ###############################################################################
@@ -305,6 +300,7 @@ function k8s-mcrestore()
             kubectl set env deployments.apps/${releasename}-minecraft FORCE_WORLD_COPY=false
         else
             echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
+            return 1
         fi
     fi
 }

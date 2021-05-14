@@ -28,16 +28,17 @@ minecraftServer:
   gameMode: survival
   motd: "The Adventure of Doom (sic)"
   pvp: false
-  serviceType: LoadBalancer
+  serviceType: NodePort
   # restore the world from a backup on first execution
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-02-23.16-21.Adventure.THofDoom22.zip
   # external port must be unique across all mc server instances
-  servicePort: 30600
+  nodePort: 30600
 
   # enable rcon for remote control - set to false if not required
   rcon:
     # external port must be unique across all mc server instances
     port: 30601
+    serviceType: NodePort
     enabled: true
     password: "TODO - supply this as an override on the command line "
 

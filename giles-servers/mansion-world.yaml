@@ -2,7 +2,8 @@ minecraftServer:
   rcon:
     enabled: false
     port: 31301
-  servicePort: 31300
+    serviceType: NodePort
+  nodePort: 31300
   downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/mansion-world.zip
   motd: "Noah and Dads early creative Mansion World, with Iron Golem Grandad"
   gameMode: creative
@@ -10,7 +11,7 @@ minecraftServer:
   ops: TransformerScorn,DispenserAD11
   forcegameMode: true
   maxWorldSize: 29999984
-  serviceType: LoadBalancer
+  serviceType: NodePort
 
 extraEnv:
   ENABLE_ROLLING_LOGS: true

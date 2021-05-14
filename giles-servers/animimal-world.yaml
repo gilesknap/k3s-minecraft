@@ -1,6 +1,6 @@
 minecraftServer:
   version: LATEST
-  servicePort: 31100
+  nodePort: 31100
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-05-09-world-of-animals-old1.zip
   motd: "World of animals creative playground"
   gameMode: creative
@@ -10,10 +10,11 @@ minecraftServer:
   levelSeed:
   maxWorldSize: 29999984
   pvp: false
-  serviceType: LoadBalancer
+  serviceType: NodePort
 
   rcon:
     port: 31101
+    serviceType: NodePort
     enabled: true
     password: "TODO - supply this as an override on the command line "
 

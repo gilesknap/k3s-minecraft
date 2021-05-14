@@ -16,11 +16,11 @@ minecraftServer:
   # player vs player enabled
   pvp: false
   # REQUIRED this means you get the node IP address (with default K3s loadbalancer)
-  serviceType: LoadBalancer
+  serviceType: NodePort
   # restore the world from a backup on first execution (requires NFS volume - see below)
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups//2021-05-01.23-25.DadNoahSurvival.GilesWorld.zip
   # external port must be unique across all mc server instances on a given node
-  servicePort: 31200
+  nodePort: 31200
   # how far from the player are chunks rendered on the server
   # 10 is default, larger is nice on high spec hardware
   # I believe 25 is the client max so larger is wasted
@@ -31,6 +31,7 @@ minecraftServer:
     enabled: true
     # external port must be unique across all mc server instances
     port: 31201
+    serviceType: NodePort
     password: "TODO - supply this as an override on the command line "
 
 extraVolumes:

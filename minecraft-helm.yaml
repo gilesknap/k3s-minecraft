@@ -29,12 +29,13 @@ minecraftServer:
   motd: "Welcome to Minecraft on Kubernetes"
   # player vs player enabled
   pvp: false
-  # REQUIRED this means you get the node IP address (with default K3s loadbalancer)
-  serviceType: LoadBalancer
+  # REQUIRED this means you get nodePort exposed on all nodes and will get
+  # directed to the correct node if you connect to any
+  serviceType: NodePort
   # restore the world from a backup on first execution (requires NFS volume - see below)
   downloadWorldUrl:
   # external port must be unique across all mc server instances on a given node
-  servicePort: 30100
+  nodePort: 30100
   # how far from the player are chunks rendered on the server
   # 10 is default, larger is nice on high spec hardware
   # I believe 25 is the client max so larger is wasted
@@ -45,6 +46,8 @@ minecraftServer:
     enabled: true
     # external port must be unique across all mc server instances
     port: 30101
+    # required
+    nodePort: 30100
     password: "TODO - supply this as an override on the command line "
 
 # UNCOMMENT and supply an NFS mounted folder if you have backups of minecraft server

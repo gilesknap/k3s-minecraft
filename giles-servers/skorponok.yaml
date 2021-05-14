@@ -32,16 +32,17 @@ minecraftServer:
   motd: "Tests for python rcon library and mcwb world builder"
   pvp: false
   # this means you get the node IP address on K3s
-  serviceType: LoadBalancer
+  serviceType: NodePort
   # restore the world from a backup on first execution
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-01-03.05-05.Flatworlds.Scorpnok.zip
   # external port must be unique across all mc server instances
-  servicePort: 31000
+  nodePort: 31000
 
   # enable rcon for remote control - set to false if not required
   rcon:
     # external port must be unique across all mc server instances
     port: 31001
+    serviceType: NodePort
     enabled: true
     password: "TODO - supply this as an override on the command line "
 
