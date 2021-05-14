@@ -2,7 +2,7 @@ minecraftServer:
   rcon:
     enabled: false
     serviceType: NodePort
-    port: 31601
+    nodePort: 31601
   version: 21w05b
   nodePort: 31600
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/weaponsmith.zip

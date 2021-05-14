@@ -45,9 +45,9 @@ minecraftServer:
     # enable rcon for remote control - set to false if not required
     enabled: true
     # external port must be unique across all mc server instances
-    port: 30101
+    nodePort: 30101
     # required
-    nodePort: 30100
+    serviceType: NodePort
     password: "TODO - supply this as an override on the command line "
 
 # UNCOMMENT and supply an NFS mounted folder if you have backups of minecraft server

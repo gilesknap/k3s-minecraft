@@ -13,7 +13,7 @@ minecraftServer:
   serviceType: NodePort
 
   rcon:
-    port: 31101
+    nodePort: 31101
     serviceType: NodePort
     enabled: true
     password: "TODO - supply this as an override on the command line "

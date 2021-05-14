@@ -223,7 +223,9 @@ function k8s-mcdeploy()
         MCPASSWD=${MCPASSWD:-$(read -p "password for rcon: " IN; echo $IN)}
         MCEULA=${MCEULA:-$(read -p "agree to minecraft EULA? (type 'true'): " IN; echo $IN)}
         helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-        helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" minecraft-server-charts/minecraft
+        # default to using itzg repo but allow override through export MCHELMREPO=xxx for testing
+        MCHELMREPO=${MCHELMREPO:-minecraft-server-charts/minecraft}
+        helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" ${MCHELMREPO}
         k8s-mcwait $releasename
     else
         echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
@@ -297,7 +299,9 @@ function k8s-mcrestore()
             base=$(basename ${filename})
             releasename="${base%.*}"
             helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-            helm upgrade ${releasename} -f ${filename} ${restore_settings} minecraft-server-charts/minecraft
+            # default to using itzg repo but allow override through export MCHELMREPO=xxx for testing
+            MCHELMREPO=${MCHELMREPO:-minecraft-server-charts/minecraft}
+            helm upgrade ${releasename} -f ${filename} ${restore_settings} ${MCHELMREPO}
 
             # reset the FORCE_WORLD_COPY so future changes will be preserved on restart
             k8s-mcwait ${releasename}

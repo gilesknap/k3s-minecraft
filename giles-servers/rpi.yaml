@@ -42,7 +42,7 @@ minecraftServer:
   rcon:
     # external port must be unique across all mc server instances
     serviceType: NodePort
-    port: 30901
+    nodePort: 30901
     enabled: true
     password: "TODO - supply this as an override on the command line "
 

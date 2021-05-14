@@ -1,7 +1,7 @@
 minecraftServer:
   rcon:
     enabled: false
-    port: 31701
+    nodePort: 31701
     serviceType: NodePort
   version: LATEST
   nodePort: 31700

@@ -1,7 +1,7 @@
 minecraftServer:
   rcon:
     enabled: false
-    port: 31301
+    nodePort: 31301
     serviceType: NodePort
   nodePort: 31300
   downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/mansion-world.zip
