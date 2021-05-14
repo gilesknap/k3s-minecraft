@@ -113,14 +113,17 @@ function k8s-mcwait()
 
     # first wait for the pod to be active
     echo "waiting for ${deployname} pod to start"
-    kubectl  wait deployment ${deployname} --for=condition=available --timeout 60s
+    kubectl  wait deployment ${deployname} --for=condition=available --timeout 160s
 
     # get the pod name
     pod=$(kubectl get pods -l app=${deployname} -o name)
 
-    # wait for the mc server to be healthy
-    echo "waiting for minecraft server ${1}"
-    kubectl  wait ${pod} --for=condition=ready --timeout 60s
+    # if there is no pod then the deployment is at 0 replicas
+    if [ ! -z "${pod}" ]; then
+        # wait for the mc server to be healthy
+        echo "waiting for minecraft server ${1}"
+        kubectl  wait ${pod} --for=condition=ready --timeout 160s
+    fi
 }
 
 ###############################################################################
@@ -143,14 +146,15 @@ function k8s-mclist()
 }
 
 portsformat=custom-columns=\
-PORT:spec.template.spec.containers[0].ports[0].containerPort,\
-NAME:metadata.ownerReferences[0].name
+NAME:metadata.labels.release,\
+PORT:spec.ports[0].nodePort,\
+TYPE:spec.ports[0].name
 
 function k8s-mcports()
 {
   # list all server and rcon ports
-  kubectl -n minecraft get daemonsets.apps -o ${portsformat}\
-    --sort-by=.spec.template.spec.containers[0].ports[0].containerPort
+  kubectl -n minecraft get services -o ${portsformat}\
+    --sort-by=spec.ports[0].nodePort
 }
 
 function k8s-mcstart()
@@ -298,6 +302,8 @@ function k8s-mcrestore()
             # reset the FORCE_WORLD_COPY so future changes will be preserved on restart
             k8s-mcwait ${releasename}
             kubectl set env deployments.apps/${releasename}-minecraft FORCE_WORLD_COPY=false
+            # the env setting creates a new pod
+            k8s-mcwait ${releasename}
         else
             echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
             return 1
