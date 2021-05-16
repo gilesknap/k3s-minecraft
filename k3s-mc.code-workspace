@@ -1,14 +1,17 @@
 {
 	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"path": "../minecraft-server-charts"
-		},
-		{
-			"path": "../docker-minecraft-server"
-		}
-	],
+        {
+            "path": "."
+        },
+        {
+            "path": "../minecraft-server-charts"
+        },
+        {
+            "path": "../docker-minecraft-server"
+        },
+        {
+            "path": "../noip"
+        }
+    ],
     "settings": {}
 }

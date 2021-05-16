@@ -1,0 +1,11 @@
+# TODO will create a user for a child who can start and stop minecraft servers.
+# Also they can initiate a backup
+# but, they cannot delete anything
+
+"apiVersion": "abac.authorization.kubernetes.io/v1beta1",
+"kind": "Policy"
+"spec":
+  "namespace": "projectCaribou"
+  "readonly": true,
+  "resource": "pods"
+  "user": "child"

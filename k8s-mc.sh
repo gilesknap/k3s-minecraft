@@ -246,6 +246,8 @@ function k8s-mcbackups()
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
     echo "MCBACKUP folder is ${MCBACKUP}"
     ls -R ${MCBACKUP}
+    echo
+    du -d 0 -h ${MCBACKUP}
 }
 
 function k8s-mcbackup()
@@ -272,6 +274,15 @@ function k8s-mcbackup()
         fi
     fi
 }
+
+function k8s-mcbackupall()
+ {
+    releases=$( kubectl -n minecraft get deploy -o jsonpath="{.items[*]['metadata.labels.release']}")
+    for i in $releases ; do
+      k8s-mcbackup $i
+    done
+ }
+
 function k8s-mcrestore()
 {
     # restore a backup into an exisitng server deployment
