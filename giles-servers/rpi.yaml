@@ -67,3 +67,7 @@ persistence:
 nodeSelector:
   kubernetes.io/hostname: pi1
 
+tolerations:
+  - key: "arm64"
+    operator: "Exists"
+    effect: "NoExecute"
