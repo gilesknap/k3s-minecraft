@@ -2,13 +2,14 @@ minecraftServer:
   rcon:
     enabled: true
     serviceType: NodePort
-    nodePort: 31801
-  nodePort: 31800
+    nodePort: 30010
+  nodePort: 30011
   downloadWorldUrl:
   motd: "Dragons and Hydra"
-  gameMode: creative
-  whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
+  gameMode: survival
+  whitelist: TransformerScorn,DispenserAD11,Bigbob2
   ops: TransformerScorn,DispenserAD11
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2021-05-17-08:36:50-fire-ice2.zip
   forcegameMode: true
   maxWorldSize: 29999984
   serviceType: NodePort
@@ -50,5 +51,5 @@ extraVolumes:
 
 resources:
   requests:
-    memory: 4Gi
-    cpu: 4
+    memory: 6Gi
+    cpu: 6
