@@ -1,0 +1,43 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-storageclass # IMPORTANT pvc needs to mention this name
+provisioner: k3s-nfs
+parameters:
+  archiveOnDelete: "true"
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nfs-pod-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccountName: nfs-pod-provisioner-sa
+      containers:
+        - name: nfs-client-provisioner
+          image: gcr.io/k8s-staging-sig-storage/nfs-subdir-external-provisioner:v4.0.0
+          volumeMounts:
+            - name: nfs-provisioner-v
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME # do not change
+              value: k3s-nfs # SAME AS PROVISONER NAME VALUE IN STORAGECLASS
+            - name: NFS_SERVER # do not change
+              value: gknuc # UPDATE WITH NFS SERVER IP OR NAME
+            - name: NFS_PATH # do not change
+              value: /mnt/bigdisk/k3sdata # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
+      volumes:
+       - name: nfs-provisioner-v # same as volumemouts name
+         nfs:
+           server: gknuc # UPDATE WITH NFS SERVER IP OR NAME
+           path: /mnt/bigdisk/k3sdata # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs

@@ -1,3 +1,5 @@
+imagePullSecret: regcred
+
 minecraftServer:
   rcon:
     enabled: true
@@ -9,7 +11,7 @@ minecraftServer:
   gameMode: survival
   whitelist: TransformerScorn,DispenserAD11,Bigbob2
   ops: TransformerScorn,DispenserAD11
-  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2021-05-17-08:36:50-fire-ice2.zip
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2021-05-18-20:40:47-fire-ice2.zip
   forcegameMode: true
   maxWorldSize: 29999984
   serviceType: NodePort
@@ -23,13 +25,11 @@ extraEnv:
   FORCE_WORLD_COPY: false
 
 persistence:
+  storageClass: nfs-storageclass
   annotations: {}
   dataDir:
     enabled: true
-    Size: 1Gi
-
-nodeSelector:
-  kubernetes.io/hostname: gknuc
+    Size: 4Gi
 
 extraVolumes:
   - volumeMounts:

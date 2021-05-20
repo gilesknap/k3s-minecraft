@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-pvc-test
+spec:
+  storageClassName: nfs-storageclass
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: test-dnfs
+  name: test-dnfs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-dnfs
+  template:
+    metadata:
+      labels:
+        app: test-dnfs
+    spec:
+      volumes:
+      - name: test-dnfs
+        persistentVolumeClaim:
+          claimName: nfs-pvc-test
+      - name: bigdisk
+        nfs:
+          server: 192.168.86.32
+          path: /mnt/bigdisk/k3sdata
+      containers:
+      - name: test-dnfs
+        image: alpine
+        args:
+        - sleep
+        - "1000000"
+        volumeMounts:
+        - name: test-dnfs
+          mountPath: /data2
+        - name: bigdisk
+          mountPath: /data

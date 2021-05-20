@@ -2,7 +2,7 @@
 minecraftServer:
   # version: 1.14.4
   whitelist: TransformerScorn,DispenserAD11
-  ops: TransformerScorn
+  ops:
   # always set game mode when a player connects
   forcegameMode: true
   # choose a seed for the starting world
