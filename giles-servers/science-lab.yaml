@@ -1,3 +1,5 @@
+imagePullSecret: regcred
+
 # This is value overrides for the helm chart defined here
 # https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
 
@@ -63,6 +65,7 @@ extraEnv:
 # NOTE this ties the deployment to the first node it goes to
 # we could perhaps use an NFS mount to avoid this
 persistence:
+  storageClass: nfs-storageclass
   annotations: {}
   dataDir:
     enabled: true

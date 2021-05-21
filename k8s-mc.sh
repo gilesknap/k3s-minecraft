@@ -113,7 +113,7 @@ function k8s-mcwait()
 
     # first wait for the pod to be active
     echo "waiting for ${deployname} pod to start"
-    kubectl  wait  deployment ${deployname} --for=condition=available --timeout 160s -n minecraft
+    kubectl  wait  deployment ${deployname} --for=condition=available --timeout 300s -n minecraft
 
     # get the pod name
     pod=$(kubectl get pods -l app=${deployname} -n minecraft -o name)
@@ -122,7 +122,7 @@ function k8s-mcwait()
     if [ ! -z "${pod}" ]; then
         # wait for the mc server to be healthy
         echo "waiting for minecraft server ${1}"
-        kubectl  wait ${pod} --for=condition=ready --timeout 160 -n minecraft
+        kubectl  wait ${pod} --for=condition=ready --timeout 160s -n minecraft
     fi
 }
 

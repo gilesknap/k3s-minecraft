@@ -1,3 +1,4 @@
+imagePullSecret: regcred
 minecraftServer:
   rcon:
     enabled: false
@@ -19,6 +20,7 @@ extraEnv:
   FORCE_WORLD_COPY: false
 
 persistence:
+  storageClass: nfs-storageclass
   annotations: {}
   dataDir:
     enabled: true

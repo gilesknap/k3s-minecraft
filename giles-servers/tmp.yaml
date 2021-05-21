@@ -1,3 +1,5 @@
+imagePullSecret: regcred
+
 minecraftServer:
   whitelist:
   ops:
@@ -24,6 +26,7 @@ extraEnv:
   FORCE_WORLD_COPY: true
 
 persistence:
+  storageClass: nfs-storageclass
   annotations: {}
   dataDir:
     enabled: true

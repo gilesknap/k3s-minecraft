@@ -1,3 +1,5 @@
+imagePullSecret: regcred
+
 minecraftServer:
   version: LATEST
   nodePort: 31100
@@ -24,6 +26,7 @@ extraEnv:
   FORCE_WORLD_COPY: false
 
 persistence:
+  storageClass: nfs-storageclass
   annotations: {}
   dataDir:
     enabled: true

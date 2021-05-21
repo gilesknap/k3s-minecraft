@@ -1,3 +1,5 @@
+imagePullSecret: regcred
+
 # This is value overrides for the helm chart defined here
 # https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
 
@@ -58,6 +60,7 @@ extraEnv:
 # by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
 # I beleive this ties the deployment to the first node it goes to
 persistence:
+  storageClass: nfs-storageclass
   annotations: {}
   dataDir:
     enabled: true
