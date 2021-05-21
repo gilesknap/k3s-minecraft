@@ -39,4 +39,4 @@ I have the [Flirc passive cooling case](https://flirc.tv/more/raspberry-pi-4-cas
 and this can sustain 100% utilization for 30 minutes or more with no throttling.
 See my test results below.
 
-![pi3 stress](https://github.com/gilesknap/k3s-minecraft/tree/main/images/mytest.png "pi3 stress test")
+![alt text](https://github.com/gilesknap/k3s-minecraft/blob/main/images/mytest.png "pi3 stress test")
