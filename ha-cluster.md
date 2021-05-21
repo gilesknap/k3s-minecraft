@@ -11,7 +11,8 @@ then you can tolerate the loss of 2 nodes. Do not use even numbers, there
 is a great explanation
 [here](https://discuss.kubernetes.io/t/high-availability-host-numbers/13143)
 
-Choose a secret and replace CHANGE_ME in the following commands.
+In the following, replace CHANGE_ME with a chosen secret and
+FIRST_MASTER_NODE with the name or IP of the first machine.
 
 ## First Master Node
 This command will initialise your first master as a multi master cluster.

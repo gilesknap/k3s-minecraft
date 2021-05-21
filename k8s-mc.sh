@@ -42,7 +42,7 @@ function k8s-mccheckname()
     fi
 
     # if there is a pod associated with the app name then set $pod to its name
-    pod=$(kubectl get pods -l app=${deployname} -o name)
+    pod=$(kubectl get pods -n minecraft -l app=${deployname} -o name)
 }
 
 function k8s-mccheck ()
@@ -113,16 +113,16 @@ function k8s-mcwait()
 
     # first wait for the pod to be active
     echo "waiting for ${deployname} pod to start"
-    kubectl  wait deployment ${deployname} --for=condition=available --timeout 160s
+    kubectl  wait  deployment ${deployname} --for=condition=available --timeout 160s -n minecraft
 
     # get the pod name
-    pod=$(kubectl get pods -l app=${deployname} -o name)
+    pod=$(kubectl get pods -l app=${deployname} -n minecraft -o name)
 
     # if there is no pod then the deployment is at 0 replicas
     if [ ! -z "${pod}" ]; then
         # wait for the mc server to be healthy
         echo "waiting for minecraft server ${1}"
-        kubectl  wait ${pod} --for=condition=ready --timeout 160s
+        kubectl  wait ${pod} --for=condition=ready --timeout 160 -n minecraft
     fi
 }
 
@@ -180,7 +180,7 @@ function k8s-mcstop()
 {
     # stop the minecraft server named $1
     if k8s-mccheck ${1}; then
-      kubectl scale --replicas=0 ${deploy}
+      kubectl -n minecraft scale --replicas=0 ${deploy}
     else
         echo "${1} is not running"
     fi
@@ -192,7 +192,7 @@ function k8s-mcexec()
     # for debugging and also can directly edit server.properties
 
     if k8s-mccheck ${1}; then
-      kubectl exec -it ${deploy} -- bash
+      kubectl -n minecraft exec -it ${deploy} -- bash
     else
         echo "${1} is not running"
     fi
@@ -204,7 +204,7 @@ function k8s-mclog()
     # add -f to attach to the log stream
     if k8s-mccheckname "${1}"; then
         shift
-        kubectl logs ${deploy} ${*}
+        kubectl -n minecraft logs ${deploy} ${*}
     fi
 }
 
@@ -316,7 +316,7 @@ function k8s-mcrestore()
 
             # reset the FORCE_WORLD_COPY so future changes will be preserved on restart
             k8s-mcwait ${releasename}
-            kubectl set env deployments.apps/${releasename}-minecraft FORCE_WORLD_COPY=false
+            kubectl -n minecraft set env deployments.apps/${releasename}-minecraft FORCE_WORLD_COPY=false
             # the env setting creates a new pod
             k8s-mcwait ${releasename}
         else
