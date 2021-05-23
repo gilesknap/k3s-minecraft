@@ -1,5 +1,6 @@
 to avoid running on arm nodes (only run on amd64) edit the deployment and set:
 
+
 spec:
   template:
     spec:

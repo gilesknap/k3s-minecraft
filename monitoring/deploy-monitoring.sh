@@ -14,11 +14,11 @@ helm upgrade -i grafana grafana/grafana \
   --set persistence.enabled=true \
   --set nodeSelector."kubernetes\\.io/hostname"=gknuc
 helm upgrade -i prometheus prometheus-community/prometheus \
+  -f prometheus.values.yaml \
   --set alertmanager.persistentVolume.storageClass=nfs-storageclass \
   --set server.persistentVolume.storageClass=nfs-storageclass \
   --set pushgateway.persistentVolume.storageClass=nfs-storageclass \
-  --set pushgateway.persistentVolume.enabled=true \
-  --set nodeSelector."kubernetes\\.io/hostname"=gknuc
+  --set pushgateway.persistentVolume.enabled=true
 
 # to use grafana:
 # create new data source - prometheus with

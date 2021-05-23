@@ -1,3 +1,5 @@
+image: itzg/minecraft-server
+imageTag: java8
 imagePullSecret: regcred
 
 minecraftServer:
@@ -21,7 +23,7 @@ minecraftServer:
 extraEnv:
   TYPE: FORGE
   ENABLE_ROLLING_LOGS: true
-  OVERRIDE_SERVER_PROPERTIES: true
+  OVERRIDE_SERVER_PROPERTIES: false
   FORCE_WORLD_COPY: false
 
 persistence:
@@ -53,3 +55,6 @@ resources:
   requests:
     memory: 6Gi
     cpu: 6
+
+nodeSelector:
+  kubernetes.io/hostname: gknuc

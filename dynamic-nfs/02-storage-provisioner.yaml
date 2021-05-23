@@ -22,6 +22,16 @@ spec:
       labels:
         app: nfs-client-provisioner
     spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              preference:
+                matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                  - gknuc # UPDATE WITH NFS SERVER IP OR NAME
       serviceAccountName: nfs-pod-provisioner-sa
       containers:
         - name: nfs-client-provisioner

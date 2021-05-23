@@ -2,7 +2,7 @@ imagePullSecret: regcred
 
 # Common minecraft server settings
 minecraftServer:
-  # version: 1.14.4
+  version: 21w05b
   whitelist: TransformerScorn,DispenserAD11
   ops:
   # always set game mode when a player connects
@@ -20,7 +20,7 @@ minecraftServer:
   # REQUIRED this means you get the node IP address (with default K3s loadbalancer)
   serviceType: NodePort
   # restore the world from a backup on first execution (requires NFS volume - see below)
-  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups//2021-05-01.23-25.DadNoahSurvival.GilesWorld.zip
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2021-05-01.23-25.DadNoahSurvival.GilesWorld-21w05b.zip
   # external port must be unique across all mc server instances on a given node
   nodePort: 31200
   # how far from the player are chunks rendered on the server
