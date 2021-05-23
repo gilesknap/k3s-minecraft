@@ -19,13 +19,13 @@ This command will initialise your first master as a multi master cluster.
 
 WARNING: this erases etcd and resets your cluster to new.
 ```
-curl -sfL https://get.k3s.io | sh - --cluster-init --token CHANGE_ME
+curl -sfL https://get.k3s.io | sh -s - --cluster-init --token CHANGE_ME
 ```
 
 ## Further Nodes
 This command will join the server as a another cluster master and start it as a service
 ```
-curl -sfL https://get.k3s.io |  sh - --server  https://FIRST_MASTER_NODE:6443 --token CHANGE_ME
+curl -sfL https://get.k3s.io |  sh -s - --server  https://FIRST_MASTER_NODE:6443 --token CHANGE_ME
 ```
 
 Note that if the first master node is lost you need to replace FIRST_MASTER_NODE with one of the working master node when bringing up a replacement.
