@@ -60,7 +60,6 @@ extraEnv:
 # by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
 # I beleive this ties the deployment to the first node it goes to
 persistence:
-  storageClass: nfs-storageclass
   annotations: {}
   dataDir:
     enabled: true
@@ -68,7 +67,7 @@ persistence:
 
 # choose the node to run on (delete if not needed)
 nodeSelector:
-  kubernetes.io/hostname: pi1
+  kubernetes.io/hostname: pi3
 
 tolerations:
   - key: "arm64"
