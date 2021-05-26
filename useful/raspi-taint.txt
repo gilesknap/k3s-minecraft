@@ -1,0 +1,7 @@
+Unfortunately some pods which don't support multi arch may try to run
+on the raspis so I added a taint to them e.g.
+
+kubectl taint nodes pi3 architecture=arm:NoSchedule
+
+Then for those items you do want to run there, add a toleration.
+

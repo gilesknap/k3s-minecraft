@@ -67,7 +67,7 @@ persistence:
 
 # choose the node to run on (delete if not needed)
 nodeSelector:
-  kubernetes.io/hostname: pi3
+  kubernetes.io/hostname: pi4
 
 tolerations:
   - key: "arm64"

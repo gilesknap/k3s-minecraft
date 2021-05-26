@@ -33,7 +33,7 @@ pushgateway:
               values:
               - pi1
 
-kubeStateMetrics:q
+kubeStateMetrics:
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
