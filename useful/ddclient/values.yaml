@@ -1,0 +1,24 @@
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 1
+      preference:
+        matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - pi2
+          - pi3
+          - pi4
+
+config: |
+  protocol=dyndns2
+  use=web, web=myip.dnsomatic.com
+  ssl=yes
+  server=updates.opendns.com
+  login=gilesknap@gmail.com
+  password=${password}
+  GilesHome2
+
+# the last line above is the Personal Network Name to update. See https://dashboard.opendns.com/
+# login and password are the creds used to log in to https://dashboard.opendns.com/
