@@ -137,13 +137,14 @@ to support this and be configured for it as implied here https://traefik.io/blog
 
 When I describe the certificate I see:
 
-
+```
 Events:
   Type    Reason     Age   From          Message
   ----    ------     ----  ----          -------
   Normal  Issuing    26m   cert-manager  Issuing certificate as Secret does not exist
   Normal  Generated  26m   cert-manager  Stored new private key in temporary Secret resource "kubernetes-dashboard-nz4x5"
   Normal  Requested  26m   cert-manager  Created new CertificateRequest resource "kubernetes-dashboard-rbgsx"
+```
 
 At what point is the secret certificate-prod-dashboard supposed to get created?
 
