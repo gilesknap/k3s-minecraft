@@ -17,14 +17,17 @@ To get this to work simply install with
 ```
 helm repo add k8s-at-home https://k8s-at-home.com/charts/
 helm repo update
-helm upgrade -i syncthing k8s-at-home/syncthing -n admin
+helm upgrade -i syncthing k8s-at-home/syncthing -n admin -f values-pi1.yaml
 ```
 
 
 then use the following to get a GUI that can configure syncthing
 ```
-export POD_NAME=$(kubectl get pods --namespace admin -l "app.kubernetes.io/name=syncthing,app.kubernetes.io/instance=my-syncthing" -o jsonpath="{.items[0].metadata.name}")
+export POD_NAME=$(kubectl get pods --namespace admin -l "app.kubernetes.io/name=syncthing,app.kubernetes.io/instance=syncthing" -o jsonpath="{.items[0].metadata.name}")
 echo "Visit http://127.0.0.1:8080 to use your application"
-kubectl port-forward $POD_NAME 8080:8384
+kubectl -n admin port-forward $POD_NAME 8080:8384
 ```
+
+Or setup ingress using ../dashboard_https
+
 

@@ -19,22 +19,5 @@ tolerations:
   value: "arm"
   effect: "NoSchedule"
 
-# # this is required for Traefik ingress manger to work across namespaces
-# service:
-#   main:
-#     type: ExternalName
-#     spec:
-#       externalName: syncthing
-
-# ingress:
-#   main:
-#     enabled: true
-#     hosts:
-#     - host: "pi4"
-#       paths:
-#       - path: /sync
-#         service:
-#           name: syncthing
-
 
 
