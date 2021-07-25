@@ -1,0 +1,23 @@
+servers:
+  extinction:
+    map: Extinction
+    ports:
+      queryudp: 27015
+      gameudp: 7770
+      rcon: 32330
+    replicas: 1
+
+persistence:
+  enabled: true
+  game:
+    storageClass: nfs-storageclass
+  cluster:
+    storageClass: nfs-storageclass
+  save:
+    storageClass: nfs-storageclass
+
+extraEnvVars:
+  - name: am_arkStagingDir
+    value:
+  - name: ARKSERVER_SHARED
+    value: /arkserver

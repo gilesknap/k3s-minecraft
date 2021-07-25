@@ -1,0 +1,40 @@
+# for deploying to the master node and syncing the etcd snapshots to backup
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - pi4
+
+image:
+  repository: ghcr.io/linuxserver/syncthing
+  tag: arm32v7-latest
+
+tolerations:
+- key: "architecture"
+  operator: "Equal"
+  value: "arm"
+  effect: "NoSchedule"
+
+# # this is required for Traefik ingress manger to work across namespaces
+# service:
+#   main:
+#     type: ExternalName
+#     spec:
+#       externalName: syncthing
+
+# ingress:
+#   main:
+#     enabled: true
+#     hosts:
+#     - host: "pi4"
+#       paths:
+#       - path: /sync
+#         service:
+#           name: syncthing
+
+
+

@@ -70,6 +70,7 @@ nodeSelector:
   kubernetes.io/hostname: pi4
 
 tolerations:
-  - key: "arm64"
-    operator: "Exists"
-    effect: "NoExecute"
+- key: "architecture"
+  operator: "Equal"
+  value: "arm"
+  effect: "NoSchedule"
