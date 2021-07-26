@@ -87,6 +87,12 @@ helm delete my-first-mc
 #
 # Additional Nice to Have Stuff
 
+## check the latest logs for k3s
+
+Go to your master / server and do:
+
+    sudo journalctl -fu k3s
+
 ## Add a worker node (aka K3S Agent) to your cluster
 First get the node token on your server:
 ```

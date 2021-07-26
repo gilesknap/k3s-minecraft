@@ -1,6 +1,9 @@
 Good Overview
 =============
 
+UPDATE: I have disabled traefik and now use ambassador which makes for easy
+ingress setups.
+
 https://levelup.gitconnected.com/a-guide-to-k3s-ingress-using-traefik-with-nodeport-6eb29add0b4b
 
 To enable traefik dashboard.

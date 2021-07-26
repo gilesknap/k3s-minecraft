@@ -24,7 +24,10 @@ only
 
 ```
 sed s/\${password}/YOUR_PASSWORD/ values.yaml | helm upgrade -i  ddclient --namespace admin k8s-at-home/ddclient -f -
-# or maybe (if ddclient picks up environ vars in /defaults/ddclient.conf - not yet tested)
+
+
+# or maybe (if ddclient picks up environ vars in /defaults/ddclient.conf - not yet tested):
+
 # helm install ddclient k8s-at-home/ddclient -f values.yaml --set env.password=YOUR_PASSWORD
 ```
 

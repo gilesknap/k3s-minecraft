@@ -1,14 +1,18 @@
-Attempting to provide HTTPS ingress to the Dashboard
-====================================================
+Ambassador Ingress Controller
+=============================
 
-and other services like syncthing.
+This details how to set up ingress for various other services with Web GUI.
+
+Note this means disabling traefik and replacing with `Ambassador Edge Stack`
+https://www.getambassador.io/docs/edge-stack/latest/tutorials/getting-started/
+
 
 Install Ambassador
 ==================
 Deploy ambassador as a lightweight ingress controller
 
 See https://rancher.com/blog/2020/deploy-an-ingress-controllers
-but actually do it using helm as follows:
+for how to setup ingress for k3s but actually do it using helm as follows:
 ``` bash
 # Add the Repo:
 helm repo add datawire https://www.getambassador.io
@@ -22,10 +26,12 @@ kubectl -n ambassador wait --for condition=available --timeout=90s deploy -lprod
 See here for details on how to create Ambassador Edge Stack 'mappings'.
 https://www.getambassador.io/docs/edge-stack/latest/topics/using/intro-mappings/
 
-Install Mappings for Dash and Sync
-==================================
+Install Mappings for my Services
+================================
 
-```
+``` bash
+# syncthing
 k apply -f syncthing-mapping.yaml
-k apply -f dashboard.yaml
+# k8s dashboard
+k apply -f dashboard-mapping.yaml
 ```

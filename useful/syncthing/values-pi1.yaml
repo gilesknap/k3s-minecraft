@@ -7,17 +7,39 @@ affinity:
         - key: kubernetes.io/hostname
           operator: In
           values:
-          - pi4
+          - pi1
 
+# overriding image for running on pi1 (should not be needed?)
 image:
   repository: ghcr.io/linuxserver/syncthing
   tag: arm32v7-latest
 
+# I have architecture taint on pis so add a toleration
 tolerations:
 - key: "architecture"
   operator: "Equal"
   value: "arm"
   effect: "NoSchedule"
+
+persistence:
+# this enables saving of config to an nfs mounted volume
+  config:
+    enabled: true
+    mountPath: /config
+    storageClass: nfs-storageclass
+# this enables access to the etcd snapsh  ots folder for backup
+  snapshots:
+    enabled: true
+    type: hostPath
+    mountPath: /snapshots
+    hostPath: /var/lib/rancher/k3s/server/db/snapshots
+    # unfortunately syncthing writes hidden files even to Send only folders
+    readOnly: false
+
+# also unfortunately the snapshots are readable by root only
+# they contain secrets so the backup needs guarding too
+podSecurityContext:
+    runAsUser: 0
 
 
 

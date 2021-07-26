@@ -1,0 +1,9 @@
+
+apiVersion: getambassador.io/v2
+kind: Mapping
+metadata:
+  name: sync-pi1
+  namespace: admin
+spec:
+  prefix: /sync-pi1/
+  service: http://sync-pi1-syncthing.admin:8384
