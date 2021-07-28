@@ -27,7 +27,7 @@ persistence:
     enabled: true
     mountPath: /config
     storageClass: nfs-storageclass
-# this enables access to the etcd snapsh  ots folder for backup
+# this enables access to the etcd snapshots folder for backup
   snapshots:
     enabled: true
     type: hostPath

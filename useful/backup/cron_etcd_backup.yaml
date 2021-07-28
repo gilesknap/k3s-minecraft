@@ -1,0 +1,91 @@
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: backup
+  namespace: admin
+  labels:
+    app: etcd-backup
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "nfs-storageclass"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "5Gi"
+  # this must be an auto provisioning class that saves data securely
+  storageClassName: "nfs-storageclass"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-backup
+  namespace: admin
+spec:
+  schedule: "0 1 * * *"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: etcd-backup
+        spec:
+          restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      # this must be the dns name of the master node
+                    - pi1
+          containers:
+          - image: gcr.io/etcd-development/etcd:v3.5.0
+            imagePullPolicy: IfNotPresent
+            name: etcd-backup
+            resources:
+              limits:
+                memory: 100Mi
+                cpu: 100m
+            volumeMounts:
+            - mountPath: /etcd-cert/
+              name: etcd-cert
+              readOnly: true
+            - mountPath: /backup/
+              name: backup
+            env:
+              - name: ETCDCTL_ENDPOINTS
+                # this must be the IP of the master node
+                value: https://192.168.86.41:2379
+              - name: ETCDCTL_CACERT
+                value: /etcd-cert/server-client.crt
+              - name: ETCDCTL_KEY
+                value: /etcd-cert/server-client.key
+              - name: ETCDCTL_CERT
+                value: /etcd-cert/server-client.crt
+              - name: ETCDCTL_API
+                value: '3'
+            command:
+            - /bin/sh
+            - -c
+            - etcdctl snapshot save /backup/$(date +%F:%R)-etcd
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+          tolerations:
+          - effect: NoSchedule
+            key: architecture
+            operator: Equal
+            value: arm
+          volumes:
+          - name: etcd-cert
+            hostPath:
+              path: /var/lib/rancher/k3s/server/tls/etcd/
+              type: Directory
+          - name: backup
+            persistentVolumeClaim:
+              claimName: backup

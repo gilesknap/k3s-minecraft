@@ -1,3 +1,5 @@
+# this is an example of how to provide basic auth
+# to an Ambassador mapping - FOR DEMO ONLY
 ---
 apiVersion: getambassador.io/v2
 kind: Filter
