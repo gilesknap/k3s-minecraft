@@ -27,6 +27,8 @@ spec:
   schedule: "0 1 * * *"
   jobTemplate:
     spec:
+      # auto cleanup the job after 2.5 days or so
+      ttlSecondsAfterFinished: 200000
       template:
         metadata:
           labels:
