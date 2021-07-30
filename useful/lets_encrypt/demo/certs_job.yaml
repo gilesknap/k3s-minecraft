@@ -1,0 +1,57 @@
+#https://runnable.com/blog/how-to-use-lets-encrypt-on-kubernetes
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: default
+  name: letsencrypt-job
+  labels:
+    app: letsencrypt
+spec:
+  template:
+    metadata:
+      name: letsencrypt
+      labels:
+        app: letsencrypt
+      namespace: default
+    spec:
+      containers:
+      # Bash script that starts an http server and launches certbot
+      # Fork of github.com/sjenning/kube-nginx-letsencrypt
+      - image: quay.io/hiphipjorge/kube-nginx-letsencrypt:latest
+        name: letsencrypt
+        imagePullPolicy: Always
+        ports:
+        - name: letsencrypt
+          containerPort: 80
+        env:
+        - name: DOMAINS
+          value: |
+            - gilesk.ddns.net
+            - gknuc.local
+        - name: EMAIL
+          value: gilesknap@gmail.com # Your email. CHANGE ME!
+        - name: SECRET
+          value: letsencrypt-certs
+      restartPolicy: Never
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: letsencrypt
+spec:
+  selector:
+    app: letsencrypt
+  ports:
+  - protocol: "TCP"
+    port: 80
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: default
+  name: letsencrypt-certs
+type: Opaque
+# Create an empty secret (with no data) in order for the update to work
+---

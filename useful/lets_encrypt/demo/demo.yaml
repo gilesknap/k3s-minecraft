@@ -1,0 +1,104 @@
+# see https://runnable.com/blog/how-to-use-lets-encrypt-on-kubernetes
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: default
+data:
+  default.conf: |
+    upstream letsencrypt {
+      server letsencrypt:80 max_fails=0 fail_timeout=1s;
+    }
+    server {
+      listen 80;
+      listen [::]:80;
+      server_name  _;
+
+      location / {
+        add_header Content-Type text/plain; # Prevents download
+        return 200 "Hello world! Kubernetes + Let's encrypt demo.";
+      }
+      # Redirect all traffic in /.well-known/ to letsencrypt
+      location ^~ /.well-known/acme-challenge/ {
+        proxy_pass http://letsencrypt;
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        # image: ubuntu
+        # command:
+        #   - "bash"
+        #   - "-c"
+        #   - "sleep infinity"
+              # HTTP Health Check
+        livenessProbe:
+          httpGet:
+            path: /hello
+            port: 80
+        resources:
+          limits:
+            cpu: 100m
+            memory: 500Mi
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-configs
+          mountPath: /etc/nginx/conf.d
+      # Load the configuration files for nginx
+      volumes:
+        - name: nginx-configs
+          configMap:
+            name: nginx-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  selector:
+    app: nginx
+  ports:
+  - protocol: "TCP"
+    port: 80
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: ambassador
+  name: kubernetes-demo-app-ingress-service
+  namespace: default
+spec:
+  tls:
+  - hosts:
+    - gilesk.ddns.net # Your host. CHANGE ME
+    secretName: letsencrypt-certs # Name of the secret
+  rules:
+  - host: gilesk.ddns.net # CHANGE ME!
+    http:
+      paths:
+      - path: /hello
+        backend:
+          serviceName: nginx
+          servicePort: 80
