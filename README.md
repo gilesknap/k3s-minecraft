@@ -190,3 +190,8 @@ $ k8s-mchelp
         restore the world from backup for a server, overwriting its
         current world
 ```
+
+More Useful Things to do with your Cluster
+------------------------------------------
+
+see [More Useful Stuff](useful/README.md)

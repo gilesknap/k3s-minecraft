@@ -38,3 +38,11 @@ k apply -f syncthing-mapping.yaml
 # k8s dashboard
 k apply -f dashboard-mapping.yaml
 ```
+
+Interesting
+===========
+
+Ambassador can also be used with ingress but claims that mappings are
+superior:
+
+https://www.getambassador.io/docs/edge-stack/latest/topics/running/ingress-controller/

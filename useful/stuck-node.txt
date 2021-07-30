@@ -1,5 +1,0 @@
-When deleting a master node k3s got stuck on the finalizer
-
-The workaround is below. In general this works for resources that cant run their finalizers.
-
-kubectl get node -o name <nodename> | xargs -i kubectl patch {} -p '{"metadata":{"finalizers":[]}}' --type=merge

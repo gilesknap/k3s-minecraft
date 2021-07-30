@@ -87,7 +87,7 @@ add the signing authority to Chrome
 # copy out the server ca cert from the cluster master
 ssh pi1
 sudo -i
-scp  /var/lib/rancher/k3s/server/tls/server-ca.crt giles@gklinux2:/home/giles
+scp  /var/lib/rancher/k3s/server/tls/erver-ca.crt giles@gklinux2:/home/giles
 # get chrome to accept above (don't forget to switch to the ROOT auth tab)
 ```
 
