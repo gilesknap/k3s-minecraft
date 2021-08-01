@@ -107,18 +107,30 @@ See config docs here
 This is an example configuration for dashboard 315
  - https://grafana.com/grafana/dashboards/315
 
-You can verify that the change has worked by looking at the deployed config
-file.
-Get the pod that is running prometheus server and run a shell in it, then
-cat the config file.
+For this exercise we need to add in scrape_configs: job_name: kubernetes-nodes-cadvisor
+listed in the above link. This needs to be merged with the existing set of
+scrape_configs. So first get the current yml config file from the server pod
+
 ``` bash
 export POD_NAME=$(kubectl get pods --namespace monitoring -l "app=prometheus,component=server" -o jsonpath="{.items[0].metadata.name}")
-kubectl exec -it $POD_NAME -- sh
-cd /etc/config
-cat prometheus.yml
-```
 
-OR copy the config file locally and view in your preferred editor like this:
-``` bash
-
+kubectl cp $POD_NAME:/etc/config/..data/prometheus.yml prometheus.yml
 ```
+extract the scrape_configs section from the yaml and merge in kubernetes-nodes-cadvisor.
+update the prometheus.values.yaml serverFiles section accordingly.
+(in this repo the kubernetes-nodes-cadvisor is already merged in).
+
+redeploy with ``./deploy-monitoring.sh``
+
+There is probably a better way to get the default config and maybe there is a
+way to do the merge automatically so you only supply kubernetes-nodes-cadvisor
+definition.  (TODO for refining in the future).
+
+Add the Dashboard
+-----------------
+
+Go to grafana at http:/gknuc.local/grafana/ go to settings and create a
+data source, choose Prometheus and give it the URL of http://prometheus-server.monitoring.svc.cluster.local.
+
+Go to Dashboards / Manage and choose import. Provide the dash number 315.
+
