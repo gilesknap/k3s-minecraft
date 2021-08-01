@@ -21,6 +21,7 @@ To use
   - http://prometheus-server.monitoring.svc.cluster.local
 
 - import a dashboard such as 1860 (node exporter full)
+- actually this one seems better 11074
 
 
 grafana helm chart output
@@ -119,6 +120,9 @@ kubectl cp $POD_NAME:/etc/config/..data/prometheus.yml prometheus.yml
 extract the scrape_configs section from the yaml and merge in kubernetes-nodes-cadvisor.
 update the prometheus.values.yaml serverFiles section accordingly.
 (in this repo the kubernetes-nodes-cadvisor is already merged in).
+
+NOTE: there is already a kubernetes-nodes-cadvisor and you need to overwrite
+the existing one.
 
 redeploy with ``./deploy-monitoring.sh``
 
