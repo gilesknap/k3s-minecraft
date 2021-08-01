@@ -1,6 +1,8 @@
 Useful additions to k3s
 =======================
 
+More Things in this repo
+------------------------
 Notes on things I have deployed to my k3s cluster
 
 - [Ambassador easy ingress](deployed/ambassador/README.md)
@@ -10,6 +12,13 @@ Notes on things I have deployed to my k3s cluster
 - [auto provisioning nfs persistent volumes](deployed/dynamic-nfs/README.md)
 - [grafana monitoring](deployed/monitoring/README.md)
 - [create new master node from etcd backup](deployed/ambassador/README.md)
+
+Other Repos
+-----------
+For a very simple docker build and deploy to kubernetes for a simple service
+see. This pattern should work for any simple service.
+
+- https://github.com/gilesknap/noip
 
 Other useful tips
 =================
