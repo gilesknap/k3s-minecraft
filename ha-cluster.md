@@ -1,3 +1,10 @@
+# Update
+I came to the conclusion that 3 master nodes for a home setup was overkill.
+Instead I now run a backup process for the etcd db that sends it to my
+RAID NFS disks. It is really easy to restore a complete cluster from this
+backup (all PVC mounts are also on the NFS disks). See
+- [backup etcd](useful/deployed/backup/README.md)
+- [restore master from etcd snapshot](useful/deployed/new_master/README.md)
 # Installing a High Availability Cluster
 
 Although the documentation here
@@ -40,4 +47,4 @@ I have the [Flirc passive cooling case](https://flirc.tv/more/raspberry-pi-4-cas
 and this can sustain 100% utilization for 30 minutes or more with no throttling.
 See my test results below.
 
-![alt text](https://github.com/gilesknap/k3s-minecraft/blob/main/images/mytest.png "pi3 stress test")
+![alt text](images/mytest.png "pi3 stress test")
