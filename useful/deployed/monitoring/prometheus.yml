@@ -1,0 +1,65 @@
+global:
+  evaluation_interval: 1m
+  scrape_interval: 1m
+  scrape_timeout: 10s
+rule_files:
+- /etc/config/recording_rules.yml
+- /etc/config/alerting_rules.yml
+- /etc/config/rules
+- /etc/config/alerts
+scrape_configs:
+- bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+  job_name: kubernetes-nodes-cadvisor
+  kubernetes_sd_configs:
+  - role: node
+  metric_relabel_configs:
+  - action: replace
+    regex: ^/machine\.slice/machine-rkt\\x2d([^\\]+)\\.+/([^/]+)\.service$
+    replacement: ${2}-${1}
+    source_labels:
+    - id
+    target_label: rkt_container_name
+  - action: replace
+    regex: ^/system\.slice/(.+)\.service$
+    replacement: ${1}
+    source_labels:
+    - id
+    target_label: systemd_service_name
+  relabel_configs:
+  - action: labelmap
+    regex: __meta_kubernetes_node_label_(.+)
+  - replacement: kubernetes.default.svc:443
+    target_label: __address__
+  - regex: (.+)
+    replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+    source_labels:
+    - __meta_kubernetes_node_name
+    target_label: __metrics_path__
+  scheme: https
+  scrape_interval: 10s
+  scrape_timeout: 10s
+  tls_config:
+    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+alerting:
+  alertmanagers:
+  - kubernetes_sd_configs:
+      - role: pod
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_namespace]
+      regex: monitoring
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_label_app]
+      regex: prometheus
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_label_component]
+      regex: alertmanager
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_probe]
+      regex: .*
+      action: keep
+    - source_labels: [__meta_kubernetes_pod_container_port_number]
+      regex: "9093"
+      action: keep

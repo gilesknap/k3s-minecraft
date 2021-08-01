@@ -92,9 +92,13 @@ scp  /var/lib/rancher/k3s/server/tls/server-ca.crt giles@gklinux2:/home/giles
 ```
 
 This seems to have worked for the following examples:
-http://gilesk.ddns.net/dashboard/
-http://gilesk.ddns.net/hello
-http://gknuc.local/dashboard/
+- http://gilesk.ddns.net/dashboard/
+- http://gilesk.ddns.net/hello
+- http://gknuc.local/dashboard/
 
-etc...
+Note that a better way to do this may be to use TLSContext. See the end of :
+- https://www.getambassador.io/docs/edge-stack/latest/topics/running/ingress-controller/
+
+
+
 
