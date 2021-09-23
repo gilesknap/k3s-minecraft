@@ -7,7 +7,7 @@ affinity:
         - key: kubernetes.io/hostname
           operator: In
           values:
-          - pi1
+          - gknuc
 
 # overriding image for running on pi1 (should not be needed?)
 image:
@@ -27,19 +27,15 @@ persistence:
     enabled: true
     mountPath: /config
     storageClass: nfs-storageclass
-# this enables access to the etcd snapshots folder for backup
-  snapshots:
+
+# this enables access to the Google Disk
+  backup:
     enabled: true
     type: hostPath
     mountPath: /snapshots
     hostPath: /var/lib/rancher/k3s/server/db/snapshots
-    # unfortunately syncthing writes hidden files even to Send only folders
     readOnly: false
 
-# also unfortunately the snapshots are readable by root only
-# they contain secrets so the backup needs guarding too
-podSecurityContext:
-    runAsUser: 0
 
 
 
