@@ -110,6 +110,13 @@ function k8s-mcwait()
 {
     # block until an mc server has good health
     deployname="${1}"-minecraft
+    downfirst="${2:-false}"
+
+    if [ "${downfirst}" == "true" ] ; then
+        # first wait for the pod to be inactive
+        echo "waiting for ${deployname} pod to delete pod"
+        kubectl  wait  deployment ${deployname} --for=condition=available=false --timeout 30s -n minecraft
+    fi
 
     # first wait for the pod to be active
     echo "waiting for ${deployname} pod to start"
@@ -125,6 +132,7 @@ function k8s-mcwait()
         kubectl  wait ${pod} --for=condition=ready --timeout 160s -n minecraft
     fi
 }
+
 
 ###############################################################################
 ## User Functions
@@ -315,10 +323,10 @@ function k8s-mcrestore()
             helm upgrade ${releasename} -f ${filename} ${restore_settings} ${MCHELMREPO}
 
             # reset the FORCE_WORLD_COPY so future changes will be preserved on restart
-            k8s-mcwait ${releasename}
+            k8s-mcwait ${releasename} true
             kubectl -n minecraft set env deployments.apps/${releasename}-minecraft FORCE_WORLD_COPY=false
             # the env setting creates a new pod
-            k8s-mcwait ${releasename}
+            k8s-mcwait ${releasename} true
         else
             echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
             return 1
