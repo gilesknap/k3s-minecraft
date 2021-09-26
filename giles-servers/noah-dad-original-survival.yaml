@@ -2,7 +2,7 @@ imagePullSecret: regcred
 
 # Common minecraft server settings
 minecraftServer:
-  version: 21w05b
+  version: LATEST
   whitelist: TransformerScorn,DispenserAD11
   ops:
   # always set game mode when a player connects
