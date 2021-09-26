@@ -81,6 +81,11 @@ function k8s-mcvalidbackup()
     MCBACKUP=${MCBACKUP:-$(read -p "path to backup folder: " IN; echo $IN)}
 
     case "${k8smcbackupFileName}" in
+    "")
+        # nothing specified - look for most recent backup
+        k8smcbackupFileName=$(ls ${MCBACKUP}/*${releasename}.zip | tail -n 1)
+        echo "using latest backup $k8smcbackupFileName"
+        ;;
     /*)
         # full path with leading slash - leave it alone
         ;;
@@ -270,6 +275,7 @@ function k8s-mcbackup()
 
         kubectl exec -n minecraft ${pod} -- rcon-cli save-off
         kubectl exec -n minecraft ${pod} -- rcon-cli save-all
+        sleep 5
         tmp_dir=$(mktemp -d)
         kubectl -n minecraft cp ${pod#pod/}:/data ${tmp_dir}
         zip -r ${MCBACKUP}/${zipname} ${tmp_dir}
@@ -298,39 +304,40 @@ function k8s-mcrestore()
     # IMPORTANT - the backup folder must be mounted read only in the
     # server pods, see extraVolumes in minecraft-helm.yaml
 
-    filename="${1}"
+    yaml_filename="${1}"
+    backup_filename="${2}"
+    base=$(basename ${filename})
+    releasename="${base%.*}"
+
+    if ! k8s-mcvalidyaml ${yaml_filename}; then
+        echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
+        return 1
+    fi
 
     read -p "WARNING this will overwrite the current world. OK? " -n 1 -r
     echo
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
 
-        if ! k8s-mcvalidbackup ${2}; then
+        if ! k8s-mcvalidbackup ${backup_filename}; then
             echo "please name a valid zipped minecraft save from ${MCBACKUP} as a parameter 2"
             return 1
         fi
 
-        if k8s-mcvalidyaml ${filename}; then
-            restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${k8smcbackupFileName},minecraftServer.eula=true"
+        restore_settings="--set extraEnv.FORCE_WORLD_COPY=true,minecraftServer.downloadWorldUrl=${k8smcbackupFileName},minecraftServer.eula=true"
 
-            echo $restore_settings
+        echo $restore_settings
 
-            base=$(basename ${filename})
-            releasename="${base%.*}"
-            helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-            # default to using itzg repo but allow override through export MCHELMREPO=xxx for testing
-            MCHELMREPO=${MCHELMREPO:-minecraft-server-charts/minecraft}
-            helm upgrade ${releasename} -f ${filename} ${restore_settings} ${MCHELMREPO}
+        helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+        # default to using itzg repo but allow override through export MCHELMREPO=xxx for testing
+        MCHELMREPO=${MCHELMREPO:-minecraft-server-charts/minecraft}
+        helm upgrade ${releasename} -f ${yaml_filename} ${restore_settings} ${MCHELMREPO}
 
-            # reset the FORCE_WORLD_COPY so future changes will be preserved on restart
-            k8s-mcwait ${releasename} true
-            kubectl -n minecraft set env deployments.apps/${releasename}-minecraft FORCE_WORLD_COPY=false
-            # the env setting creates a new pod
-            k8s-mcwait ${releasename} true
-        else
-            echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
-            return 1
-        fi
+        # reset the FORCE_WORLD_COPY so future changes will be preserved on restart
+        k8s-mcwait ${releasename} true
+        kubectl -n minecraft set env deployments.apps/${releasename}-minecraft FORCE_WORLD_COPY=false
+        # the env setting creates a new pod
+        k8s-mcwait ${releasename} true
     fi
 }
 
