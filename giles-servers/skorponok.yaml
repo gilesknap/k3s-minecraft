@@ -70,4 +70,4 @@ persistence:
 
 # choose the node to run on (delete if not needed)
 nodeSelector:
-  kubernetes.io/hostname: gklinux2
+  kubernetes.io/hostname: gknuc

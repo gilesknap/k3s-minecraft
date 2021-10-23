@@ -27,7 +27,7 @@ minecraftServer:
   forcegameMode: true
   levelSeed:
   maxWorldSize: 10000
-  gameMode: survival
+  gameMode: adventure
   motd: "The Adventure of Doom (sic)"
   pvp: false
   serviceType: NodePort
@@ -67,4 +67,3 @@ persistence:
 # choose the node to run on (delete if not needed)
 nodeSelector:
   kubernetes.io/hostname: gknuc
-

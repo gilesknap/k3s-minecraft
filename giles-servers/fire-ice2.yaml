@@ -54,7 +54,7 @@ extraVolumes:
 resources:
   requests:
     memory: 6Gi
-    cpu: 6
+    cpu: 2
 
 nodeSelector:
   kubernetes.io/hostname: gknuc
