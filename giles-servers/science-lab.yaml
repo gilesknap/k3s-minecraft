@@ -74,3 +74,8 @@ persistence:
 # choose the node to run on (delete if not needed)
 nodeSelector:
   kubernetes.io/hostname: gknuc
+
+resources:
+  requests:
+    memory: 6Gi
+    cpu: 6

@@ -306,7 +306,8 @@ function k8s-mcrestore()
 
     yaml_filename="${1}"
     backup_filename="${2}"
-    base=$(basename ${filename})
+    echo "attempting to restore world description ${yaml_filename} with backup ${backup_filename}"
+    base=$(basename ${yaml_filename})
     releasename="${base%.*}"
 
     if ! k8s-mcvalidyaml ${yaml_filename}; then
