@@ -1,3 +1,5 @@
+imagePullSecret: regcred
+
 # This is value overrides for the helm chart defined here
 # https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
 
@@ -7,13 +9,13 @@
 
 # this is where I store world backups so mount it read-only in order to start a new
 # server from a backup
-imagePullSecret: regcred
-
 extraVolumes:
+  # define where the volume mounts in the container
   - volumeMounts:
       - name: bigdisk
         mountPath: /mnt/bigdisk
         readOnly: true
+    # define the remote nfs mount to attach to above
     volumes:
       - name: bigdisk
         nfs:
@@ -21,41 +23,46 @@ extraVolumes:
           path: /mnt/bigdisk
 
 minecraftServer:
-  # Noahs friends get access, Noah and I get ops
-  whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
+  whitelist: TransformerScorn,DispenserAD11
   ops: TransformerScorn,DispenserAD11
+  # always set game mode when a player connects
   forcegameMode: true
   levelSeed:
-  maxWorldSize: 10000
-  gameMode: adventure
-  motd: "The Adventure of Doom (sic)"
+  maxWorldSize: 29999983
+  gameMode: creative
+  motd: "Science Lab, Redstone Museum and Scenic Railway"
   pvp: false
+  # this means you get the node IP address on K3s
   serviceType: NodePort
   # restore the world from a backup on first execution
-  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-02-23.16-21.Adventure.THofDoom22.zip
-  # external port must be unique across all mc server instances
-  nodePort: 30600
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/mctest.zip
+  # external node port must be unique across all mc server instances
+  nodePort: 30350
+  # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
+  viewDistance: 10
 
   # enable rcon for remote control - set to false if not required
   rcon:
     # external port must be unique across all mc server instances
-    nodePort: 30601
     serviceType: NodePort
+    nodePort: 30351
     enabled: true
 
 extraEnv:
   # recommended rolling logs for saving disk
   ENABLE_ROLLING_LOGS: true
   # if this is true then minecraftServer properties above are always applied
-  # if false they only apply at first run
-  OVERRIDE_SERVER_PROPERTIES: true
+  # on restart, if false they only apply at first run
+  OVERRIDE_SERVER_PROPERTIES: no
   # if this is true then downloadWorldUrl is always loaded on restart
   # useful for resetting the world but should be reset to false afterwards
+  # WARNING: setting this to true deletes your previous world data
   FORCE_WORLD_COPY: false
 
-# required to save the world in persistant local-path storage
+# required to save the world in persistant local-path storage (k3s default Storage Class)
 # by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
-# I beleive this ties the deployment to the first node it goes to
+# NOTE this ties the deployment to the first node it goes to
+# we could perhaps use an NFS mount to avoid this
 persistence:
   storageClass: nfs-storageclass
   annotations: {}
@@ -66,3 +73,11 @@ persistence:
 # choose the node to run on (delete if not needed)
 nodeSelector:
   kubernetes.io/hostname: gknuc
+
+resources:
+  requests:
+    memory: 4Gi
+    cpu: 1
+  limits:
+    memory: 12Gi
+    cpu: 8

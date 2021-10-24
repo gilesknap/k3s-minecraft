@@ -239,7 +239,7 @@ function k8s-mcdeploy()
         # default to using itzg repo but allow override through export MCHELMREPO=xxx for testing
         MCHELMREPO=${MCHELMREPO:-minecraft-server-charts/minecraft}
         helm upgrade --install ${releasename} -f ${filename} --set minecraftServer.eula=${MCEULA},rcon.password="${MCPASSWD}" ${MCHELMREPO}
-        k8s-mcwait $releasename
+        k8s-mcwait $releasename true
     else
         echo "please supply a valid helm values override file for parameter 1 (see example dashboard-admin.yaml)"
     fi
@@ -271,7 +271,7 @@ function k8s-mcbackup()
     k8s-mcstart "${1}"
 
     if [ "${pod}" ]; then
-        zipname=$(date +%Y-%m-%d-%X)-${shortname}.zip
+        zipname=$(date +%Y-%m-%dZ%X)-${shortname}.zip
 
         kubectl exec -n minecraft ${pod} -- rcon-cli save-off
         kubectl exec -n minecraft ${pod} -- rcon-cli save-all
