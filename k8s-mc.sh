@@ -42,7 +42,7 @@ function k8s-mccheckname()
     fi
 
     # if there is a pod associated with the app name then set $pod to its name
-    pod=$(kubectl get pods -n minecraft -l app=${deployname} -o name)
+    pod=$(kubectl get pods -n minecraft -l app=${deployname} --field-selector=status.phase==Running -o name)
 }
 
 function k8s-mccheck ()
