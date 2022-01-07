@@ -13,6 +13,8 @@ Install Ambassador
 ==================
 Deploy ambassador as a lightweight ingress controller
 
+Make sure you have disabled traefik before you run these steps.
+
 https://rancher.com/blog/2020/deploy-an-ingress-controllers
 discusses how to setup ingress for k3s but it is better to
  do it using helm as follows:
