@@ -19,10 +19,18 @@ discusses how to setup ingress for k3s but it is better to
 ``` bash
 # Add the Repo:
 helm repo add datawire https://www.getambassador.io
+helm repo update
+
+# set up CRDS
+# important - this will fail if you have arm nodes as it will try to run on them
+# taint your arm nodes as follows (including the master if that is arm)
+# kubectl taint nodes pi1 architecture=arm:NoSchedule
+kubectl apply -f https://app.getambassador.io/yaml/emissary/latest/emissary-crds.yaml
+kubectl wait --timeout=90s --for=condition=available deployment emissary-apiext -n emissary-system
 
 # Create Namespace and Install:
-kubectl create namespace ambassador && \
-helm install ambassador --namespace ambassador datawire/ambassador && \
+kubectl create namespace ambassador
+helm install ambassador --namespace ambassador datawire/ambassador
 kubectl -n ambassador wait --for condition=available --timeout=90s deploy -lproduct=aes
 ```
 
