@@ -18,19 +18,15 @@ tolerations:
   operator: "Equal"
   value: "arm"
   effect: "NoSchedule"
-# allow running on the master (actually not required ...)
-# - key: "node-role.kubernetes.io/master"
-#   operator: "Exists"
-#   effect: "NoSchedule"
 
 config: |
   protocol=dyndns2
-  use=web, web=myip.dnsomatic.com
-  ssl=yes
-  server=updates.opendns.com
+  use=web,web=checkip.dyndns.com/,web-skip='IP Address'
+  server=dynupdate.no-ip.com
   login=gilesknap@gmail.com
   password=${password}
-  GilesHome2
+  gilesk.ddns.net
 
 # the last line above is the Personal Network Name to update. See https://dashboard.opendns.com/
 # login and password are the creds used to log in to https://dashboard.opendns.com/
+

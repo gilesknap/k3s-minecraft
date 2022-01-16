@@ -66,5 +66,15 @@ spec:
             service:
               name: test-nginx-service
               port:
+                number: 80           
+  - host: gilesk.ddns.net
+    http:
+      paths:
+        - path: /test
+          pathType: Prefix
+          backend:
+            service:
+              name: test-nginx-service
+              port:
                 number: 80
                 
