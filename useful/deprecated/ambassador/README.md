@@ -1,3 +1,9 @@
+UPDATE
+======
+This has changed and got more complex.
+I think nginx is a more popular choice anyway so now trying 
+https://blog.thenets.org/how-to-create-a-k3s-cluster-with-nginx-ingress-controller/
+
 Ambassador Ingress Controller
 =============================
 
@@ -7,6 +13,7 @@ Note this means disabling traefik and replacing with `Ambassador Edge Stack`
 
 See:
 https://www.getambassador.io/docs/edge-stack/latest/tutorials/getting-started/
+https://kubernetes.github.io/ingress-nginx/deploy/
 
 
 Install Ambassador

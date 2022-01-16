@@ -1,0 +1,61 @@
+image: itzg/minecraft-server
+imageTag: java8
+imagePullSecret: regcred
+
+minecraftServer:
+  rcon:
+    enabled: true
+    serviceType: NodePort
+    nodePort: 31710
+  nodePort: 31711
+  downloadWorldUrl:
+  motd: "Better Minecraft"
+  gameMode: survival
+  whitelist: TransformerScorn,DispenserAD11,Bigbob2
+  ops: TransformerScorn,DispenserAD11
+  forcegameMode: true
+  maxWorldSize: 29999984
+  serviceType: NodePort
+  viewDistance: 25
+  memory: 16G
+
+extraEnv:
+  TYPE: CURSEFORGE
+  CF_SERVER_MOD: /mnt/bigdisk/mods/Better+Minecraft+Server+Pack+[FORGE]+v8.zip
+  VERSION: 1.17.1
+  ENABLE_ROLLING_LOGS: true
+  OVERRIDE_SERVER_PROPERTIES: false
+  FORCE_WORLD_COPY: false
+
+persistence:
+  storageClass: nfs-storageclass
+  annotations: {}
+  dataDir:
+    enabled: true
+    Size: 8Gi
+
+extraVolumes:
+  - volumeMounts:
+      - name: bigdisk
+        mountPath: /mnt/bigdisk
+        readOnly: true
+      - name: mods
+        mountPath: /mods
+        readOnly: true
+    volumes:
+      - name: bigdisk
+        nfs:
+          server: 192.168.86.32
+          path: /mnt/bigdisk
+      - name: mods
+        nfs:
+          server: 192.168.86.32
+          path: /mnt/bigdisk/mods
+
+resources:
+  requests:
+    memory: 16Gi
+    cpu: 8
+
+nodeSelector:
+  kubernetes.io/hostname: gknuc

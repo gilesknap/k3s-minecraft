@@ -1,0 +1,90 @@
+imagePullSecret: regcred
+
+# This is value overrides for the helm chart defined here
+# https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
+
+# to use this file
+# helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+# helm upgrade --install WORLD_NAME -f THIS_FILE.yaml --set minecraftServer.eula=true,rcon.password=YOUR_PWD minecraft-server-charts/minecraft
+
+# this is where I store world backups so mount it read-only in order to start a new
+# server from a backup
+extraVolumes:
+  # define where the volume mounts in the container
+  - volumeMounts:
+      - name: bigdisk
+        mountPath: /mnt/bigdisk
+        readOnly: true
+    # define the remote nfs mount to attach to above
+    volumes:
+      - name: bigdisk
+        nfs:
+          server: 192.168.86.32
+          path: /mnt/bigdisk
+
+minecraftServer:
+  whitelist: TransformerScorn,DispenserAD11,BigBob2
+  ops: TransformerScorn
+  # always set game mode when a player connects
+  forcegameMode: true
+  levelSeed:
+  maxWorldSize: 29999983
+  gameMode: creative
+  motd: "Noah and James Creative World"
+  pvp: false
+  # this means you get the node IP address on K3s
+  serviceType: NodePort
+  # restore the world from a backup on first execution
+  # downloadWorldUrl:
+  # external node port must be unique across all mc server instances
+  nodePort: 30505
+  # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
+  viewDistance: 32
+
+  # enable rcon for remote control - set to false if not required
+  rcon:
+    # external port must be unique across all mc server instances
+    serviceType: NodePort
+    nodePort: 30506
+    enabled: true
+
+# ensure that the resources matches java memory allocation
+# resources:
+#   requests:
+#     memory: 4Gi
+memory: 8192M
+
+extraEnv:
+  # recommended rolling logs for saving disk
+  ENABLE_ROLLING_LOGS: true
+  # if this is true then minecraftServer properties above are always applied
+  # on restart, if false they only apply at first run
+  OVERRIDE_SERVER_PROPERTIES: yes
+  # if this is true then downloadWorldUrl is always loaded on restart
+  # useful for resetting the world but should be reset to false afterwards
+  # WARNING: setting this to true deletes your previous world data
+  FORCE_WORLD_COPY: false
+
+# required to save the world in persistant local-path storage (k3s default Storage Class)
+# by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
+# NOTE this ties the deployment to the first node it goes to
+# we could perhaps use an NFS mount to avoid this
+persistence:
+  storageClass: nfs-storageclass
+  annotations: {}
+  dataDir:
+    enabled: true
+    Size: 2Gi
+
+# choose the node to run on (delete if not needed)
+nodeSelector:
+  kubernetes.io/hostname: gknuc
+
+
+resources:
+  requests:
+    memory: 4Gi
+    cpu: 4
+  limits:
+    memory: 10Gi
+    cpu: 8

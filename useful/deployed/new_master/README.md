@@ -20,7 +20,7 @@ Restore from Backup with brand new server
 build a new server with your etcd snapshot
 ------------------------------------------
 
-Note that we use --disable traefik since we are using ambassador for ingress.
+Note that we use --disable traefik since we are using ingress-nginx instead for ingress.
 
 ``` bash
 curl -fL https://get.k3s.io | sh -s - server --disable traefik
