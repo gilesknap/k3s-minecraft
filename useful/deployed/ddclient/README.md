@@ -26,7 +26,7 @@ kubectl create namespace admin
 Install with some config for OpenDNS and for running on my pi nodes only.
 
 ```
-sed s/\${password}/YOUR_PASSWORD/ opendns.yaml | helm upgrade -i  ddclient --namespace admin k8s-at-home/ddclient -f -
+sed s/\${password}/YOUR_PASSWORD/ opendns.yaml | helm upgrade -i  opendns --namespace admin k8s-at-home/ddclient -f -
 ```
 NoIP
 ====
@@ -47,8 +47,7 @@ kubectl create namespace admin
 ```
 
 Install with some config for NoIP and for running on my pi nodes only.
-
 ```
-sed s/\${password}/YOUR_PASSWORD/ noip.yaml | helm upgrade -i  ddclient --namespace admin k8s-at-home/ddclient -f -
+sed s/\${password}/YOUR_PASSWORD/ noip.yaml | helm upgrade -i  noip --namespace admin k8s-at-home/ddclient -f -
 ```
 
