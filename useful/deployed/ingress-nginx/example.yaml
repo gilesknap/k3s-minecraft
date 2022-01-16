@@ -66,7 +66,8 @@ spec:
             service:
               name: test-nginx-service
               port:
-                number: 80           
+                number: 80        
+  # a public dns name for one of my worker nodes    
   - host: gilesk.ddns.net
     http:
       paths:

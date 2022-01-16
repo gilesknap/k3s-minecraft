@@ -2,6 +2,8 @@ These links were useful in working this out
 
    - https://kubernetes.github.io/ingress-nginx/deploy/
    - https://blog.thenets.org/how-to-create-a-k3s-cluster-with-nginx-ingress-controller/
+   - https://jonathangazeley.com/2020/09/16/exposing-the-kubernetes-dashboard-with-an-ingress/
+   - https://stackoverflow.com/questions/48324760/ingress-configuration-for-dashboard
 
 
 Install ingress-nginx with:
