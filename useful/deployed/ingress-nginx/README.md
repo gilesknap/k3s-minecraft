@@ -1,3 +1,5 @@
+# Setting up Ingress and Certificate Manager for Lets Encrypt
+## in particular to expose the Dashboard without requiring a Proxy
 These links were useful in working this out
 
    - https://kubernetes.github.io/ingress-nginx/deploy/
@@ -5,7 +7,7 @@ These links were useful in working this out
    - https://jonathangazeley.com/2020/09/16/exposing-the-kubernetes-dashboard-with-an-ingress/
    - https://stackoverflow.com/questions/48324760/ingress-configuration-for-dashboard
 
-# Get nginx ingress working
+## Get nginx ingress working
 
 Install ingress-nginx with:
 ```
@@ -22,7 +24,7 @@ kubectl wait --namespace ingress-nginx \
   --timeout=120s
 ```
 
-# Create insecure ingress for Dashboard
+## Create insecure ingress for Dashboard
 Now you can get dashboard ingress working in an unsecure fashion using
 [this yaml](dash-ingress.yaml).
 
@@ -39,7 +41,7 @@ The second one is my public dns name provided by noip and port forwarded into
 one of my servers. Therefore it is a bad idea to send the login token over
 this connection until we secure with https.
 
-# set up a Cert Manager
+## set up a Cert Manager
 To secure the connection you need to generate an SSL cert for the site.
 I used these notes to set up a cert manager with lets-encrypt certificates.
 
@@ -82,7 +84,7 @@ kubectl apply -f cert-manager-arm.yaml
 
 OK - that was easy !
 
-# Stage Cert Manager with Lets Encrypt
+## Stage Cert Manager with Lets Encrypt
 
 Continuing with instructions from https://opensource.com/article/20/3/ssl-letsencrypt-k3s
 
@@ -95,7 +97,7 @@ kubectl apply -f letsencrypt-issuer-staging.yaml
 kubectl get clusterissuers
 ```
 
-# Request test a Certificate
+## Request test a Certificate
 
 ```
 kubectl apply -f le-test-certificate.yaml
@@ -112,7 +114,7 @@ kubectl delete certificates gilesk-ddns-net
 kubectl delete secrets gilesk-ddns-net-tls
 ```
 
-# Configure production cert manager
+## Configure production cert manager
 
 ```
 kubectl apply -f lets-encrypt-issuer-production.yaml
@@ -127,7 +129,8 @@ internet. I was not sure if this would break certificate requests but checked
 and apparently not (no probably I never needed the port forward - unless
 I do want to expose services on the internet)
 
-**Next challenge** - how do I expose some services but not others? I guess I could
+## Next challenge
+How do I expose some services but not others? I guess I could
 do filtering at the router - but it feels like k8s should be able to do this
 for me. Ingresses usually only work on 80 and 443 but maybe it is possible to
 set up >1 ingress with different ports?

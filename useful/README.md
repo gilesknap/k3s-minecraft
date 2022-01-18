@@ -5,7 +5,7 @@ More Things in this repo
 ------------------------
 Notes on things I have deployed to my k3s cluster
 
-- [Ambassador easy ingress](deployed/ambassador/README.md)
+- [Ingress and Cert Manager](deployed/ingress-nginx/README.md)
 - [backup etcd](deployed/backup/README.md)
 - [ddclient for opendns and noip](deployed/ddclient/README.md)
 - [use docker creds for better pull limits](deployed/docker-account/README.md)
@@ -22,6 +22,11 @@ see. This pattern should work for any simple service.
 
 Other useful tips
 =================
+
+Automated Update of K3S version
+-------------------------------
+For automatic Update to Latest Stable K3S version 
+  - see https://rancher.com/docs/k3s/latest/en/upgrades/automated/
 
 Raspberry Pis
 -------------
@@ -49,6 +54,21 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: amd64
+```
+
+Finally to ensure pods do run on a pi:
+``` yaml
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - arm64
+                - arm
+
 ```
 
 When deploying a new raspi to the cluster these are some quick notes on
