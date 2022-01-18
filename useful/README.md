@@ -5,6 +5,7 @@ More Things in this repo
 ------------------------
 Notes on things I have deployed to my k3s cluster
 
+- [Automatic upgrade of k3s](deployed/upgrade_plans/README.md)
 - [Ingress and Cert Manager](deployed/ingress-nginx/README.md)
 - [backup etcd](deployed/backup/README.md)
 - [ddclient for opendns and noip](deployed/ddclient/README.md)
@@ -22,11 +23,6 @@ see. This pattern should work for any simple service.
 
 Other useful tips
 =================
-
-Automated Update of K3S version
--------------------------------
-For automatic Update to Latest Stable K3S version 
-  - see https://rancher.com/docs/k3s/latest/en/upgrades/automated/
 
 Raspberry Pis
 -------------
