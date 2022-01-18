@@ -55,6 +55,8 @@ to get this error:
 
 I can't easily explain this. Perhaps there is a routing issue on this Pi. TODO
 see what happens when joining further pis.
+UPDATE: a fix to this was to add pi1 into the /etc/hosts of the other nodes
+so I assume this is because there is no DNS resolving the local network names.
 
 Also NOTE:
    I needed to delete and re-create the service account for kubernetes-dashboard
