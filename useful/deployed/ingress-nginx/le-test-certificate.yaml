@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gilesk-ddns-net
+  namespace: default
+spec:
+  secretName: gilesk-ddns-net-tls
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  commonName: gilesk.ddns.net
+  dnsNames:
+  - gilesk.ddns.net

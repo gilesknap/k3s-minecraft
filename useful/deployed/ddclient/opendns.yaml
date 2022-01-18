@@ -3,15 +3,14 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: kubernetes.io/hostname
+        - key: kubernetes.io/arch
           operator: In
           values:
-          - pi2
-          - pi3
-          - pi4
+          - arm
+          - arm64
 
 image:
-  tag: arm32v7-latest
+  tag: latest
 
 # allow running on my tainted raspberry pi nodes
 tolerations:

@@ -1,23 +1,26 @@
+
+image:
+  tag: latest
+
+# ### NB between the comments is required to ensure and allow running on Pi nodes
+
 affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: kubernetes.io/hostname
+        - key: kubernetes.io/arch
           operator: In
           values:
-          - pi2
-          - pi3
-          - pi4
-
-image:
-  tag: arm32v7-latest
+          - arm64
 
 tolerations:
 - key: "architecture"
   operator: "Equal"
   value: "arm"
   effect: "NoSchedule"
+
+# ### NB #########################################################################
 
 config: |
   protocol=dyndns2
