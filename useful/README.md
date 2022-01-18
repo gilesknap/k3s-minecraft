@@ -31,6 +31,14 @@ on the raspis so I added a taint to them e.g.
 ```bash
 kubectl taint nodes pi3 architecture=arm:NoSchedule
 ```
+UPDATE - this blew up for system-upgrade-controller and is a pain for everything
+that does support raspi. So I'm removing these taints and will put affinity 
+onto any pods that can't run on raspi instead.
+``` bash
+kubectl taint nodes pi3 architecture=arm:NoSchedule-
+```
+
+
 Then for those items you do want to run there, add a toleration.
 e.g.
 ``` yaml
