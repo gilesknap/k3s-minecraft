@@ -1,0 +1,88 @@
+---
+# this template is for the root Pane on each tab. It provides the 
+# header tab-bar and footer status-bar
+template:
+  direction: Horizontal
+  parts:
+    - direction: Vertical  # part 1
+      borderless: true
+      split_size:
+        Fixed: 1
+      run:
+        plugin:
+          location: "zellij:tab-bar"
+    - direction: Vertical # part 2
+      body: true
+    - direction: Vertical # part 3
+      borderless: true
+      split_size:
+        Fixed: 2
+      run:
+        plugin:
+          location: "zellij:status-bar"
+# this does not work - the docs don't specify at which level to place session
+session:
+  name: "k8s-session"
+  attach: true
+tabs:
+  - name: "K8s Monitor"
+    direction: Vertical
+    parts:
+      - direction: Horizontal
+        borderless: true
+        parts:
+          - split_size:
+              Fixed: 3
+            borderless: true
+            run:
+              command: {cmd: ssh, args: ["-t", "pi1", "watch -t \"hostname && vcgencmd measure_temp\""]}
+          - pane_name: pi1
+            split_size:
+              Percent: 30
+            run:
+              command: {cmd: ssh, args: ["-t", "pi1", "top && bash"]}
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi1", "journalctl -fu k3s"]}
+      - direction: Horizontal
+        borderless: false
+        parts:
+          - split_size:
+              Fixed: 3
+            borderless: true
+            run:
+              command: {cmd: ssh, args: ["-t", "pi2", "watch -t \"hostname && vcgencmd measure_temp\""]}
+          - split_size:
+              Percent: 30
+            run:
+              command: {cmd: ssh, args: ["-t", "pi2", "top && bash"]}
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi2", "journalctl -fu k3s"]}
+      - direction: Horizontal
+        borderless: false
+        parts:
+          - split_size:
+              Fixed: 3
+            borderless: true
+            run:
+              command: {cmd: ssh, args: ["-t", "pi3", "watch -t \"hostname && vcgencmd measure_temp\""]}
+          - split_size:
+              Percent: 30
+            run:
+              command: {cmd: ssh, args: ["-t", "pi3", "top && bash"]}
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi3", "journalctl -fu k3s"]}
+      - direction: Horizontal
+        borderless: false
+        parts:
+          - split_size:
+              Fixed: 3
+            borderless: true
+            run:
+              command: {cmd: ssh, args: ["-t", "gknuc", "watch -t \"hostname && sensors | grep Package\""]}
+          - split_size:
+              Percent: 30
+            run:
+              command: {cmd: ssh, args: ["-t", "gknuc", "top && bash"]}
+          - run:
+              command: {cmd: ssh, args: ["-t", "gknuc", "journalctl -fu k3s"]}
+        
