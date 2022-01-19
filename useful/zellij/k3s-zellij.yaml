@@ -29,60 +29,62 @@ tabs:
     direction: Vertical
     parts:
       - direction: Horizontal
-        borderless: true
         parts:
-          - split_size:
-              Fixed: 3
-            borderless: true
-            run:
-              command: {cmd: ssh, args: ["-t", "pi1", "watch -t \"hostname && vcgencmd measure_temp\""]}
-          - pane_name: pi1
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi1", "watch -t \"vcgencmd measure_temp\""]}
             split_size:
-              Percent: 30
-            run:
-              command: {cmd: ssh, args: ["-t", "pi1", "top && bash"]}
+              Fixed: 2
+            borderless: true
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi1", "htop && bash"]}
+            pane_name: pi1
+            split_size:
+              Percent: 30            
           - run:
               command: {cmd: ssh, args: ["-t", "pi1", "journalctl -fu k3s"]}
       - direction: Horizontal
         borderless: false
         parts:
-          - split_size:
-              Fixed: 3
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi2", "watch -t \"vcgencmd measure_temp\""]}
+            split_size:
+              Fixed: 2
             borderless: true
-            run:
-              command: {cmd: ssh, args: ["-t", "pi2", "watch -t \"hostname && vcgencmd measure_temp\""]}
-          - split_size:
-              Percent: 30
-            run:
-              command: {cmd: ssh, args: ["-t", "pi2", "top && bash"]}
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi2", "htop && bash"]}
+            pane_name: pi2
+            split_size:
+              Percent: 30            
           - run:
               command: {cmd: ssh, args: ["-t", "pi2", "journalctl -fu k3s"]}
       - direction: Horizontal
         borderless: false
         parts:
-          - split_size:
-              Fixed: 3
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi3", "watch -t \"vcgencmd measure_temp\""]}
+            split_size:
+              Fixed: 2
             borderless: true
-            run:
-              command: {cmd: ssh, args: ["-t", "pi3", "watch -t \"hostname && vcgencmd measure_temp\""]}
-          - split_size:
-              Percent: 30
-            run:
-              command: {cmd: ssh, args: ["-t", "pi3", "top && bash"]}
+          - run:
+              command: {cmd: ssh, args: ["-t", "pi3", "htop && bash"]}
+            pane_name: pi3
+            split_size:
+              Percent: 30            
           - run:
               command: {cmd: ssh, args: ["-t", "pi3", "journalctl -fu k3s"]}
       - direction: Horizontal
         borderless: false
         parts:
-          - split_size:
-              Fixed: 3
+          - run:
+              command: {cmd: ssh, args: ["-t", "gknuc", "watch -t \"sensors | grep Package\""]}
+            split_size:
+              Fixed: 2
             borderless: true
-            run:
-              command: {cmd: ssh, args: ["-t", "gknuc", "watch -t \"hostname && sensors | grep Package\""]}
-          - split_size:
-              Percent: 30
-            run:
-              command: {cmd: ssh, args: ["-t", "gknuc", "top && bash"]}
+          - run:
+              command: {cmd: ssh, args: ["-t", "gknuc", "htop && bash"]}
+            pane_name: gknuc
+            split_size:
+              Percent: 30            
           - run:
               command: {cmd: ssh, args: ["-t", "gknuc", "journalctl -fu k3s"]}
-        
+              

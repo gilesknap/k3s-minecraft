@@ -1,4 +1,4 @@
-# this makes the ambassador mapping work
+# this makes the ingress mapping work
 grafana.ini:
   server:
     # The full public facing url you use in browser, used for redirects and emails
@@ -6,9 +6,12 @@ grafana.ini:
 
 # for some reason nfs-storageclass causes grafana pod to exit 1 with no log
 # so use local-path and tie to a specific server for local storage
-persistence:
-  enabled: true
-  storageClassName: local-path
+
+# is this still an issue ??
+
+# persistence:
+#   enabled: true
+#   storageClassName: local-path
 
 affinity:
   nodeAffinity:
@@ -19,7 +22,8 @@ affinity:
           - key: kubernetes.io/hostname
             operator: In
             values:
-            - pi4
+            - pi3
+            - pi2
 
 tolerations:
 - key: "architecture"

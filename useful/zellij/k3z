@@ -2,10 +2,10 @@
 
 # a script to launch a set of windows in the zellij terminal muxer for monitoring 
 # all the nodes in giles k8s cluster
-export THIS_DIR=$(dirname "${BASH_SOURCE[0]}")
+export ZELLIJ_DIR=$(dirname "${BASH_SOURCE[0]}")
 
 export KUBECONFIG=/home/giles/.kube/mcconfig:/home/giles/.kube/config_argus:/home/giles/.kube/config_pollux
 kubectl config use-context minecraft
-source ${THIS_DIR}/../../k8s-mc.sh
+source ${ZELLIJ_DIR}/../../k8s-mc.sh
 
-zellij --layout-path ${THIS_DIR}/k3s-zellij.yaml
+zellij --layout-path ${ZELLIJ_DIR}/k3s-zellij.yaml
