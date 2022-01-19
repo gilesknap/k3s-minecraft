@@ -2,8 +2,7 @@
 image:
   tag: latest
 
-# ### NB between the comments is required to ensure and allow running on Pi nodes
-
+# affinity to the raspberry pi nodes
 affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
@@ -14,13 +13,6 @@ affinity:
           values:
           - arm64
 
-tolerations:
-- key: "architecture"
-  operator: "Equal"
-  value: "arm"
-  effect: "NoSchedule"
-
-# ### NB #########################################################################
 
 config: |
   protocol=dyndns2

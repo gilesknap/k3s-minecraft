@@ -1,8 +1,0 @@
-apiVersion: getambassador.io/v2
-kind:  Mapping
-metadata:
-  name:  catch-all
-spec:
-  prefix: /
-  service: https://www.getambassador.io
-

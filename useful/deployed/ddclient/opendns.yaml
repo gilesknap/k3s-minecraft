@@ -12,12 +12,6 @@ affinity:
 image:
   tag: latest
 
-# allow running on my tainted raspberry pi nodes
-tolerations:
-- key: "architecture"
-  operator: "Equal"
-  value: "arm"
-  effect: "NoSchedule"
 
 config: |
   protocol=dyndns2

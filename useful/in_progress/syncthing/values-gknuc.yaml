@@ -14,13 +14,6 @@ image:
   repository: ghcr.io/linuxserver/syncthing
   tag: arm32v7-latest
 
-# I have architecture taint on pis so add a toleration
-tolerations:
-- key: "architecture"
-  operator: "Equal"
-  value: "arm"
-  effect: "NoSchedule"
-
 persistence:
 # this enables saving of config to an nfs mounted volume
   config:
