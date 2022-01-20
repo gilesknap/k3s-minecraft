@@ -15,3 +15,9 @@ k apply -f upgradeplan.yaml -n system-upgrade
 # use this to check for progress (-o yaml for more detail)
 kubectl -n system-upgrade get jobs
 ```
+
+In the plans we have used the stable channel.
+
+You can see which versions are in which channel here: 
+
+https://update.k3s.io/v1-release/channels
