@@ -1,0 +1,11 @@
+nodeAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+  - weight: 1
+    preference:
+      matchExpressions:
+      - key: kubernetes.io/hostname
+        operator: In
+        values:
+        - p2
+        - p3
+        - p4

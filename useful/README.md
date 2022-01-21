@@ -5,6 +5,7 @@ More Things in this repo
 ------------------------
 Notes on things I have deployed to my k3s cluster
 
+- [Install Kubernetes Dashboard](deployed/dashboard/README.md)
 - [Automatic upgrade of k3s](deployed/upgrade_plans/README.md)
 - [Ingress and Cert Manager](deployed/ingress-nginx/README.md)
 - [backup etcd](deployed/backup/README.md)

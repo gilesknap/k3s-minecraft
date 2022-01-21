@@ -14,3 +14,9 @@ To avoid running the port forward I created an ingress [here](../ingress-nginx/g
 
 And then set the host name to point at any of the cluster nodes in ets/hosts
 on my workstation.
+
+To get notified of alerts via slack follow these simple instructions which
+work with a free slack installation:
+
+https://medium.com/@_oleksii_/grafana-alerting-and-slack-notifications-3affe9d5f688
+

@@ -20,7 +20,7 @@ spec:
           pathType: Prefix
           backend:
             service:
-              name: kubernetes-dashboard
+              name: dashboard-release-kubernetes-dashboard
               port:
                 number: 443
   tls:

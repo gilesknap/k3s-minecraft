@@ -103,24 +103,6 @@ Then execute the following on your new node to create a K3S Agent:
 curl -sfL https://get.k3s.io | K3S_URL=https://gknuc:6443 K3S_TOKEN=<your token string>  sh -
 ```
 
-## Install the Kubernetes Dashboard
-Execute this on your workstation
-```
-GITHUB_URL=https://github.com/kubernetes/dashboard/releases
-VERSION_KUBE_DASHBOARD=$(curl -w '%{url_effective}' -I -L -s -S ${GITHUB_URL}/latest -o /dev/null | sed -e 's|.*/||')
-kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/${VERSION_KUBE_DASHBOARD}/aio/deploy/recommended.yaml
-```
-Then create the admin user and role with the yaml file supplied in this repo and
-get a token for the user
-```
-kubectl create -f dashboard-admin.yaml
-kubectl -n kubernetes-dashboard describe secret admin-user-token | grep '^token'
-```
-Finally, start a proxy and goto the Dashboard URL, use the above token to log in.
-```
-kubectl proxy &
-browse to http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy
-```
 
 ## Add a Raspberry Pi to the cluster
 For a Raspberry Pi make sure you set imageTag: multiarch in the yaml file.
