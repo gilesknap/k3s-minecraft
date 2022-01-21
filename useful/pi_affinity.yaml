@@ -1,11 +1,15 @@
-nodeAffinity:
-  preferredDuringSchedulingIgnoredDuringExecution:
-  - weight: 1
-    preference:
-      matchExpressions:
-      - key: kubernetes.io/hostname
-        operator: In
-        values:
-        - p2
-        - p3
-        - p4
+# pass this file to helm with -f to make the installed deployments run
+# on one of my 3 raspberry pi worker nodes
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 1
+      preference:
+        matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - pi2
+          - pi3
+          - pi4
