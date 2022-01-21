@@ -35,7 +35,7 @@ minecraftServer:
   # this means you get the node IP address on K3s
   serviceType: NodePort
   # restore the world from a backup on first execution
-  # downloadWorldUrl:
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/22-01-21.21.50.00-noah-james.zip
   # external node port must be unique across all mc server instances
   nodePort: 30505
   # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
@@ -48,11 +48,11 @@ minecraftServer:
     nodePort: 30506
     enabled: true
 
-# ensure that the resources matches java memory allocation
-# resources:
-#   requests:
-#     memory: 4Gi
-memory: 8192M
+  # ensure that the resources matches java memory allocation
+  # resources:
+  #   requests:
+  #     memory: 6Gi
+  memory: 6g
 
 extraEnv:
   # recommended rolling logs for saving disk
@@ -65,8 +65,8 @@ extraEnv:
   # WARNING: setting this to true deletes your previous world data
   FORCE_WORLD_COPY: false
 
-# required to save the world in persistant local-path storage (k3s default Storage Class)
-# by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
+# required to save the world in persistent local-path storage (k3s default Storage Class)
+# by default this goes in /var/lib/rancher/k3s/storage on the executing node
 # NOTE this ties the deployment to the first node it goes to
 # we could perhaps use an NFS mount to avoid this
 persistence:
@@ -83,7 +83,7 @@ nodeSelector:
 
 resources:
   requests:
-    memory: 4Gi
+    memory: 6Gi
     cpu: 4
   limits:
     memory: 10Gi

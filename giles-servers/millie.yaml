@@ -8,13 +8,15 @@ minecraftServer:
   nodePort: 31700
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
   motd: "The Soj"
-  gameMode: spectator
-  whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
+  gameMode: creative
+  whitelist: TransformerScorn,DispenserAD11,Bigbob2,destroyerSB737
   ops: TransformerScorn,DispenserAD11
   forcegameMode: true
   maxWorldSize: 29999984
   serviceType: NodePort
   viewDistance: 32
+  # Java VM memory reservation - make sure k8s resources matches
+  memory: 4g
 
 extraEnv:
   ENABLE_ROLLING_LOGS: true
@@ -41,3 +43,13 @@ extraVolumes:
         nfs:
           server: 192.168.86.32
           path: /mnt/bigdisk
+
+
+# kubernetes memory/cpu reservation/limits
+resources:
+  requests:
+    memory: 4Gi
+    cpu: 4
+  limits:
+    memory: 4Gi
+    cpu: 4

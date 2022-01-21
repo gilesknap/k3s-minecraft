@@ -35,7 +35,7 @@ minecraftServer:
   # this means you get the node IP address on K3s
   serviceType: NodePort
   # restore the world from a backup on first execution
-  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2021-10-23Z15:06:00-science-lab.zip
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/22-01-21.21.50.00-science.zip
   # external node port must be unique across all mc server instances
   nodePort: 30500
   # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
@@ -47,6 +47,8 @@ minecraftServer:
     serviceType: NodePort
     nodePort: 30501
     enabled: true
+  # make sure this matches k8s resources requests below
+  memory: 6g
 
 extraEnv:
   # recommended rolling logs for saving disk
@@ -76,8 +78,8 @@ nodeSelector:
 
 resources:
   requests:
-    memory: 4Gi
-    cpu: 1
+    memory: 6Gi
+    cpu: 4
   limits:
-    memory: 12Gi
+    memory: 10Gi
     cpu: 8
