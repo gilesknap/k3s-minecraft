@@ -84,7 +84,7 @@ nodeSelector:
 resources:
   requests:
     memory: 6Gi
-    cpu: 4
+    cpu: 1
   limits:
-    memory: 10Gi
-    cpu: 8
+    memory: 7Gi
+    cpu: 2

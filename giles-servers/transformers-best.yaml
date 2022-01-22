@@ -14,6 +14,7 @@ minecraftServer:
   forcegameMode: true
   maxWorldSize: 29999984
   serviceType: NodePort
+  memory: 2g
 
 extraEnv:
   ENABLE_ROLLING_LOGS: true
@@ -40,3 +41,12 @@ extraVolumes:
         nfs:
           server: 192.168.86.32
           path: /mnt/bigdisk
+
+# kubernetes memory/cpu reservation/limits
+resources:
+  requests:
+    memory: 2Gi
+    cpu: 2
+  limits:
+    memory: 3Gi
+    cpu: 2

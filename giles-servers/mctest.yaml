@@ -47,6 +47,7 @@ minecraftServer:
     serviceType: NodePort
     nodePort: 30351
     enabled: true
+  memory: 1g
 
 extraEnv:
   # recommended rolling logs for saving disk
@@ -80,4 +81,4 @@ resources:
     cpu: 1
   limits:
     memory: 12Gi
-    cpu: 8
+    cpu: 1

@@ -277,14 +277,23 @@ function k8s-mcbackup()
         kubectl exec -n minecraft ${pod} -- rcon-cli save-all
         sleep 5
         tmp_dir=$(mktemp -d)
-        kubectl -n minecraft cp ${pod#pod/}:/data ${tmp_dir}
-        zip -r ${MCBACKUP}/${zipname} ${tmp_dir}
-        rm -r ${tmp_dir}
-        kubectl -n minecraft exec ${pod} -- rcon-cli save-on
+        echo "copying data from ${deploy} ..."
+        # note #pod/ removes the pod/ prefix from pod name
+        if ${THIS_DIR}/krsync -av  ${pod#pod/}@minecraft:/data ${tmp_dir} ; then
+            echo "zipping data ..."
+            zip -r ${MCBACKUP}/${zipname} ${tmp_dir}
+            rm -r ${tmp_dir}
+            echo "restoring auto save ..."
+            kubectl -n minecraft exec ${pod} -- rcon-cli save-on
 
-        if [ "${was_shutdown}" == "true" ]; then
-            echo "stopping ${deploy} ..."
-            kubectl scale -n minecraft ${deploy} --replicas=0
+            if [ "${was_shutdown}" == "true" ]; then
+                echo "stopping ${deploy} ..."
+                kubectl scale -n minecraft ${deploy} --replicas=0
+            fi
+            echo "backup of ${deploy} done."
+        else
+            echo "rsync returned an error"
+            kubectl -n minecraft exec ${pod} -- rcon-cli save-on
         fi
     fi
 }
