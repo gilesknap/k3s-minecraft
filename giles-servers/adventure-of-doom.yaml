@@ -23,7 +23,7 @@ extraVolumes:
 minecraftServer:
   # Noahs friends get access, Noah and I get ops
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
-  ops: TransformerScorn,DispenserAD11
+  ops: TransformerScorn
   forcegameMode: true
   levelSeed:
   maxWorldSize: 10000
@@ -32,7 +32,7 @@ minecraftServer:
   pvp: false
   serviceType: NodePort
   # restore the world from a backup on first execution
-  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-02-23.16-21.Adventure.THofDoom22.zip
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2022-01-22Z17:08:50-adventure-of-doom.zip
   # external port must be unique across all mc server instances
   nodePort: 30600
 
@@ -54,9 +54,8 @@ extraEnv:
   # useful for resetting the world but should be reset to false afterwards
   FORCE_WORLD_COPY: false
 
-# required to save the world in persistant local-path storage
-# by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
-# I beleive this ties the deployment to the first node it goes to
+# required to save the world in persistent local-path storage
+# we are using nfs-storageclass so the pod can be node agnostic
 persistence:
   storageClass: nfs-storageclass
   annotations: {}
@@ -66,14 +65,18 @@ persistence:
 
 # choose the node to run on (delete if not needed)
 nodeSelector:
-  kubernetes.io/hostname: gknuc
-
+  kubernetes.io/hostname: pi4
+# on a pi we may need longer before the health check
+readinessProbe:
+  initialDelaySeconds: 240
+livenessProbe:
+  initialDelaySeconds: 240
 
 # kubernetes memory/cpu reservation/limits
 resources:
   requests:
     memory: 2Gi
-    cpu: 1
+    cpu: 3
   limits:
-    memory: 2Gi
-    cpu: 1
+    memory: 3Gi
+    cpu: 3.8

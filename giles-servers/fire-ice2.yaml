@@ -18,7 +18,7 @@ minecraftServer:
   maxWorldSize: 29999984
   serviceType: NodePort
   viewDistance: 15
-  memory: 4G
+  memory: 4g
 
 extraEnv:
   TYPE: FORGE
@@ -53,8 +53,12 @@ extraVolumes:
 
 resources:
   requests:
-    memory: 6Gi
+    memory: 4Gi
+    cpu: 1
+  limits:
+    memory: 4Gi
     cpu: 2
+  
 
 nodeSelector:
   kubernetes.io/hostname: gknuc
