@@ -279,9 +279,10 @@ function k8s-mcbackup()
         tmp_dir=$(mktemp -d)
         echo "copying data from ${deploy} ..."
         # note #pod/ removes the pod/ prefix from pod name
-        if ${THIS_DIR}/krsync -av  ${pod#pod/}@minecraft:/data ${tmp_dir} ; then
+        # this uses rsync instead of the less reliable 'kubectl cp'
+        if ${THIS_DIR}/krsync -a ${pod#pod/}@minecraft:/data ${tmp_dir} ; then
             echo "zipping data ..."
-            zip -r ${MCBACKUP}/${zipname} ${tmp_dir}
+            zip -qr ${MCBACKUP}/${zipname} ${tmp_dir}
             rm -r ${tmp_dir}
             echo "restoring auto save ..."
             kubectl -n minecraft exec ${pod} -- rcon-cli save-on
@@ -416,7 +417,7 @@ function k8s-mchelp()
         zips up the server data folder to a dated zip file and places it
         in the folder $MCBACKUP (prompts for MCBACKUP if not set)
 
-    k8s-mcrestore <server name> <backup file name>
+    k8s-mcrestore <my_server_def.yaml> <backup file name>
         restore the world from backup for a server, overwriting its
         current world
 
