@@ -8,8 +8,8 @@ minecraftServer:
     serviceType: NodePort
     nodePort: 30010
   nodePort: 30011
-  downloadWorldUrl:
   motd: "Dragons and Hydra"
+  version: 1.16.5
   gameMode: survival
   whitelist: TransformerScorn,DispenserAD11,Bigbob2
   ops: TransformerScorn,DispenserAD11
@@ -18,7 +18,7 @@ minecraftServer:
   maxWorldSize: 29999984
   serviceType: NodePort
   viewDistance: 15
-  memory: 4g
+  memory: 3g
 
 extraEnv:
   TYPE: FORGE
@@ -53,11 +53,11 @@ extraVolumes:
 
 resources:
   requests:
-    memory: 4Gi
-    cpu: 1
+    memory: 3Gi
+    cpu: 3
   limits:
-    memory: 4Gi
-    cpu: 2
+    memory: 3.5Gi
+    cpu: 3
   
 
 nodeSelector:

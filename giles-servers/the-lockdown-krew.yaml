@@ -39,6 +39,7 @@ minecraftServer:
   downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2021-05-15-21:59:30-the-lockdown-krew.zip
   # external port must be unique across all mc server instances
   nodePort: 30700
+  memory: 3g
 
   # enable rcon for remote control - set to false if not required
   rcon:
@@ -72,3 +73,11 @@ persistence:
 # choose the node to run on (delete if not needed)
 nodeSelector:
   kubernetes.io/hostname: gknuc
+
+resources:
+  requests:
+    memory: 3Gi
+    cpu: 1
+  limits:
+    memory: 4Gi
+    cpu: 8

@@ -81,5 +81,5 @@ resources:
     memory: 6Gi
     cpu: 1
   limits:
-    memory: 10Gi
-    cpu: 2
+    memory: 7Gi
+    cpu: 8

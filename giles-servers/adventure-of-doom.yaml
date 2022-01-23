@@ -32,7 +32,7 @@ minecraftServer:
   pvp: false
   serviceType: NodePort
   # restore the world from a backup on first execution
-  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2022-01-22Z17:08:50-adventure-of-doom.zip
+  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2022-01-22Z23:18:11-adventure-of-doom.zip
   # external port must be unique across all mc server instances
   nodePort: 30600
 
@@ -63,9 +63,20 @@ persistence:
     enabled: true
     Size: 1Gi
 
-# choose the node to run on (delete if not needed)
-nodeSelector:
-  kubernetes.io/hostname: pi4
+# choose the nodes to run on
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 1
+      preference:
+        matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - pi2
+          - pi4
+
+
 # on a pi we may need longer before the health check
 readinessProbe:
   initialDelaySeconds: 240
@@ -79,4 +90,4 @@ resources:
     cpu: 3
   limits:
     memory: 3Gi
-    cpu: 3.8
+    cpu: 4

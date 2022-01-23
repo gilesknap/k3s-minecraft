@@ -39,6 +39,8 @@ minecraftServer:
   # 10 is default, larger is nice on high spec hardware
   # I believe 25 is the client max so larger is wasted
   viewDistance: 10
+  # memory to allocate to the jvm - if you change this also change the K8s resource request
+  memory: 2g
 
   rcon:
     # enable rcon for remote control - set to false if not required
@@ -75,8 +77,8 @@ extraEnv:
   # WARNING: setting this to true deletes your previous world data
   FORCE_WORLD_COPY: false
 
-# required to save the world in persistant local-path storage (k3s default Storage Class)
-# by defualt this goes in /var/lib/rancher/k3s/storage on the executing node.
+# required to save the world in persistent local-path storage (k3s default Storage Class)
+# by default this goes in /var/lib/rancher/k3s/storage on the executing node.
 # NOTE this ties the deployment to the first node it spins up on,
 # we could perhaps use an NFS mount to avoid this
 persistence:
@@ -85,6 +87,36 @@ persistence:
     enabled: true
     Size: 1Gi
 
-# UNCOMMENT to choose which node to run on
+# K8S resources to grant the pod. memory must be the same as java memory above
+# I've also found that limit should be a little higher.
+# For processors - if you want to run lots of servers but only use one or two at
+# a time then it is OK to set a low request and a higher limit. Minecraft servers
+# can make use of quite a few cpus if available and this is especially helpful
+# at startup time
+resources:
+  requests:
+    memory: 2Gi
+    cpu: 1
+  limits:
+    memory: 3Gi
+    cpu: 6
+
+# UNCOMMENT to choose a single node to run on
 # nodeSelector:
 #   kubernetes.io/hostname: my-worker-node-name
+
+# UNCOMMENT to choose a range of nodes to run on
+# (change 'key' for other criteria e.g. processor architecture 
+#  use 'kubectl get nodes --show-labels' for full set of criteria )
+# affinity:
+#   nodeAffinity:
+#     preferredDuringSchedulingIgnoredDuringExecution:
+#     - weight: 1
+#       preference:
+#         matchExpressions:
+#         - key: kubernetes.io/hostname
+#           operator: In
+#           values:
+#           - pi2
+#           - pi3
+#           - pi4
