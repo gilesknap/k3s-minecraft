@@ -17,6 +17,9 @@ if you decide to back out.
 # Installation Steps
 
 ## Install K3S lightweight Kubernetes
+
+(If you are installing on a Raspberry Pi, first see the steps in the section below.)
+
 Execute this command on your server to set up the cluster master (aka K3S Server node):
 ```
 curl -sfL https://get.k3s.io | sh -
