@@ -3,6 +3,8 @@ Minecraft servers managed in a lightweight Kubernetes cluster
 
 Thanks to https://github.com/itzg/docker-minecraft-server and https://k3s.io/
 
+![alt text](images/pis.png "Raspberry Pi K3S cluster")
+
 # Intro
 This is a very easy set of instructions for setting up a Kubernetes cluster
 and deploying minecraft java edition servers.
