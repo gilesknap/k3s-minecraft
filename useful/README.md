@@ -25,6 +25,18 @@ see. This pattern should work for any simple service.
 Other useful tips
 =================
 
+Taint your master node
+----------------------
+If you have more than one node, it is best to not allow random pods to run
+on your master node. This keeps it free to manage the cluster.
+
+If you add this taint then most pods will not get scheduled on to it,
+usually pods that are designed to run on the master will have a toleration 
+for this taint in their helm charts.
+```
+kubectl taint node pi1 node-role.kubernetes.io/master=true:NoSchedule
+```
+
 Raspberry Pis
 -------------
 Unfortunately some pods which don't support multi arch may try to run
