@@ -2,6 +2,13 @@ imagePullSecret: regcred
 
 # Common minecraft server settings
 minecraftServer:
+  rcon:
+    # enable rcon for remote control - set to false if not required
+    enabled: true
+    # external port must be unique across all mc server instances
+    nodePort: 31201
+    serviceType: NodePort
+    password: "TODO - supply this as an override on the command line "
   version: LATEST
   whitelist: TransformerScorn,DispenserAD11
   ops:
@@ -27,14 +34,16 @@ minecraftServer:
   # 10 is default, larger is nice on high spec hardware
   # I believe 25 is the client max so larger is wasted
   viewDistance: 25
+  memory: 2g
 
-  rcon:
-    # enable rcon for remote control - set to false if not required
-    enabled: true
-    # external port must be unique across all mc server instances
-    nodePort: 31201
-    serviceType: NodePort
-    password: "TODO - supply this as an override on the command line "
+# kubernetes memory/cpu reservation/limits
+resources:
+  requests:
+    memory: 2Gi
+    cpu: 1
+  limits:
+    memory: 3Gi
+    cpu: 8
 
 extraVolumes:
   # define where the volume mounts in the container

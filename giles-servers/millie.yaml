@@ -16,7 +16,7 @@ minecraftServer:
   serviceType: NodePort
   viewDistance: 32
   # Java VM memory reservation - make sure k8s resources matches
-  memory: 4g
+  memory: 2g
 
 extraEnv:
   ENABLE_ROLLING_LOGS: true
@@ -48,8 +48,8 @@ extraVolumes:
 # kubernetes memory/cpu reservation/limits
 resources:
   requests:
-    memory: 4Gi
-    cpu: 4
+    memory: 2Gi
+    cpu: 1
   limits:
-    memory: 4Gi
-    cpu: 4
+    memory: 3Gi
+    cpu: 8

@@ -43,6 +43,17 @@ minecraftServer:
     serviceType: NodePort
     enabled: true
     password: "TODO - supply this as an override on the command line "
+      
+  memory: 2g
+
+# kubernetes memory/cpu reservation/limits
+resources:
+  requests:
+    memory: 2Gi
+    cpu: 1
+  limits:
+    memory: 3Gi
+    cpu: 8
 
 # required to save the world in persistant local-path storage
 # by defult this goes in /var/lib/rancher/k3s/storage on the executing node

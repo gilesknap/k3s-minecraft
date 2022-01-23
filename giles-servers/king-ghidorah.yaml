@@ -1,7 +1,7 @@
 imagePullSecret: regcred
 minecraftServer:
   rcon:
-    enabled: false
+    enabled: true
     serviceType: NodePort
     nodePort: 31501
   nodePort: 31500
@@ -14,6 +14,16 @@ minecraftServer:
   maxWorldSize: 29999984
   serviceType: NodePort
   viewDistance: 32
+  memory: 2g
+
+# kubernetes memory/cpu reservation/limits
+resources:
+  requests:
+    memory: 2Gi
+    cpu: 1
+  limits:
+    memory: 3Gi
+    cpu: 8
 
 extraEnv:
   ENABLE_ROLLING_LOGS: true

@@ -54,10 +54,10 @@ extraVolumes:
 resources:
   requests:
     memory: 3Gi
-    cpu: 3
+    cpu: 1
   limits:
-    memory: 3.5Gi
-    cpu: 3
+    memory: 4Gi
+    cpu: 8
   
 
 nodeSelector:

@@ -46,7 +46,7 @@ extraVolumes:
 resources:
   requests:
     memory: 2Gi
-    cpu: 2
+    cpu: 1
   limits:
     memory: 3Gi
-    cpu: 2
+    cpu: 8

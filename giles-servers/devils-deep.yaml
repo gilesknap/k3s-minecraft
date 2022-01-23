@@ -22,6 +22,13 @@ extraVolumes:
           path: /mnt/bigdisk
 
 minecraftServer:
+  # enable rcon for remote control - set to false if not required
+  rcon:
+    # external port must be unique across all mc server instances
+    nodePort: 30801
+    serviceType: NodePort
+    enabled: true
+    password: "TODO - supply this as an override on the command line "
   # Noahs friends get access, Noah and I get ops
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
   ops: TransformerScorn
@@ -38,14 +45,17 @@ minecraftServer:
   downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2021-05-01.23-39.Adventure.DeepBak.zip
   # external port must be unique across all mc server instances
   nodePort: 30800
+  memory: 5g
 
-  # enable rcon for remote control - set to false if not required
-  rcon:
-    # external port must be unique across all mc server instances
-    nodePort: 30801
-    serviceType: NodePort
-    enabled: true
-    password: "TODO - supply this as an override on the command line "
+# kubernetes memory/cpu reservation/limits
+resources:
+  requests:
+    memory: 5Gi
+    cpu: 1
+  limits:
+    memory: 6Gi
+    cpu: 8
+
 
 extraEnv:
   # recommended rolling logs for saving disk
