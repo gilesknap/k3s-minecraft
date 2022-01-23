@@ -1,0 +1,84 @@
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: backup
+  namespace: admin
+  labels:
+    app: sqlite-backup
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "nfs-storageclass"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "5Gi"
+  # this must be an auto provisioning class that saves data securely
+  storageClassName: "nfs-storageclass"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sqlite-backup
+  namespace: admin
+spec:
+  # 0100h every day
+  schedule: "0 1 * * *"
+  jobTemplate:
+    spec:
+      # auto cleanup the job after 2.5 days or so
+      ttlSecondsAfterFinished: 200000
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: sqlite-backup
+        spec:
+          restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      # this must be the dns name of the master node
+                    - pi1
+          containers:
+          - image: alpine:3.15
+            imagePullPolicy: IfNotPresent
+            name: sqlite-backup
+            resources:
+              limits:
+                memory: 100Mi
+                cpu: 100m
+            volumeMounts:
+            - mountPath: /server/
+              name: server-folder
+              readOnly: true
+            - mountPath: /backup/
+              name: backup
+            command:
+            - /bin/sh
+            - -c
+            - cd /server ; tar  cvf  /backup/$(date +%F:%R).tar  --exclude *.sock . && find /backup -type f -mtime +60 -delete
+          serviceAccount: default
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+          # you will need to add tolerations for any taints your master has
+          tolerations:
+          - effect: NoSchedule
+            key: node-role.kubernetes.io/master
+            operator: Exists
+          volumes:
+          # host path to the server folder to back up (mount read only)
+          - name: server-folder
+            hostPath:
+              path: /var/lib/rancher/k3s/server
+              type: Directory
+          # PVC for the backups to go to
+          - name: backup
+            persistentVolumeClaim:
+              claimName: backup

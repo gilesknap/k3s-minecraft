@@ -1,5 +1,16 @@
-Backup Snapshots
-================
+Backups
+=======
+
+For the HA configuration with 3 masters, k3s uses etcd and this does snapshots
+automatically. See below for an approach to getting the snapshots backed up
+off of the master node.
+
+For a single master k3s uses sqlite for the database see 
+[here](../backup-sqlite/README.md) for my instructions on this.
+
+
+Backup etcd snapshots
+=====================
 
 The yaml in this folder specifies cron job that will
 take a snapshot of the etcd database and save it away in
