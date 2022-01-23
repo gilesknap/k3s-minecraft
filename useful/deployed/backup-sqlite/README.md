@@ -38,7 +38,7 @@ Steps
 - sudo -s
 - cd /var/lib/rancher/k3s
 - mv server server.old
-- tar tar -xf /PATH_TO_BACKUP_TAR_FILE
+- tar -xf /PATH_TO_BACKUP_TAR_FILE
 - make sure that `/etc/systemd/system/k3s.service` and `/etc/rancher/k3s/config.yaml`
   have the same startup options as the original master  
   - e.g. for the ingress setup we added `--no-deploy traefik`
