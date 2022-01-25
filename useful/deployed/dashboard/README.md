@@ -13,9 +13,9 @@ helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
 helm repo update
 
 # Deploy a Helm Release named "dashboard-release" using the chart
-helm install dashboard-release -n kubernetes-dashboard kubernetes-dashboard/
-kubernetes-dashboard -f ../../pi_affinity.yaml
+helm install dashboard-release -n kubernetes-dashboard kubernetes-dashboard kubernetes-dashboard -f ../../pi_affinity.yaml -f dashboard-values.yaml  
 # pi_affinity.yaml is to make it run on one of my 3 pi worker nodes
+# dashboard-values.yaml increases token expiry
 ```
 
 # discover the password
