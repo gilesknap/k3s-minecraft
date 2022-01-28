@@ -9,7 +9,8 @@ Thanks to https://github.com/itzg/docker-minecraft-server and https://k3s.io/
 This is a very easy set of instructions for setting up a Kubernetes cluster
 and deploying minecraft java edition servers.
 
-It has been tested on Ubuntu 20.10 and Raspbian Buster.
+It has been tested on Ubuntu 20.10 and Raspbian Bullseye. For some details
+on installing on Raspberry Pi see [here](useful/README.md)
 
 Give it a try, K3S provides a good uninstaller that will clean up your system
 if you decide to back out.
@@ -106,23 +107,6 @@ sudo cat /var/lib/rancher/k3s/server/node-token
 Then execute the following on your new node to create a K3S Agent:
 ```
 curl -sfL https://get.k3s.io | K3S_URL=https://gknuc:6443 K3S_TOKEN=<your token string>  sh -
-```
-
-
-## Add a Raspberry Pi to the cluster
-For a Raspberry Pi make sure you set imageTag: multiarch in the yaml file.
-
-It should be possible to
-install the K3S Server node on a Pi, but you would need one Pi for the K3S
-Server and one Pi K3S Agent (worker node)
-per minecraft server for decent performance.
-
-You need the following changes before installing:
-```
-sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
-# edit /boot/cmdline and make sure the single line contains:
-#  cgroup_memory=1 cgroup_enable=memory
-sudo reboot
 ```
 
 ## Do Backups of running servers and more ...

@@ -37,22 +37,84 @@ for this taint in their helm charts.
 kubectl taint node pi1 node-role.kubernetes.io/master=true:NoSchedule
 ```
 
-Raspberry Pis
--------------
+Deploying to Raspberry Pi
+-------------------------
+
+When deploying a new raspi to the cluster these are some quick notes on
+the settings to use. These apply to the 64 bit Raspberry Pi OS which I
+recommend because many images support arm64 but not arm32.
+
+The Pi 4 is suitable as a master or worker node.
+
+```bash
+# Use a USB drive for booting the raspi - raspi 4 will boot of USB by default
+
+# Burn a standard raspios latest disto onto USB with balenea etcher
+# Before moving the USB drive to the Pi and booting make these changes in 
+#  the /boot partition
+
+cd <mountpoint>/boot
+touch ssh
+
+vim cmdline.txt 
+# add
+#  " cgroup_memory=1 cgroup_enable=memory"
+# to the end of the command line
+
+vim config.txt 
+# add these lines:
+#    dtoverlay=disable-wifi
+#    dtoverlay=disable-bt
+
+# Boot from USB and find out the IP, then ssh to the pi with user pi pass raspberry.
+# Maybe create a new user and delete pi if you are paranoid.
+
+ssh my-new-pi-ip-address
+sudo raspi-config
+# change these:
+#   set hostname, password and boot/autologin (boot to cmdline and no autologin)
+#   set Performance/GPU Memory to 16GB (the minimum)
+sudo apt update
+sudo apt full-upgrade
+#  (this may take a while)
+```
+
+Copying your USB image for reuse on multiple Pis
+
+
+```bash
+sudo shutdown now
+
+# Put the USB key back in your desktop and make a image copy:
+lsblk
+#  look for the drive with /boot and /rootfs - that i the drive to image e.g. /dev/sdd
+sudo dd if=/dev/sdd bs=1024 conv=sparse count=10M | gzip > 2021-05-rpi1-tiny4.zip
+```
+
+This image 2021-05-rpi1-tiny4.zip can be used to quickly burn a copy, to use the new
+copy:
+- use the gnome disks utility to expand the rootfs partition to fill the new USB drive
+- boot in a pi and change the hostname if necessary
+
+
+Cluster changes for Raspberry Pis 
+---------------------------------
+
+UPDATE - this blew up for system-upgrade-controller and is a pain for everything
+that does support raspi. So I'm removing these taints and will put affinity 
+onto any pods that can't run on raspi instead. The documentation below is still
+a useful reminder of how to use taints and tolerations.
+
 Unfortunately some pods which don't support multi arch may try to run
 on the raspis so I added a taint to them e.g.
 ```bash
-kubectl taint nodes pi3 architecture=arm:NoSchedule
+kubectl taint nodes pi3 architecture=arm64:NoSchedule
 ```
-UPDATE - this blew up for system-upgrade-controller and is a pain for everything
-that does support raspi. So I'm removing these taints and will put affinity 
-onto any pods that can't run on raspi instead.
 
 Remove taints by adding a '-' suffix to the command:
 ``` bash
-kubectl taint nodes pi3 architecture=arm:NoSchedule-
+kubectl taint nodes pi3 architecture=arm64:NoSchedule-
 ```
-
 
 Then for those items you do want to run there, add a toleration.
 e.g.
@@ -90,49 +152,6 @@ Finally if you want to ensure pods do run on a pi:
 
 ```
 
-When deploying a new raspi to the cluster these are some quick notes on
-the settings to use. These apply to the 64 bit Raspberry Pi OS which I
-recommend because many images support arm64 but not arm32.
-
-```
-Use a USB drive for booting the raspi - raspi 4 will boot of USB by default
-
-- Burn a standard raspios latest disto onto USB with balenea etcher
-- Before booting make these changes in the /boot partition
-
-touch ssh
-
-edit /boot/cmdline.txt and add
-  " cgroup_memory=1 cgroup_enable=memory"
-to the end of the command line
-
-edit /boot/config.txt and add these lines:
-    dtoverlay=disable-wifi
-    dtoverlay=disable-bt
-
-- Boot from USB and find out the IP, then ssh to the pi with user pi pass raspberry.
-- Maybe create a new user and delete pi if you are paranoid.
-
-- sudo raspi-config
-change these:
-  set hostname, password and boot/autologin (boot to cmdline and no autologin)
-  set Performance/GPU Memory to 16GB (the minimum)
-- sudo apt update
-- sudo apt full-upgrade
-  (this may take a while)
-
-- sudo shutdown now
-
-- Put the USB key back in your desktop and make a image copy:
-- lsblk
-  look for the drive with /boot and /rootfs - that i the drive to image e.g. /dev/sdd
-- sudo dd if=/dev/sdd bs=1024 conv=sparse count=10M | gzip > 2021-05-rpi1-tiny4.zip
-
-This image 2021-05-rpi1-tiny4.zip can be used to quickly burn a copy, to use the new
-copy:
-- use the gnome disks utility to expand the rootfs partition to fill the new USB drive
-- boot in a pi and change the hostname if necessary
-```
 
 Stuck Deleting ...
 ------------------

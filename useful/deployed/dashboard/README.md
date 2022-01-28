@@ -23,11 +23,15 @@ helm install dashboard-release -n kubernetes-dashboard kubernetes-dashboard kube
 kubectl -n kubernetes-dashboard describe secret admin-user-token | grep '^token'
 ```
 
+
+**WARNING**: since I switched to using the helm chart the proxy approach to 
+accessing the dashboard is not working and needs looking into. However
+I moved on to using ingress - see [ingress](../ingress-nginx/README.md)
 # use a proxy to browse the dashboard
 Finally, start a proxy and goto the Dashboard URL, use the above token to log in.
 ```
 kubectl proxy &
-browse to http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy
+browse to http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:dashboard-release-kubernetes-dashboard:/proxy
 ```
 See [ingress-nginx](../ingress-nginx/README.md) for details of how to set up
 an ingress so you do not require a proxy.
