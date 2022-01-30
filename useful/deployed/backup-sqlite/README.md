@@ -10,6 +10,10 @@ machine. Read on for details.
 
 Backup server folder to NFS
 =======================
+
+TODO: copying the database file while k3s is running is prone to corruption,
+I should use dump instead. See https://stackoverflow.com/a/43398520/8613945
+
 The enclosed `cron_sqlite_backup.yaml` sets up a kubernetes cron job to backup the 
 server folder periodically to an NFS folder. For this to work as is requires
 that the auto provisioning storage class is set up 

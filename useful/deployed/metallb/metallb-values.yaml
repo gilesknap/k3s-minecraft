@@ -1,0 +1,12 @@
+# pick the latest stable image version - the chart defaults to a specific tag 
+# which is AMD64 only
+
+controller:
+  image:
+    repository: metallb/controller
+    tag: v0.11
+
+speaker:
+  image:
+    repository: metallb/speaker
+    tag: v0.11

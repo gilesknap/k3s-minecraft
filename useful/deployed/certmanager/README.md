@@ -14,8 +14,7 @@ https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.y
 sed -r 's/(image:.*):(v.*)$/\1-arm:\2/g' > cert-manager-arm.yaml
 ```
 
-For my mixed node cluster we need to add affinity to arm and toleration of 
-architecture:arm.
+For my mixed node cluster we need to add affinity to arm.
 
 Add the following yaml into the template for each of the 3 deployments - at the
 same indent level as `containers:`
@@ -29,11 +28,6 @@ same indent level as `containers:`
                 operator: In
                 values:
                 - arm64
-      tolerations:
-      - key: "architecture"
-        operator: "Equal"
-        value: "arm"
-        effect: "NoSchedule"
 ```
 
 Now apply the updated yaml

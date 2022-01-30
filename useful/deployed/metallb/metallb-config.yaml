@@ -1,0 +1,24 @@
+# example layer 2 config - IP range for metallb - UPDATE addresses as appropriate
+apiVersion: v1
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 192.168.86.50-192.168.86.99
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: my-metal
+    meta.helm.sh/release-namespace: metal
+  creationTimestamp: "2022-01-29T22:12:22Z"
+  labels:
+    app.kubernetes.io/instance: my-metal
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: metallb
+    helm.sh/chart: metallb-2.6.2
+  name: my-metal-metallb-config
+  namespace: metal
+  resourceVersion: "1890524"
+  uid: f257b1da-bb4d-456a-b37e-a269af55302f
