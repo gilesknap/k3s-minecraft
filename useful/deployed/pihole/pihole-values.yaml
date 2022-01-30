@@ -1,0 +1,41 @@
+serviceDns:
+  type: LoadBalancer
+  loadBalancerIP: 192.168.86.99
+  
+  annotations: 
+    metallb.universe.tf/address-pool: network-services
+    metallb.universe.tf/allow-shared-ip: pihole-svc  
+
+serviceDhcp:
+  enabled: false
+
+ingress:
+  enabled: true
+
+  annotations: 
+    kubernetes.io/ingress.class: nginx
+  path: /
+  hosts:
+    - pi.hole
+  
+resources:
+  requests:
+   cpu: 1
+   memory: 256Mi
+  limits:
+   cpu: 1
+   memory: 512Mi
+
+persistentVolumeClaim:
+  enabled: true
+
+# this is the OpenDNS family safe upstream DNS service
+# configure OpenDns here https://www.opendns.com/setupguide/#familyshield
+# or omit these entries
+DNS1: "208.67.222.222"
+DNS2: "208.67.220.220"
+
+
+admin:
+  existingSecret: "piholeadminpass"
+  passwordKey: "password"

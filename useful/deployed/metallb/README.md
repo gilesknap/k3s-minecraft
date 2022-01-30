@@ -14,14 +14,14 @@ ingress-nginx: much more widely used ingress controller
 To remove klipper and traefik:
 
 Update the file /etc/systemd/system/k3s.service and make the last ExecStart 
-look like this:
+look like this on the master node(s) :
 
 ```
 ExecStart=/usr/local/bin/k3s \
     server \
     --no-deploy traefik \
     --disable servicelb \
-    --disable traefik
+    --disable traefike
 ```
 
 Install metallb with helm
