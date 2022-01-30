@@ -11,7 +11,13 @@ ingress-nginx: much more widely used ingress controller
 ```
 ( see [ingress-nginx](../ingress-nginx/README.md) )
 
-To remove klipper and traefik:
+Metallb allows you to have an external address pool that services can draw on to
+expose themselves outside of the cluster. Metallb will then load balance between
+the replicas that the service is fronting.
+
+# Installing Metallb on K3S
+
+First we remove the defaults, klipper and traefik:
 
 Update the file /etc/systemd/system/k3s.service and make the last ExecStart 
 look like this on the master node(s) :
@@ -45,7 +51,15 @@ kubectl get services -o wide --all-namespaces | grep --color=never -E 'LoadBalan
 For my existing ingresses that are using /etc/hosts to reach the cluster I now
 see that they are using the first IP from the pool.
 
-TODO: I'm not clear if I can rely on my ingress controller always picking up
+QUESTION: I'm not clear if I can rely on my ingress controller always picking up
 the first IP address in the pool. If not I need some way of advertising the 
 correct IP for the host names in my ingresses. 
+
+ANSWER: when any service is configured with 'type: Loadbalancer' it may specify
+it external IP with "loadBalancerIP:". Since I installed ingress first and did 
+not specify loadBalancerIP it picked the 1st available IP. So best to go back
+and specify this in the ingress controller to enforce this. (Even better would 
+be to get external DNS working so that I would refer to ingresses by internal DNS 
+name only). For the moment I have added loadbalancerIP option to the installation
+of [ingress-nginx](../ingress-nginx/README.md).
 

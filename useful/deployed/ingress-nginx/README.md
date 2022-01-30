@@ -1,5 +1,9 @@
 # Setting up Ingress
 ## in particular to expose the Dashboard without requiring a Proxy
+
+(but a good ingress controller is also useful for setting up any web
+services on http/https that you expose outside of the cluster)
+
 These links were useful in working this out
 
    - https://kubernetes.github.io/ingress-nginx/deploy/
@@ -9,11 +13,31 @@ These links were useful in working this out
 
 ## Get nginx ingress working
 
-Install ingress-nginx with:
+I eventually chose to replace the ingress and loadbalancer of k3s with more popular options.
+The instruction below are for replacing the ingress only. Read 
+[here](../metallb/README.md) first for details of replacing the loadbalancer too.
+
+To disable the built in traefik ingress controller add the --no-deploy option
+below to `/etc/systemd/system/k3s.service` on the master node and 
+`sudo systemctl restart k3s`
+```
+ExecStart=/usr/local/bin/k3s \
+    server \
+    --no-deploy traefik 
+```
+
+Install ingress-nginx with the following command. If you are using metallb then
+it would be useful to specify which ip address you want the ingress assigned to.
+If you are still using klipper (k3s default loadbalancer) then the ingress 
+will respond to any node ip address in the cluster.
+
+Remove controller.service.loadBalancerIP if you are using klipper or 
+change the IP as required if using metallb.
 ```
 helm upgrade --install ingress-nginx ingress-nginx \
   --repo https://kubernetes.github.io/ingress-nginx \
-  --namespace ingress-nginx --create-namespace
+  --namespace ingress-nginx --create-namespace \
+  --set controller.service.loadBalancerIP=192.168.86.50
 ```
 
 Verify it is up and running with:

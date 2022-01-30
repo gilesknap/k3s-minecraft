@@ -1,6 +1,8 @@
 Disaster Recovery
 =================
 
+DEPRECATED: these notes are from when I was using an etcd server (HA config)
+
 backups
 -------
 You will need to backup these files on the original master to be able to
