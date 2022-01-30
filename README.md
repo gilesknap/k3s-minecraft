@@ -9,8 +9,7 @@ Thanks to https://github.com/itzg/docker-minecraft-server and https://k3s.io/
 This is a very easy set of instructions for setting up a Kubernetes cluster
 and deploying minecraft java edition servers.
 
-It has been tested on Ubuntu 20.10 and Raspbian Bullseye. For some details
-on installing on Raspberry Pi see [here](useful/README.md)
+It has been tested on Ubuntu 20.10 and Raspbian Bullseye.
 
 Give it a try, K3S provides a good uninstaller that will clean up your system
 if you decide to back out.
@@ -19,9 +18,11 @@ if you decide to back out.
 
 ## Install K3S lightweight Kubernetes
 
-(If you are installing on a Raspberry Pi, first see the steps in the section below.)
+(If you are installing on a Raspberry Pi, first prepare the Pi with steps 
+[here](useful/README.md))
 
-Execute this command on your server to set up the cluster master (aka K3S Server node):
+Execute this command on your server to set up the cluster master
+(aka K3S Server node):
 ```
 curl -sfL https://get.k3s.io | sh -
 ```
@@ -35,7 +36,7 @@ sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 Go to the server machine and copy over the kubectl configuration to your
 workstation
 ```
-sudo scp  /etc/rancher/k3s/k3s.yaml <YOUR_ACCOUNT>@<YOUR_WORKSTATION>:.kube/config
+sudo scp /etc/rancher/k3s/k3s.yaml <YOUR_ACCOUNT>@<YOUR_WORKSTATION>:.kube/config
 # edit the file .kube/config replacing 127.0.0.1 with your server IP Address
 ```
 
@@ -46,6 +47,10 @@ kubectl create namespace minecraft
 kubectl config set-context minecraft --namespace=minecraft --user=default --cluster=default
 kubectl config use-context minecraft
 ```
+
+This creates a namespace in which to create all of our minecraft assets,
+it then defines a context which uses that namespace as the default and sets
+this to be the current context.
 
 ## Install helm
 Execute this on the workstation:
