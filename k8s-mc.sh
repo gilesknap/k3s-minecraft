@@ -271,7 +271,7 @@ function k8s-mcbackup()
     k8s-mcstart "${1}"
 
     if [ "${pod}" ]; then
-        zipname=$(date +%Y-%m-%dZ%X)-${shortname}.zip
+        zipname=$(date +%Y-%m-%d+%H.%M.%S)-${shortname}.zip
 
         kubectl exec -n minecraft ${pod} -- rcon-cli save-off
         kubectl exec -n minecraft ${pod} -- rcon-cli save-all
@@ -280,7 +280,7 @@ function k8s-mcbackup()
         echo "copying data from ${deploy} ..."
         # note #pod/ removes the pod/ prefix from pod name
         # this uses rsync instead of the less reliable 'kubectl cp'
-        if ${THIS_DIR}/krsync -a ${pod#pod/}@minecraft:/data ${tmp_dir} ; then
+        if ${THIS_DIR}/krsync -a ${pod#pod/}@minecraft:/data ${tmp_dir}; then
             echo "zipping data ..."
             zip -qr ${MCBACKUP}/${zipname} ${tmp_dir}
             rm -r ${tmp_dir}

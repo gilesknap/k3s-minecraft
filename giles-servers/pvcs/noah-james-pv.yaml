@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: noah-james-minecraft-pv
+  namespace: minecraft
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: noah-james-minecraft
+  mountOptions:
+    - hard
+    - nfsvers=4
+  nfs:
+    path: /share/k3sdata/pv/minecraft-noah-james-minecraft-datadir-pvc-ba9fed24-d835-49ad-9488-d615e5f7aa7d
+    server: 192.168.86.32
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: noah-james-minecraft-pvc
+  namespace: minecraft
+spec:
+  storageClassName: noah-james-minecraft
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
