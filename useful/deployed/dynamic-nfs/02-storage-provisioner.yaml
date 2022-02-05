@@ -5,11 +5,13 @@ metadata:
 provisioner: k3s-nfs
 parameters:
   archiveOnDelete: "true"
+  namespace: default
 ---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: nfs-pod-provisioner
+  namespace: default
 spec:
   replicas: 1
   strategy:
@@ -23,15 +25,17 @@ spec:
         app: nfs-client-provisioner
     spec:
       affinity:
+        # I like to use the Pis (arm64) for running the cluster and keep
+        # my AMD64 server(s) for heavy lifting
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 1
               preference:
                 matchExpressions:
-                - key: kubernetes.io/hostname
+                - key: kubernetes.io/arch
                   operator: In
                   values:
-                  - gknuc # UPDATE WITH NFS SERVER IP OR NAME
+                  - arm64
       serviceAccountName: nfs-pod-provisioner-sa
       containers:
         - name: nfs-client-provisioner
@@ -43,11 +47,18 @@ spec:
             - name: PROVISIONER_NAME # do not change
               value: k3s-nfs # SAME AS PROVISONER NAME VALUE IN STORAGECLASS
             - name: NFS_SERVER # do not change
-              value: gknuc # UPDATE WITH NFS SERVER IP OR NAME
+              value: 192.168.86.32 # UPDATE WITH NFS SERVER IP OR NAME
             - name: NFS_PATH # do not change
-              value: /mnt/bigdisk/k3sdata # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
+              value: /share/k3sdata/auto-pvcs # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1
+              memory: 500Mi
       volumes:
-       - name: nfs-provisioner-v # same as volumemouts name
+       - name: nfs-provisioner-v # same as volumemounts name
          nfs:
-           server: gknuc # UPDATE WITH NFS SERVER IP OR NAME
-           path: /mnt/bigdisk/k3sdata # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
+           server: 192.168.86.32 # UPDATE WITH NFS SERVER IP OR NAME
+           path: /share/k3sdata/auto-pvcs # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
