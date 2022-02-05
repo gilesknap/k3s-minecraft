@@ -1,0 +1,75 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-nfs
+  namespace: admin
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      # auto cleanup the job
+      ttlSecondsAfterFinished: 100000
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: backup-nfs
+        spec:
+          securityContext:
+            runAsUser: 0
+          restartPolicy: OnFailure
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                    - arm64
+          containers:
+          - image: instrumentisto/rsync-ssh:alpine3.15
+            imagePullPolicy: IfNotPresent
+            name: backup-nfs
+            resources:
+              requests:
+                memory: 50Mi
+                cpu: 100m
+              limits:
+                memory: 100Mi
+                cpu: 1
+            env:
+              - name: DIRS
+                value: bigdisk k3sdata
+            command:
+            - /bin/sh
+            - -c
+            - for d in $DIRS ; do sh /script/rsync-backup.sh /source/$d /backup/$d; done
+            volumeMounts:
+              - name: script
+                mountPath: /script
+              - name: backup
+                mountPath: /backup
+              - name: bigdisk
+                mountPath: /source/bigdisk
+                readOnly: true
+              - name: k3sdata
+                mountPath: /source/k3sdata
+                readOnly: true
+
+          volumes:
+            - name: backup
+              nfs:
+                server: 192.168.86.31
+                path: /mnt/bigdisk_archive/daily_backups
+            - name: bigdisk
+              nfs:
+                server: 192.168.86.32
+                path: /share/bigdisk
+            - name: k3sdata
+              nfs:
+                server: 192.168.86.32
+                path: /share/k3sdata            
+            - name: script
+              configMap:
+                name: rsync-backup

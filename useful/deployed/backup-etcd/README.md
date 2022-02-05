@@ -1,5 +1,5 @@
-Backups
-=======
+Backups of K8s etcd Database
+============================
 
 For the HA configuration with 3 masters, k3s uses etcd and this does snapshots
 automatically. See below for an approach to getting the snapshots backed up
