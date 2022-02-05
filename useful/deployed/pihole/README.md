@@ -7,6 +7,7 @@ a helm chart.
 
 ```
 helm repo add mojo2600 https://mojo2600.github.io/pihole-kubernetes/
+helm search repo mojo2600
 helm show values mojo2600/pihole > pihole-values-original.yaml
 ```
 
