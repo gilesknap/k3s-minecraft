@@ -40,4 +40,9 @@ spec:
   upgrade:
     image: rancher/k3s-upgrade
   channel: https://update.k3s.io/v1-release/channels/stable
-  
+  # I use the taint 'workstation' to include workstations for monitoring 
+  # but exclude them from most workloads
+  tolerations:
+    - key: "workstation"
+      operator: "Exists"
+      effect: "NoSchedule"
