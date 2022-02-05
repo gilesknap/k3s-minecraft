@@ -69,16 +69,15 @@ extraEnv:
   # WARNING: setting this to true deletes your previous world data
   FORCE_WORLD_COPY: false
 
-# required to save the world in persistant local-path storage (k3s default Storage Class)
-# by defualt this goes in /var/lib/rancher/k3s/storage on the executing node.
-# NOTE this ties the deployment to the first node it spins up on,
-# we could perhaps use an NFS mount to avoid this
+securityContext:
+  runAsUser: 1022
+  fsGroup: 1022
+
+# always reuse an existing nfs mount so the world survives chart deletion
 persistence:
-  storageClass: nfs-storageclass
-  annotations: {}
   dataDir:
     enabled: true
-    Size: 1Gi
+    existingClaim: noah-dad-original-survival-pvc
 
 # UNCOMMENT to choose which node to run on
 nodeSelector:

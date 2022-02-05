@@ -54,14 +54,15 @@ extraEnv:
   # useful for resetting the world but should be reset to false afterwards
   FORCE_WORLD_COPY: false
 
-# required to save the world in persistent local-path storage
-# we are using nfs-storageclass so the pod can be node agnostic
+securityContext:
+  runAsUser: 1022
+  fsGroup: 1022
+
+# always reuse an existing nfs mount so the world survives chart deletion
 persistence:
-  storageClass: nfs-storageclass
-  annotations: {}
   dataDir:
     enabled: true
-    Size: 1Gi
+    existingClaim: adventure-of-doom-pvc
 
 # choose the nodes to run on
 affinity:
