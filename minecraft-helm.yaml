@@ -57,14 +57,14 @@ minecraftServer:
 #   # define where the volume mounts in the container
 #   - volumeMounts:
 #       - name: bigdisk
-#         mountPath: /mnt/bigdisk
+#         mountPath: /share/bigdisk
 #         readOnly: true
 #     # define the remote nfs mount to attach to above
 #     volumes:
 #       - name: bigdisk
 #         nfs:
 #           server: 192.168.86.32
-#           path: /mnt/bigdisk
+#           path: /share/bigdisk
 
 extraEnv:
   # recommended rolling logs for saving disk

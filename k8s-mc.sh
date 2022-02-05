@@ -411,11 +411,11 @@ function k8s-mchelp()
         see in file comments for details.
 
     k8s-mcbackups
-        List the backups in the folder $MCBACKUP
+        List the backups in the folder ${MCBACKUP:-[MCBACKUP not yet specified]}
 
     k8s-mcbackup <server name>
         zips up the server data folder to a dated zip file and places it
-        in the folder $MCBACKUP (prompts for MCBACKUP if not set)
+        in the folder ${MCBACKUP:-[MCBACKUP not yet specified]} (prompts for MCBACKUP if not set)
 
     k8s-mcrestore <my_server_def.yaml> <backup file name>
         restore the world from backup for a server, overwriting its

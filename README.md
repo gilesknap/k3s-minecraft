@@ -156,11 +156,11 @@ $ k8s-mchelp
         see in file comments for details.
 
     k8s-mcbackups
-        List the backups in the folder /mnt/bigdisk/minecraft-k8s-backup
+        List the backups in the folder [MCBACKUP not yet specified]
 
     k8s-mcbackup <server name>
         zips up the server data folder to a dated zip file and places it
-        in the folder /mnt/bigdisk/minecraft-k8s-backup (prompts for MCBACKUP if not set)
+        in the folder [MCBACKUP not yet specified] (prompts for MCBACKUP if not set)
 
     k8s-mcrestore <server name> <backup file name>
         restore the world from backup for a server, overwriting its
