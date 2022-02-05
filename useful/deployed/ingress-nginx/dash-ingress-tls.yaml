@@ -7,16 +7,19 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Add https backend protocol support for ingress-nginx
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    # todo rewrite of the target does not seem to work for dashboard
-    # (get a blank web page)
-    # nginx.ingress.kubernetes.io/rewrite-target: "/"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Accept-Encoding "";
+      sub_filter '<base href="/">' '<base href="/dashboard/">';
+      sub_filter_once on;
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   rules: 
   - host: gilesk.ddns.net
     http:
       paths:
-        - path: /
+        - path: /dashboard(/|$)(.*)
           pathType: Prefix
           backend:
             service:

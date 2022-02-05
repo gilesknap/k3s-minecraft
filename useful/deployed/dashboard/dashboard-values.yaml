@@ -1,3 +1,24 @@
 # make token expiry longer
 extraArgs:
   - --token-ttl=86400
+
+# TODO - we don't need our own ingress yaml - the helm chart could support it 
+# like below (need to make this match what we are doing in dash-ingress-tls.yaml)
+
+# ingress:
+#   enabled: true
+#   annotations:
+#     kubernetes.io/ingress.class: nginx
+#     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+#     nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+#     nginx.ingress.kubernetes.io/app-root: /dash
+#   paths:
+#     - /
+  
+# tls:
+# - hosts:
+#   - gilesk.ddns.net
+#   secretName: gilesk.ddns.net-tls
+
+# settings:
+#   itemsPerPage: 50
