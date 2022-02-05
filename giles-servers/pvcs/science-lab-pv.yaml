@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: science-lab-minecraft-pv
+  namespace: minecraft
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: science-lab-minecraft
+  mountOptions:
+    - hard
+    - nfsvers=4
+  nfs:
+    path: /share/k3sdata/pv/minecraft-science-lab-minecraft-datadir-pvc-c0439914-d609-4480-998f-8de5eca66c68
+    server: 192.168.86.32
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: science-lab-minecraft-pvc
+  namespace: minecraft
+spec:
+  storageClassName: science-lab-minecraft
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi

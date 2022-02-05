@@ -6,7 +6,7 @@ minecraftServer:
     serviceType: NodePort
   version: LATEST
   nodePort: 31700
-  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
+  downloadWorldUrl: /share/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
   motd: "The Soj"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,destroyerSB737
@@ -36,13 +36,13 @@ nodeSelector:
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /mnt/bigdisk
+        mountPath: /share/bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.86.32
-          path: /mnt/bigdisk
+          path: /share/bigdisk
 
 
 # kubernetes memory/cpu reservation/limits

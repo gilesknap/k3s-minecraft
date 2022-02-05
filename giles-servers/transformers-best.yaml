@@ -6,7 +6,7 @@ minecraftServer:
     serviceType: NodePort
     nodePort: 31401
   nodePort: 31400
-  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/transformers-best.zip
+  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/transformers-best.zip
   motd: "Noah's awesome transformers made in minecraft with two secret bases"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11
@@ -34,13 +34,13 @@ nodeSelector:
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /mnt/bigdisk
+        mountPath: /share/bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.86.32
-          path: /mnt/bigdisk
+          path: /share/bigdisk
 
 # kubernetes memory/cpu reservation/limits
 resources:

@@ -7,7 +7,7 @@ minecraftServer:
     nodePort: 31601
   version: LATEST
   nodePort: 31600
-  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/weaponsmith.zip
+  downloadWorldUrl: /share/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/weaponsmith.zip
   motd: "smith in 21w05b"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
@@ -45,10 +45,10 @@ nodeSelector:
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /mnt/bigdisk
+        mountPath: /share/bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.86.32
-          path: /mnt/bigdisk
+          path: /share/bigdisk

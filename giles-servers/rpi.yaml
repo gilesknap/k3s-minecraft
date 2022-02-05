@@ -9,20 +9,19 @@ imagePullSecret: regcred
 
 # to target a raspberry pi use imageTag multiarch
 image: itzg/minecraft-server
-imageTag: multiarch
 
 # this is where I store world backups so mount it read-only in order to start a new
 # server from a backup
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /mnt/bigdisk
+        mountPath: /share/bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.86.32
-          path: /mnt/bigdisk
+          path: /share/bigdisk
 
 minecraftServer:
   # Noahs friends get access, Noah and I get ops
@@ -56,11 +55,12 @@ extraEnv:
   # useful for resetting the world but should be reset to false afterwards
   FORCE_WORLD_COPY: false
 
-# required to save the world in persistant local-path storage
-# by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
-# I beleive this ties the deployment to the first node it goes to
+# required to save the world in persistent local-path storage
+# by default this goes in /var/lib/rancher/k3s/storage on the executing node
+# I believe this ties the deployment to the first node it goes to
 persistence:
   annotations: {}
+  storageClass: nfs-storageclass
   dataDir:
     enabled: true
     Size: 1Gi
@@ -69,8 +69,3 @@ persistence:
 nodeSelector:
   kubernetes.io/hostname: pi4
 
-tolerations:
-- key: "architecture"
-  operator: "Equal"
-  value: "arm"
-  effect: "NoSchedule"

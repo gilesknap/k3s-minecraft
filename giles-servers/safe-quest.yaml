@@ -12,13 +12,13 @@ imagePullSecret: regcred
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /mnt/bigdisk
+        mountPath: /share/bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.86.32
-          path: /mnt/bigdisk
+          path: /share/bigdisk
 
 # various server settings
 minecraftServer:
@@ -32,7 +32,7 @@ minecraftServer:
   pvp: false
   serviceType: NodePort
   # restore the world from a backup on first execution
-  downloadWorldUrl: /mnt/bigdisk/MinecraftBackups/2020-12-28.15-44.MinecraftSurvival.SafeQuest.zip
+  downloadWorldUrl: /share/bigdisk/MinecraftBackups/2020-12-28.15-44.MinecraftSurvival.SafeQuest.zip
   # external port must be unique across all mc server instances
   nodePort: 30400
 

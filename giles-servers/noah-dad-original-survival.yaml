@@ -27,7 +27,7 @@ minecraftServer:
   # REQUIRED this means you get the node IP address (with default K3s loadbalancer)
   serviceType: NodePort
   # restore the world from a backup on first execution (requires NFS volume - see below)
-  downloadWorldUrl: /mnt/bigdisk/minecraft-k8s-backup/2021-09-26-11:59:33-noah-dad-original-survival.zip
+  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-09-26-11:59:33-noah-dad-original-survival.zip
   # external port must be unique across all mc server instances on a given node
   nodePort: 31200
   # how far from the player are chunks rendered on the server
@@ -49,14 +49,14 @@ extraVolumes:
   # define where the volume mounts in the container
   - volumeMounts:
       - name: bigdisk
-        mountPath: /mnt/bigdisk
+        mountPath: /share/bigdisk
         readOnly: true
     # define the remote nfs mount to attach to above
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.86.32
-          path: /mnt/bigdisk
+          path: /share/bigdisk
 
 extraEnv:
   # recommended rolling logs for saving disk

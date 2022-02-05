@@ -21,7 +21,7 @@ minecraftServer:
 
 extraEnv:
   TYPE: CURSEFORGE
-  CF_SERVER_MOD: /mnt/bigdisk/mods/Better+Minecraft+Server+Pack+[FORGE]+v8.zip
+  CF_SERVER_MOD: /share/bigdisk/mods/Better+Minecraft+Server+Pack+[FORGE]+v8.zip
   VERSION: 1.17.1
   ENABLE_ROLLING_LOGS: true
   OVERRIDE_SERVER_PROPERTIES: false
@@ -37,7 +37,7 @@ persistence:
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /mnt/bigdisk
+        mountPath: /share/bigdisk
         readOnly: true
       - name: mods
         mountPath: /mods
@@ -46,11 +46,11 @@ extraVolumes:
       - name: bigdisk
         nfs:
           server: 192.168.86.32
-          path: /mnt/bigdisk
+          path: /share/bigdisk
       - name: mods
         nfs:
           server: 192.168.86.32
-          path: /mnt/bigdisk/mods
+          path: /share/bigdisk/mods
 
 resources:
   requests:
