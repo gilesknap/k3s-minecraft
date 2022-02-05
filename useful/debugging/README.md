@@ -19,7 +19,7 @@ journalctl -fu k3s
 A nice trick to launch a debugging session in a pod on a particular node is as follows:
 (the toleration is for the master node if needed)
 ```
-kubectl run -it --rm --restart=Never busybox2 --image=busybox:1.28 --overrides='{"apiVersion": "v1", "spec": {"nodeSelector": { "kubernetes.io/hostname": "pi1" }, "tolerations": [{"key": "node-role.kubernetes.io/master", "operator": "Exists", "effect": "NoSchedule"}] }}' -- sh
+kubectl run -it --rm --privileged --restart=Never busybox2 --image=busybox:1.28 --overrides='{"apiVersion": "v1", "spec": {"nodeSelector": { "kubernetes.io/hostname": "pi1" }, "tolerations": [{"key": "node-role.kubernetes.io/master", "operator": "Exists", "effect": "NoSchedule"}] }}' -- sh
 ```
 
 To see if dns is working from the above busybox:
