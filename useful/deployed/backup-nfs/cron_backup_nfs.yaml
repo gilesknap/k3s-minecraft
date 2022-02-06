@@ -6,6 +6,7 @@ metadata:
   namespace: admin
 spec:
   schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
   jobTemplate:
     spec:
       # auto cleanup the job
