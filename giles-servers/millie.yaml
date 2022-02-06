@@ -23,12 +23,15 @@ extraEnv:
   OVERRIDE_SERVER_PROPERTIES: true
   FORCE_WORLD_COPY: false
 
+securityContext:
+  runAsUser: 1022
+  fsGroup: 1022
+
+# always reuse an existing nfs mount so the world survives chart deletion
 persistence:
-  storageClass: nfs-storageclass
-  annotations: {}
   dataDir:
     enabled: true
-    Size: 1Gi
+    existingClaim: millie-pvc
 
 nodeSelector:
   kubernetes.io/hostname: gknuc

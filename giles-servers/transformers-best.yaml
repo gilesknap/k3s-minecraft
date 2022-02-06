@@ -6,7 +6,7 @@ minecraftServer:
     serviceType: NodePort
     nodePort: 31401
   nodePort: 31400
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/transformers-best.zip
+  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-05-15-21:56:15-transformers-best.zip
   motd: "Noah's awesome transformers made in minecraft with two secret bases"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11
@@ -21,12 +21,17 @@ extraEnv:
   OVERRIDE_SERVER_PROPERTIES: false
   FORCE_WORLD_COPY: false
 
+
+
+securityContext:
+  runAsUser: 1022
+  fsGroup: 1022
+
+# always reuse an existing nfs mount so the world survives chart deletion
 persistence:
-  storageClass: nfs-storageclass
-  annotations: {}
   dataDir:
     enabled: true
-    Size: 1Gi
+    existingClaim: transformers-best-pvc
 
 nodeSelector:
   kubernetes.io/hostname: gknuc

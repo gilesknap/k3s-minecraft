@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: transformers-again-pv
+  namespace: minecraft
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: transformers-again
+  mountOptions:
+    - hard
+    - nfsvers=4
+  nfs:
+    # this folder was originally created by nfs auto provisioning, I moved it to the 
+    # pv folder and performed chown -R 1022:1022 to enable it as a permanent PV
+    path: /share/k3sdata/pv/minecraft-transformers-again
+    server: 192.168.86.32
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: transformers-again-pvc
+  namespace: minecraft
+spec:
+  storageClassName: transformers-again
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi

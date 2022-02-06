@@ -5,7 +5,7 @@ minecraftServer:
     serviceType: NodePort
     nodePort: 31501
   nodePort: 31500
-  downloadWorldUrl: /share/bigdisk/MinecraftBackups/noah_single_player_best_2021_05/king-ghidorah.zip
+  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-05-15-21:56:20-king-ghidorah.zip
   motd: "The Three Headed Monster!"
   gameMode: survival
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737

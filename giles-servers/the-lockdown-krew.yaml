@@ -59,18 +59,20 @@ extraEnv:
   # useful for resetting the world but should be reset to false afterwards
   FORCE_WORLD_COPY: false
 
-# required to save the world in persistant local-path storage (k3s default Storage Class)
-# by deafult this goes in /var/lib/rancher/k3s/storage on the executing node
-# NOTE this ties the deployment to the first node it goes to
-# we could perhaps use an NFS mount to avoid this
+
+# this is the UID for the files in the existingClaim
+securityContext:
+  runAsUser: 1022
+  fsGroup: 1022
+
+# always reuse an existing nfs mount so the world survives chart deletion
 persistence:
-  storageClass: nfs-storageclass
-  annotations: {}
   dataDir:
     enabled: true
-    Size: 1Gi
+    existingClaim: the-lockdown-krew-minecraft-pvc
 
 # choose the node to run on (delete if not needed)
+
 nodeSelector:
   kubernetes.io/hostname: gknuc
 

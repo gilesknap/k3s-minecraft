@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: the-lockdown-krew-minecraft-pv
+  namespace: minecraft
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: the-lockdown-krew-minecraft
+  mountOptions:
+    - hard
+    - nfsvers=4
+  nfs:
+    # this folder was originally created by nfs auto provisioning, I moved it to the 
+    # pv folder and performed chown -R 1022:1022 to enable it as a permanent PV
+    path: /share/k3sdata/pv/minecraft-the-lockdown-krew-minecraft-datadir-pvc-7569d92b-5415-4f30-978d-de9905c561d9
+    server: 192.168.86.32
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: the-lockdown-krew-minecraft-pvc
+  namespace: minecraft
+spec:
+  storageClassName: the-lockdown-krew-minecraft
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
