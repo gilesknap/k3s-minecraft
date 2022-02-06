@@ -271,7 +271,7 @@ function k8s-mcbackup()
     k8s-mcstart "${1}"
 
     if [ "${pod}" ]; then
-        zipname=$(date +%Y-%m-%d+%H.%M.%S)-${shortname}.zip
+        zipname=$(date '+%Y-%m-%d_%H:%M:%S')-${shortname}.zip
 
         kubectl exec -n minecraft ${pod} -- rcon-cli save-off
         kubectl exec -n minecraft ${pod} -- rcon-cli save-all

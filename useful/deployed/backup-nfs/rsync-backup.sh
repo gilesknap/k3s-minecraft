@@ -16,11 +16,17 @@ readonly LATEST_LINK="${BACKUP_DIR}/latest"
 
 mkdir -p "${BACKUP_DIR}"
 
-rsync -av --delete \
+# I had to stop using -a which would give a perfect archive
+# the thousands of symlinks in my photo albums seemed to cause 
+# issues -rptgov gives the same as -a but with ignore symlinks
+rsync -rptgov --delete \
   "${SOURCE_DIR}/" \
   --link-dest "${LATEST_LINK}" \
   --exclude=".cache" \
   "${BACKUP_PATH}"
 
-rm -rf "${LATEST_LINK}"
+unlink "${LATEST_LINK}"
 ln -s "${BACKUP_PATH}" "${LATEST_LINK}"
+
+# create a file to verify completion of this backup
+echo done > "${BACKUP_PATH}.completed"
