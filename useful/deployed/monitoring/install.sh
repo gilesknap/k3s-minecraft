@@ -7,7 +7,7 @@ helm repo update
 kubectl create namespace monitoring
 
 echo helm installing kube-prometheus-stack ...
-helm install prometheus -n monitoring prometheus-community/kube-prometheus-stack
+helm upgrade -i prometheus -n monitoring prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
 echo port forwarding - please browse to http://localhost:3000 ...
 echo def pass is prom-operator
