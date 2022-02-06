@@ -11,14 +11,30 @@ set -o nounset
 set -o pipefail
 
 readonly DATETIME="$(date '+%Y-%m-%d_%H:%M:%S')"
-readonly BACKUP_PATH="${BACKUP_DIR}/${DATETIME}"
 readonly LATEST_LINK="${BACKUP_DIR}/latest"
+BACKUP_PATH="${BACKUP_DIR}/${DATETIME}"
 
-mkdir -p "${BACKUP_DIR}"
+echo SOURCE PATH is $SOURCE_DIR
+echo BACKUP PATH is $BACKUP_PATH
 
-# I had to stop using -a which would give a perfect archive
-# the thousands of symlinks in my photo albums seemed to cause 
-# issues -rptgov gives the same as -a but with ignore symlinks
+# check for a previous incompleted run by looking for the file called
+# ${BACKUP_DIR}/${DATETIME}.in-progress
+inprogress=$(find  ${BACKUP_DIR} -maxdepth 1 -name *.in-progress)
+if test -z $inprogress ; then
+    # previous run completed - use the new dated backup folder
+    touch ${BACKUP_PATH}.in-progress
+    echo "STARTING NEW INCREMENTAL BACKUP IN ${BACKUP_PATH} ..."
+else
+    # continue the backup in the in-progress folder (remove the suffix)
+    BACKUP_PATH=${inprogress%.in-progress}
+    echo "RESUMING INCOMPLETE INCREMENTAL BACKUP IN ${BACKUP_PATH} ..."
+fi
+
+mkdir -p "${BACKUP_PATH}"
+
+# I had to stop using -a which would give a perfect archive.
+# The thousands of symlinks in my photo albums seemed to cause rsync lockups. 
+# Options -rptgov give the same as -a except ignore symlinks
 rsync -rptgov --delete \
   "${SOURCE_DIR}/" \
   --link-dest "${LATEST_LINK}" \
@@ -28,5 +44,5 @@ rsync -rptgov --delete \
 unlink "${LATEST_LINK}"
 ln -s "${BACKUP_PATH}" "${LATEST_LINK}"
 
-# create a file to verify completion of this backup
-echo done > "${BACKUP_PATH}.completed"
+# Verify completion of this backup 
+mv "${BACKUP_PATH}.in-progress" "${BACKUP_PATH}.completed"

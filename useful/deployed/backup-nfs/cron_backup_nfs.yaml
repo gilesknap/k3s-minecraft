@@ -24,10 +24,11 @@ spec:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
                 - matchExpressions:
-                  - key: kubernetes.io/arch
+                  - key: kubernetes.io/hostname
                     operator: In
                     values:
-                    - arm64
+                    # gknuc hosts the backup disk so this may improve perf
+                    - gknuc
           containers:
           - image: instrumentisto/rsync-ssh:alpine3.15
             imagePullPolicy: IfNotPresent
