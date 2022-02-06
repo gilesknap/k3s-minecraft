@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: prometheus-pv
+  namespace: monitoring
+spec:
+  capacity:
+    storage: 50Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: prometheus-pv
+  mountOptions:
+    - hard
+    - nfsvers=4
+  nfs:
+    # this folder was originally created by nfs auto provisioning, I moved it to the 
+    # pv folder and performed chown -R 1022:1022 to enable it as a permanent PV
+    path: /share/k3sdata/pv/prometheus-persistence
+    server: 192.168.86.32
