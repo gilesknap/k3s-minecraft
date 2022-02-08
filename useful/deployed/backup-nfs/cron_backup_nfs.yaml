@@ -46,7 +46,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - for d in $DIRS ; do sh /script/rsync-backup.sh /source/$d /backup/$d; done
+            - for d in $DIRS ; do sh /script/rsync-backup.sh /source/$d /backup/$d ; done
             volumeMounts:
               - name: script
                 mountPath: /script
