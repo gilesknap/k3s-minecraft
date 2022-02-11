@@ -41,6 +41,8 @@ Now configure the range of IPs that metallb will use. Change the contents
 of metallb-config to match a range of addresses your DHCP server will not use
 (make necessary DHCP changes on the router first). Then:
 ```
+k get configmap -n metal my-metal-metallb-config  -o yaml > metallb-config.yaml
+# edit the yaml and add your config (example in the repo)
 kubectl apply -f metallb-config.yaml
 
 # any load balancers in the cluster should now be using one of these addresses:

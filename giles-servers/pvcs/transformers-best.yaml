@@ -18,7 +18,7 @@ spec:
     # this folder was originally created by nfs auto provisioning, I moved it to the 
     # pv folder and performed chown -R 1022:1022 to enable it as a permanent PV
     path: /share/k3sdata/pv/minecraft-transformers-best-minecraft-datadir-pvc-db6cf952-ceed-44f1-bda2-c31d1c18a79d
-    server: 192.168.86.32
+    server: 192.168.0.20
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
