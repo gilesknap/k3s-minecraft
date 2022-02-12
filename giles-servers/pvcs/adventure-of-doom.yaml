@@ -8,8 +8,8 @@ spec:
     storage: 10Gi
   volumeMode: Filesystem
   accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Recycle
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
   storageClassName: adventure-of-doom
   mountOptions:
     - hard

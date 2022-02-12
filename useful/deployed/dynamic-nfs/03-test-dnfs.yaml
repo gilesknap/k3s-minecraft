@@ -32,7 +32,7 @@ spec:
           claimName: nfs-pvc-test
       - name: bigdisk
         nfs:
-          server: 192.168.86.32
+          server: 192.168.0.20
           path: /share/k3sdata
       containers:
       - name: test-dnfs

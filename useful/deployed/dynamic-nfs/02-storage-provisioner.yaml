@@ -47,7 +47,7 @@ spec:
             - name: PROVISIONER_NAME # do not change
               value: k3s-nfs # SAME AS PROVISONER NAME VALUE IN STORAGECLASS
             - name: NFS_SERVER # do not change
-              value: 192.168.86.32 # UPDATE WITH NFS SERVER IP OR NAME
+              value: 192.168.0.20 # UPDATE WITH NFS SERVER IP OR NAME
             - name: NFS_PATH # do not change
               value: /share/k3sdata/auto-pvcs # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
           resources:
@@ -60,5 +60,5 @@ spec:
       volumes:
        - name: nfs-provisioner-v # same as volumemounts name
          nfs:
-           server: 192.168.86.32 # UPDATE WITH NFS SERVER IP OR NAME
+           server: 192.168.0.20 # UPDATE WITH NFS SERVER IP OR NAME
            path: /share/k3sdata/auto-pvcs # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs

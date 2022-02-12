@@ -9,7 +9,7 @@ spec:
   volumeMode: Filesystem
   accessModes:
     - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Recycle
+  persistentVolumeReclaimPolicy: Retain
   storageClassName: prometheus-pv
   mountOptions:
     - hard
@@ -18,4 +18,4 @@ spec:
     # this folder was originally created by nfs auto provisioning, I moved it to the 
     # pv folder and performed chown -R 1022:1022 to enable it as a permanent PV
     path: /share/k3sdata/pv/prometheus-persistence
-    server: 192.168.86.32
+    server: 192.168.0.20
