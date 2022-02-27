@@ -20,7 +20,7 @@ config: |
   server=dynupdate.no-ip.com
   login=gilesknap@gmail.com
   password=${password}
-  gilesk.ddns.net
+  gilesk.ddns.net, gkdash.ddns.net, noahpalmer.ddns.net
 
 # the last line above is the Personal Network Name to update. See https://dashboard.opendns.com/
 # login and password are the creds used to log in to https://dashboard.opendns.com/

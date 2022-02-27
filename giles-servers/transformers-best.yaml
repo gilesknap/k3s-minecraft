@@ -1,11 +1,21 @@
 imagePullSecret: regcred
 
+# important to share IP between minecraft servers
+serviceAnnotations:
+  metallb.universe.tf/allow-shared-ip: "minecraft"
+
 minecraftServer:
   rcon:
     enabled: false
     serviceType: NodePort
     nodePort: 31401
-  nodePort: 31400
+
+  # this allows all minecraft servers to share the same IP address for port forwarding
+  serviceType: LoadBalancer
+  loadBalancerIP: 192.168.0.205
+  servicePort: 31400
+
+
   downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-05-15-21:56:15-transformers-best.zip
   motd: "Noah's awesome transformers made in minecraft with two secret bases"
   gameMode: creative
@@ -13,7 +23,6 @@ minecraftServer:
   ops: TransformerScorn,DispenserAD11
   forcegameMode: true
   maxWorldSize: 29999984
-  serviceType: NodePort
   memory: 2g
 
 extraEnv:
@@ -34,7 +43,7 @@ persistence:
     existingClaim: transformers-best-pvc
 
 nodeSelector:
-  kubernetes.io/hostname: gknuc
+  kubernetes.io/hostname: nuc1
 
 extraVolumes:
   - volumeMounts:

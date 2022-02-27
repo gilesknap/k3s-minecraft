@@ -12,7 +12,6 @@ These links were useful in working this out
    - https://stackoverflow.com/questions/48324760/ingress-configuration-for-dashboard
 
 ## Get nginx ingress working
-
 I eventually chose to replace the ingress and loadbalancer of k3s with more popular options.
 The instruction below are for replacing the ingress only. Read 
 [here](../metallb/README.md) first for details of replacing the loadbalancer too.
@@ -37,7 +36,7 @@ change the IP as required if using metallb.
 helm upgrade --install ingress-nginx ingress-nginx \
   --repo https://kubernetes.github.io/ingress-nginx \
   --namespace ingress-nginx --create-namespace \
-  --set controller.service.loadBalancerIP=192.168.86.50
+  --set controller.service.loadBalancerIP=192.168.0.201
 ```
 
 Verify it is up and running with:

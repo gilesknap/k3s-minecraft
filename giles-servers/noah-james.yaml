@@ -21,6 +21,10 @@ extraVolumes:
         nfs:
           server: 192.168.0.20
           path: /share/bigdisk
+          
+# important to share IP between minecraft servers
+serviceAnnotations:
+  metallb.universe.tf/allow-shared-ip: "minecraft"
 
 minecraftServer:
   whitelist: TransformerScorn,DispenserAD11,BigBob2
@@ -32,12 +36,14 @@ minecraftServer:
   gameMode: creative
   motd: "Noah and James Creative World"
   pvp: false
-  # this means you get the node IP address on K3s
-  serviceType: NodePort
+
+  # this allows all minecraft servers to share the same IP address for port forwarding
+  serviceType: LoadBalancer
+  loadBalancerIP: 192.168.0.205
+  servicePort: 30505
+
   # restore the world from a backup on first execution
   downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/22-01-21.21.50.00-noah-james.zip
-  # external node port must be unique across all mc server instances
-  nodePort: 30505
   # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
   viewDistance: 32
 
@@ -78,7 +84,7 @@ persistence:
 
 # choose the node to run on (delete if not needed)
 nodeSelector:
-  kubernetes.io/hostname: gknuc
+  kubernetes.io/hostname: nuc1
 
 
 resources:

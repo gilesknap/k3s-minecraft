@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: noahp-ddns-net
+  namespace: default
+spec:
+  secretName: noahp-ddns-net-tls
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  commonName: noahpalmer.ddns.net
+  dnsNames:
+  - noahpalmer.ddns.net

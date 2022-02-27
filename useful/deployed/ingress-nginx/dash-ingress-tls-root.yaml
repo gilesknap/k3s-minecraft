@@ -1,0 +1,27 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dash-ingress-root
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Add https backend protocol support for ingress-nginx
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  rules: 
+  - host: gkdash.ddns.net
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: dashboard-release-kubernetes-dashboard
+              port:
+                number: 443
+  tls:
+  - hosts:
+    - gkdash.ddns.net
+    secretName: gkdash.ddns.net-tls

@@ -54,6 +54,7 @@ kubectl get clusterissuers
 
 ```
 kubectl apply -f le-test-certificate.yaml
+
 kubectl get certificates --all-namespaces # until READY = True
 
 # diagnose issues with
@@ -74,6 +75,12 @@ kubectl apply -f lets-encrypt-issuer-production.yaml
 # then update the ingress to use TLS - this will automatically request a cert
 kubectl apply -f ../ingress-nginx/dash-ingress-tls.yaml
 ```
+# Creating more certs on different URLs
+kubectl apply -f le-test-certificate-dash.yaml
+kubectl delete certificates gilesk-ddns-net-dash
+kubectl delete secrets gilesk-ddns-net-dash-tls
+kubectl apply -f ../ingress-nginx/dash-ingress-tls-dash.yaml
+note: the above has not worked yet, not sure why
 
 # What to do with Router and exposing ports on the internet
 Now I removed the router's port forward and added an /etc/hosts entry for the 

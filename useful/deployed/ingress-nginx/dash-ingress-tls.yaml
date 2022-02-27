@@ -9,10 +9,17 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     # Add https backend protocol support for ingress-nginx
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    # some crazy filtering required to make an SPA work on a non root URL
     nginx.ingress.kubernetes.io/configuration-snippet: |
+      sub_filter_once off;
+      sub_filter '<head>' '<head> <base href="dashboard/">';
+      sub_filter 'src="/' 'src="/dashboard/';
+      sub_filter 'href="/' 'href="/dashboard/';
+
+      proxy_set_header Origin "";
       proxy_set_header Accept-Encoding "";
-      sub_filter '<base href="/">' '<base href="/dashboard/">';
-      sub_filter_once on;
+      proxy_hide_header l5d-remote-ip;
+      proxy_hide_header l5d-server-id;
     nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   rules: 

@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gkdash-ddns-net
+  namespace: default
+spec:
+  secretName: gkdash-ddns-net-tls
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  commonName: gkdash.ddns.net
+  dnsNames:
+  - gkdash.ddns.net

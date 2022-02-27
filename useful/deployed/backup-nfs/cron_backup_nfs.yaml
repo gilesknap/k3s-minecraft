@@ -27,8 +27,8 @@ spec:
                   - key: kubernetes.io/hostname
                     operator: In
                     values:
-                    # gknuc hosts the backup disk so this may improve perf
-                    - gknuc
+                    # nuc1 hosts the backup disk so this will improve performance
+                    - nuc1
           containers:
           - image: instrumentisto/rsync-ssh:alpine3.15
             imagePullPolicy: IfNotPresent
@@ -60,17 +60,17 @@ spec:
                 readOnly: true
 
           volumes:
+            # use the disk directly as we run on nuc1
             - name: backup
-              nfs:
-                server: 192.168.86.31
-                path: /mnt/bigdisk_archive/daily_backups
+              hostPath:
+                path: /bigdisk_archive/daily_backups
             - name: bigdisk
               nfs:
-                server: 192.168.86.32
+                server: nas1
                 path: /share/bigdisk
             - name: k3sdata
               nfs:
-                server: 192.168.86.32
+                server: nas1
                 path: /share/k3sdata            
             - name: script
               configMap:

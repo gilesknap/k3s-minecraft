@@ -17,6 +17,8 @@ BACKUP_PATH="${BACKUP_DIR}/${DATETIME}"
 echo SOURCE PATH is $SOURCE_DIR
 echo BACKUP DIR is $BACKUP_DIR
 
+mkdir -p "${BACKUP_PATH}"
+
 # check for a previous incompleted run by looking for the file called
 # ${BACKUP_DIR}/${DATETIME}.in-progress
 inprogress=$(find  ${BACKUP_DIR} -maxdepth 1 -name *.in-progress)
@@ -29,8 +31,6 @@ else
     BACKUP_PATH=${inprogress%.in-progress}
     echo "RESUMING INCOMPLETE INCREMENTAL BACKUP IN ${BACKUP_PATH} ..."
 fi
-
-mkdir -p "${BACKUP_PATH}"
 
 # I had to stop using -a which would give a perfect archive.
 # The thousands of symlinks in my photo albums seemed to cause rsync lockups. 
