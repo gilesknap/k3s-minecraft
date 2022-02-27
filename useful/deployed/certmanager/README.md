@@ -4,6 +4,10 @@
 To secure the connection you need to generate an SSL cert for the site.
 I used these notes to set up a cert manager with lets-encrypt certificates.
 
+IMPORTANT you need a public DNS name that resolves to
+your home router (e.g. I use noip). Your router needs ports 80 and 443 forwarded
+to the ingress address for the certificate handshake process to complete.
+
 https://opensource.com/article/20/3/ssl-letsencrypt-k3s
 
 I did these steps (check for an updated release at https://github.com/jetstack/cert-manager/tags first)
