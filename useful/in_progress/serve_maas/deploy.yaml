@@ -1,0 +1,106 @@
+# super minimal nginx static content server
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-static
+  namespace: admin
+spec:
+  replicas: 1  
+  selector:
+    matchLabels:
+      app: nginx-static
+  template:
+    metadata:
+      labels:
+        app: nginx-static
+    spec:
+      volumes:
+        - name: bigdisk
+          nfs:
+            server: 192.168.0.20
+            path: /share/bigdisk/nginx-static
+        - name: config
+          configMap:
+            name: nginx-static
+        - name: logs
+          emptyDir: {}
+      containers:
+        - name: nginx-static
+          image: nginx:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 80
+          resources:
+            limits:
+              cpu: '2'
+              memory: 2Gi
+          volumeMounts:
+            - name: config
+              readOnly: true
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: logs
+              mountPath: /logs
+            - name: bigdisk
+              readOnly: true
+              mountPath: /nginx-static
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-static
+  namespace: admin
+spec:
+  type: "LoadBalancer"
+  ports:
+  - name: "http"
+    port: 80
+    targetPort: 80
+  selector:
+    app: nginx-static
+  loadBalancerIP: 192.168.0.206
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-static
+  namespace: admin
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+  # a local dns name for one of my worker nodes 
+  - host: giles.maas
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: nginx-static
+              port:
+                number: 80
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nginx-static
+  namespace: admin
+data:
+  # this will treat the root folder of the bigdisk mount as the root of served files
+  # the subfolder jammy-maas will auto present the files and sub-folders
+  nginx.conf: |
+    events {
+      worker_connections  1024;
+    }
+    http {
+      server {
+        root /nginx-static;
+
+        location /jammy-maas/ {
+          autoindex on;
+        }
+      }
+    }
