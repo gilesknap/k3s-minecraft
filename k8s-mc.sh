@@ -66,7 +66,7 @@ function k8s-mccheck ()
 function k8s-mcvalidyaml()
 {
     # verify that a yaml file is a valid helm substitution
-    if [[ $(helm template -f "${1}"  minecraft-server-charts/minecraft) == *NAME-minecraft* ]]
+    if [[ $(helm template -f "${1}"  minecraft-server-charts/minecraft) == *name-minecraft* ]]
     then
       return 0
     fi
