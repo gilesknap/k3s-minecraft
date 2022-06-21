@@ -45,8 +45,8 @@ minecraftServer:
     nodePort: 31001
     serviceType: NodePort
     enabled: true
-    password: "TODO - supply this as an override on the command line "
       
+  viewDistance: 32
   memory: 2g
 
 # kubernetes memory/cpu reservation/limits
@@ -63,7 +63,7 @@ extraEnv:
   ENABLE_ROLLING_LOGS: true
   # if this is true then minecraftServer properties above are always applied
   # on restart, if false they only apply at first run
-  OVERRIDE_SERVER_PROPERTIES: false
+  OVERRIDE_SERVER_PROPERTIES: true
   # if this is true then downloadWorldUrl is always loaded on restart
   # useful for resetting the world but should be reset to false afterwards
   FORCE_WORLD_COPY: false
