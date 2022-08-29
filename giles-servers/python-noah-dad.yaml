@@ -1,0 +1,88 @@
+imagePullSecret: regcred
+
+# This is value overrides for the helm chart defined here
+# https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
+
+# to use this file
+# helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
+# helm upgrade --install WORLD_NAME -f THIS_FILE.yaml --set minecraftServer.eula=true,rcon.password=YOUR_PWD minecraft-server-charts/minecraft
+
+# this is where I store world backups so mount it read-only in order to start a new
+# server from a backup
+extraVolumes:
+  # define where the volume mounts in the container
+  - volumeMounts:
+      - name: bigdisk
+        mountPath: /share/bigdisk
+        readOnly: true
+    # define the remote nfs mount to attach to above
+    volumes:
+      - name: bigdisk
+        nfs:
+          server: 192.168.0.20
+          path: /share/bigdisk
+
+minecraftServer:
+  whitelist: TransformerScorn,DispenserAD11,BigBob2
+  ops: TransformerScorn, DispenserAD11
+  # always set game mode when a player connects
+  forcegameMode: true
+  levelSeed: 0
+  maxWorldSize: 29999983
+  gameMode: creative
+  motd: "Noah and Dad Python World"
+  pvp: false
+  overrideServerProperties: false
+
+  # this allows all minecraft servers to share the same IP address for port forwarding
+  serviceType: NodePort
+  nodePort: 30556
+
+  # restore the world from a backup on first execution
+  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2022-08-29_07:10:00-python-noah-dad.zip
+  # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
+  viewDistance: 32
+
+  # enable rcon for remote control - set to false if not required
+  rcon:
+    # external port must be unique across all mc server instances
+    serviceType: NodePort
+    nodePort: 30555
+    enabled: true
+
+  # ensure that the resources matches java memory allocation
+  # resources:
+  #   requests:
+  #     memory: 6Gi
+  memory: 6g
+
+extraEnv:
+  # recommended rolling logs for saving disk
+  ENABLE_ROLLING_LOGS: true
+  # if this is true then downloadWorldUrl is always loaded on restart
+  # useful for resetting the world but should be reset to false afterwards
+  # WARNING: setting this to true deletes your previous world data
+  FORCE_WORLD_COPY: false
+
+# this is the UID for the files in the existingClaim
+securityContext:
+  runAsUser: 1022
+  fsGroup: 1022
+
+# always reuse an existing nfs mount so the world survives chart deletion
+persistence:
+  storageClass: nfs-storageclass
+  dataDir:
+    enabled: true
+
+# choose the node to run on
+nodeSelector:
+  kubernetes.io/hostname: nuc2
+
+resources:
+  requests:
+    memory: 6Gi
+    cpu: 3
+  limits:
+    memory: 7Gi
+    cpu: 8
