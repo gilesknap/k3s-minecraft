@@ -1,16 +1,16 @@
 {
-	"folders": [
+    "folders": [
         {
             "path": "."
         },
         {
-            "path": "../docker-minecraft-server"
+            "path": "../mc/mciwb"
         },
         {
-            "path": "../noip"
+            "path": "../mc/mcipc"
         },
         {
-            "path": "../minecraft-server-charts"
+            "path": "../mc/mcwb"
         }
     ],
     "settings": {}
