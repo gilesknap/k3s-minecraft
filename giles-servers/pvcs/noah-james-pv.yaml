@@ -17,7 +17,7 @@ spec:
   nfs:
     # this folder was originally created by nfs auto provisioning, I moved it to the 
     # pv folder and performed chown -R 1022:1022 to enable it as a permanent PV
-    path: /share/k3sdata/pv/minecraft-noah-james-minecraft-datadir-pvc-ba9fed24-d835-49ad-9488-d615e5f7aa7d
+    path: /k3sdata/pv/minecraft-noah-james-minecraft-datadir-pvc-ba9fed24-d835-49ad-9488-d615e5f7aa7d
     server: 192.168.0.20
 ---
 apiVersion: v1

@@ -14,14 +14,14 @@ metadata:
 spec:
   rules:
   # a local dns name for one of my worker nodes 
-  - host: gknuc.local
+  - host: nuc1.local
     http:
       paths:
         - path: /
           pathType: Prefix
           backend:
             service:
-              name: kubernetes-dashboard
+              name: dashboard-release-kubernetes-dashboard
               port:
                 number: 443        
   # a public dns name for one of my worker nodes    
@@ -32,6 +32,6 @@ spec:
           pathType: Prefix
           backend:
             service:
-              name: kubernetes-dashboard
+              name: dashboard-release-kubernetes-dashboard
               port:
                 number: 443

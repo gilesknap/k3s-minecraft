@@ -13,14 +13,14 @@ extraVolumes:
   # define where the volume mounts in the container
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
     # define the remote nfs mount to attach to above
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk
           
 # important to share IP between minecraft servers
 serviceAnnotations:
@@ -37,13 +37,12 @@ minecraftServer:
   motd: "Noah and James Creative World"
   pvp: false
 
-  # this allows all minecraft servers to share the same IP address for port forwarding
-  serviceType: LoadBalancer
-  loadBalancerIP: 192.168.0.205
-  servicePort: 30505
+  # use nodeport - cant use a loadbalancer with Google Wifi port forwarding :-(
+  serviceType: NodePort
+  nodePort: 30505
 
   # restore the world from a backup on first execution
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/22-01-21.21.50.00-noah-james.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/22-01-21.21.50.00-noah-james.zip
   # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
   viewDistance: 32
 

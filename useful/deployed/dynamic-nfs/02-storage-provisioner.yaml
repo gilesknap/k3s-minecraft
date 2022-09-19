@@ -49,7 +49,7 @@ spec:
             - name: NFS_SERVER # do not change
               value: 192.168.0.20 # UPDATE WITH NFS SERVER IP OR NAME
             - name: NFS_PATH # do not change
-              value: /share/k3sdata/auto-pvcs # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
+              value: /k3sdata/auto-pvcs # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
           resources:
             requests:
               cpu: 100m
@@ -61,4 +61,4 @@ spec:
        - name: nfs-provisioner-v # same as volumemounts name
          nfs:
            server: 192.168.0.20 # UPDATE WITH NFS SERVER IP OR NAME
-           path: /share/k3sdata/auto-pvcs # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs
+           path: /k3sdata/auto-pvcs # UPDATE WITH PATH ON NFS SERVER FOR ROOT OF PVs

@@ -33,7 +33,7 @@ spec:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/k3sdata
+          path: /k3sdata
       containers:
       - name: test-dnfs
         image: alpine

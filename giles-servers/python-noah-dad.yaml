@@ -13,14 +13,14 @@ extraVolumes:
   # define where the volume mounts in the container
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
     # define the remote nfs mount to attach to above
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk
 
 minecraftServer:
   whitelist: TransformerScorn,DispenserAD11,BigBob2
@@ -39,7 +39,7 @@ minecraftServer:
   nodePort: 30556
 
   # restore the world from a backup on first execution
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2022-08-29_07:10:00-python-noah-dad.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/2022-08-29_07:10:00-python-noah-dad.zip
   # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
   viewDistance: 32
 

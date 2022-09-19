@@ -1,5 +1,22 @@
 # install the kubernetes dashboard
 
+Update - I redeployed with these instuctions https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/
+
+Then added a user and generated a token
+```
+k apply -f useful/deployed/dashboard/dashboard-admin.yaml
+kubectl -n kubernetes-dashboard create token admin-user
+```
+
+Then run a proxy and use a proxy address to the dashboard service
+```
+nohup kubectl proxy &
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/service?namespace=default
+```
+
+
+# previous approach
+
 Use the official helm chart
 
 ```bash
