@@ -58,13 +58,13 @@ touch ssh
 
 vim cmdline.txt 
 # add
-#  " cgroup_memory=1 cgroup_enable=memory"
+#  " cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory"
 # to the end of the command line
 
 vim config.txt 
 # add these lines:
-#    dtoverlay=disable-wifi
-#    dtoverlay=disable-bt
+dtoverlay=disable-wifi
+dtoverlay=disable-bt
 
 # Boot from USB and find out the IP, then ssh to the pi with user pi pass raspberry.
 # Maybe create a new user and delete pi if you are paranoid.

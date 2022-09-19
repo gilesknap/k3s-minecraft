@@ -93,15 +93,30 @@ tabs:
             borderless: false
             parts:
               - run:
-                  command: {cmd: bash, args: ["-c", "ssh -t gknuc watch -t 'sensors coretemp-isa-0000' ; bash"]}
+                  command: {cmd: bash, args: ["-c", "ssh -t nuc1 watch -t 'sensors coretemp-isa-0000' ; bash"]}
                 split_size:
                   Fixed: 5
                 borderless: true
               - run:
-                  command: {cmd: bash, args: ["-c", "ssh -t gknuc htop ; bash"]}
-                pane_name: gknuc   
+                  command: {cmd: bash, args: ["-c", "ssh -t nuc1 htop ; bash"]}
+                pane_name: nuc1   
               - run:
-                  command: {cmd: bash, args: ["-c", "ssh -t gknuc bash; bash"]}
+                  command: {cmd: bash, args: ["-c", "ssh -t nuc1 bash; bash"]}
+                split_size:
+                  Percent: 20                      
+          - direction: Horizontal
+            borderless: false
+            parts:
+              - run:
+                  command: {cmd: bash, args: ["-c", "ssh -t nuc2 watch -t 'sensors coretemp-isa-0000' ; bash"]}
+                split_size:
+                  Fixed: 5
+                borderless: true
+              - run:
+                  command: {cmd: bash, args: ["-c", "ssh -t nuc2 htop ; bash"]}
+                pane_name: nuc2   
+              - run:
+                  command: {cmd: bash, args: ["-c", "ssh -t nuc2 bash; bash"]}
                 split_size:
                   Percent: 20                           
       - direction: Vertical
@@ -126,6 +141,6 @@ tabs:
                       command: {cmd: bash, args: ["-c", "ssh -t pi4 journalctl -fu k3s-agent.service; bash"]}
                     pane_name: pi4 k3s agent logs
                   - run:
-                      command: {cmd: bash, args: ["-c", "ssh -t gknuc journalctl -fu k3s-agent.service; bash"]}
-                    pane_name: gknuc k3s agent logs
+                      command: {cmd: bash, args: ["-c", "ssh -t nuc1 journalctl -fu k3s-agent.service; bash"]}
+                    pane_name: nuc1 k3s agent logs
           
