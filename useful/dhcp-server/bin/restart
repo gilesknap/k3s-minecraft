@@ -1,0 +1,4 @@
+#!/bin/bash
+stop-dhcp
+start-dhcp
+

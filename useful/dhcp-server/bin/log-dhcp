@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sudo tail -f -n50 /var/log/syslog  | grep dhcp
+

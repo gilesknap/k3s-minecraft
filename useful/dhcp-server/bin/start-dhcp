@@ -1,0 +1,13 @@
+#!/bin/bash
+
+this_dir=$(dirname ${0})
+
+if [[ $1 != "nocopy" ]] ; then
+  scp giles@192.168.0.21:/home/giles/work/k3s-minecraft/useful/dhcp-server/dhcpd.conf ${this_dir}
+fi
+
+sudo cp ${this_dir}/dhcpd.conf /etc/default/isc-dhcp-server
+echo starting ...
+sudo sudo systemctl start isc-dhcp-server.service
+echo started
+
