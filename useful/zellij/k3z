@@ -8,4 +8,4 @@ export KUBECONFIG=/home/giles/.kube/mcconfig:/home/giles/.kube/config_argus:/hom
 kubectl config use-context minecraft
 source ${ZELLIJ_DIR}/../../k8s-mc.sh
 
-zellij --layout-path ${ZELLIJ_DIR}/k3s-zellij.yaml
+zellij --layout ${ZELLIJ_DIR}/k3s-zellij.yaml
