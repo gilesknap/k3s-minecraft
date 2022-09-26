@@ -66,12 +66,12 @@ spec:
                 path: /bigdisk_archive/daily_backups
             - name: bigdisk
               nfs:
-                server: nas1
-                path: /share/bigdisk
+                server: 192.168.0.20
+                path: /bigdisk
             - name: k3sdata
               nfs:
-                server: nas1
-                path: /share/k3sdata            
+                server: 192.168.0.20
+                path: /k3sdata            
             - name: script
               configMap:
                 name: rsync-backup
