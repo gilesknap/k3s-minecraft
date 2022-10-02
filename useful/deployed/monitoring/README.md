@@ -20,3 +20,18 @@ work with a free slack installation:
 
 https://medium.com/@_oleksii_/grafana-alerting-and-slack-notifications-3affe9d5f688
 
+# Adding a Data Source
+
+log in with default user/pass at https://localhost:3000
+
+Find add data source panel and use these settings:
+
+- URL: http://prometheus-kube-prometheus-prometheus.monitoring:9090/
+- Access: Server
+- Name: Prometheus, Default: True
+
+# useful dashboards
+
+Use import dashboard and choose these numbers
+
+- 1860: full node exporter dashboard with every stat possible on your nodes.
