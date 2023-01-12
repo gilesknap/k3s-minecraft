@@ -44,8 +44,9 @@ persistence:
     enabled: true
     existingClaim: animal-world-pvc
 
+# don't run on the raspberry pis (as we have some nice Intel Nucs for this)
 nodeSelector:
-  kubernetes.io/hostname: gknuc
+  beta.kubernetes.io/arch: amd64
 
 extraVolumes:
   - volumeMounts:

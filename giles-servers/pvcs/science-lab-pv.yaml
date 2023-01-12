@@ -15,9 +15,9 @@ spec:
     - hard
     - nfsvers=4
   nfs:
-    # this folder was originally created by nfs auto provisioning, I moved it to the 
+    # this folder was originally created by nfs auto provisioning, I moved it to the
     # pv folder and performed chown -R 1022:1022 to enable it as a permanent PV
-    path: /share/k3sdata/pv/minecraft-science-lab-minecraft-datadir-pvc-c0439914-d609-4480-998f-8de5eca66c68
+    path: /k3sdata/pv/minecraft-science-lab-minecraft-datadir-pvc-c0439914-d609-4480-998f-8de5eca66c68
     server: 192.168.0.20
 ---
 apiVersion: v1

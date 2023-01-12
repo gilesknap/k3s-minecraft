@@ -72,14 +72,14 @@ persistence:
     enabled: true
     existingClaim: science-lab-minecraft-pvc
 
-# choose the node to run on (delete if not needed)
+# don't run on the raspberry pis (as we have some nice Intel Nucs for this)
 nodeSelector:
-  kubernetes.io/hostname: nuc1
+  beta.kubernetes.io/arch: amd64
 
 resources:
   requests:
     memory: 6Gi
     cpu: 1
   limits:
-    memory: 7Gi
+    memory: 6Gi
     cpu: 8

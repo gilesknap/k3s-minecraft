@@ -59,7 +59,6 @@ extraEnv:
   # useful for resetting the world but should be reset to false afterwards
   FORCE_WORLD_COPY: false
 
-
 # this is the UID for the files in the existingClaim
 securityContext:
   runAsUser: 1022
@@ -71,10 +70,9 @@ persistence:
     enabled: true
     existingClaim: the-lockdown-krew-minecraft-pvc
 
-# choose the node to run on (delete if not needed)
-
+# don't run on the raspberry pis (as we have some nice Intel Nucs for this)
 nodeSelector:
-  kubernetes.io/hostname: gknuc
+  beta.kubernetes.io/arch: amd64
 
 resources:
   requests:
