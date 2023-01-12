@@ -21,8 +21,8 @@ extraVolumes:
           path: /share/bigdisk
 
 minecraftServer:
-  # Noahs friends get access, Noah and I get ops
-  whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
+  # # Noahs friends get access, Noah and I get ops
+  # whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
   ops: TransformerScorn
   forcegameMode: true
   levelSeed:
@@ -42,7 +42,7 @@ minecraftServer:
     nodePort: 30601
     serviceType: NodePort
     enabled: true
-  memory: 2g
+  memory: 4g
 
 extraEnv:
   # recommended rolling logs for saving disk
@@ -64,31 +64,34 @@ persistence:
     enabled: true
     existingClaim: adventure-of-doom-pvc
 
-# choose the nodes to run on
-affinity:
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-    - weight: 1
-      preference:
-        matchExpressions:
-        - key: kubernetes.io/hostname
-          operator: In
-          values:
-          - pi2
-          - pi4
+# # choose the nodes to run on
+# affinity:
+#   nodeAffinity:
+#     preferredDuringSchedulingIgnoredDuringExecution:
+#     - weight: 1
+#       preference:
+#         matchExpressions:
+#         - key: kubernetes.io/hostname
+#           operator: In
+#           values:
+#           - pi2
+#           - pi4
 
+# # on a pi we may need longer before the health check
+# readinessProbe:
+#   initialDelaySeconds: 240
+# livenessProbe:
+#   initialDelaySeconds: 240
 
-# on a pi we may need longer before the health check
-readinessProbe:
-  initialDelaySeconds: 240
-livenessProbe:
-  initialDelaySeconds: 240
+# don't run on the raspberry pis (as we have some nice Intel Nucs for this)
+nodeSelector:
+  beta.kubernetes.io/arch: amd64
 
 # kubernetes memory/cpu reservation/limits
 resources:
   requests:
-    memory: 2Gi
-    cpu: 3
+    memory: 4Gi
+    cpu: 2
   limits:
-    memory: 3Gi
+    memory: 4Gi
     cpu: 4

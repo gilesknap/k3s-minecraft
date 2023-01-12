@@ -1,9 +1,22 @@
 imagePullSecret: regcred
+
+extraVolumes:
+  - volumeMounts:
+      - name: bigdisk
+        mountPath: /share/bigdisk
+        readOnly: true
+    volumes:
+      - name: bigdisk
+        nfs:
+          server: 192.168.0.20
+          path: /share/bigdisk
+
 minecraftServer:
   rcon:
     enabled: true
     nodePort: 31301
     serviceType: NodePort
+  serviceType: NodePort
   nodePort: 31300
   downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/mansion-world.zip
   motd: "Noah and Dads early creative Mansion World, with Iron Golem Grandad"
@@ -12,7 +25,6 @@ minecraftServer:
   ops: TransformerScorn,DispenserAD11
   forcegameMode: true
   maxWorldSize: 29999984
-  serviceType: NodePort
   memory: 2g
 
 # kubernetes memory/cpu reservation/limits
@@ -21,7 +33,7 @@ resources:
     memory: 2Gi
     cpu: 1
   limits:
-    memory: 3Gi
+    memory: 2Gi
     cpu: 8
 
 extraEnv:
@@ -39,16 +51,6 @@ persistence:
     enabled: true
     existingClaim: mansion-world-pvc
 
+# don't run on the raspberry pis (as we have some nice Intel Nucs for this)
 nodeSelector:
-  kubernetes.io/hostname: gknuc
-
-extraVolumes:
-  - volumeMounts:
-      - name: bigdisk
-        mountPath: /share/bigdisk
-        readOnly: true
-    volumes:
-      - name: bigdisk
-        nfs:
-          server: 192.168.0.20
-          path: /share/bigdisk
+  beta.kubernetes.io/arch: amd64
