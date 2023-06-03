@@ -19,7 +19,7 @@ spec:
   channel: https://update.k3s.io/v1-release/channels/stable
   tolerations:
     - key: "node-role.kubernetes.io"
-      operator: "Equals"
+      operator: "Equal"
       value: "master"
       effect: "NoSchedule"
 ---
