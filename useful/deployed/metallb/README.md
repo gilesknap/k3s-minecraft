@@ -6,8 +6,8 @@ Hence I want to try metallb instead of the default klipper
 klipper: k3s default loadbalancer
 traefik: k3s default ingress controller
 
-metallb: much more widely used loadbalancer 
-ingress-nginx: much more widely used ingress controller 
+metallb: much more widely used loadbalancer
+ingress-nginx: much more widely used ingress controller
 ```
 ( see [ingress-nginx](../ingress-nginx/README.md) )
 
@@ -19,7 +19,7 @@ the replicas that the service is fronting.
 
 First we remove the defaults, klipper and traefik:
 
-Update the file /etc/systemd/system/k3s.service and make the last ExecStart 
+Update the file /etc/systemd/system/k3s.service and make the last ExecStart
 look like this on the master node(s) :
 
 ```
@@ -32,12 +32,14 @@ ExecStart=/usr/local/bin/k3s \
 
 Install metallb with helm
 (see https://bitnami.com/stack/metallb/helm)
+note that the metallb-values.yaml is no longer needed as the default chart
+works with hybrid cluster of arm and amd nodes.
 ```
 helm repo add bitnami https://charts.bitnami.com/bitnami
-helm upgrade -i my-metal bitnami/metallb -n metal --create-namespace -f metallb-values.yaml
+helm upgrade -i my-metal bitnami/metallb -n metal --create-namespace
 ```
 
-Now configure the range of IPs that metallb will use. Change the contents 
+Now configure the range of IPs that metallb will use. Change the contents
 of metallb-config to match a range of addresses your DHCP server will not use
 (make necessary DHCP changes on the router first). Then:
 ```
@@ -54,14 +56,14 @@ For my existing ingresses that are using /etc/hosts to reach the cluster I now
 see that they are using the first IP from the pool.
 
 QUESTION: I'm not clear if I can rely on my ingress controller always picking up
-the first IP address in the pool. If not I need some way of advertising the 
-correct IP for the host names in my ingresses. 
+the first IP address in the pool. If not I need some way of advertising the
+correct IP for the host names in my ingresses.
 
 ANSWER: when any service is configured with 'type: Loadbalancer' it may specify
-it external IP with "loadBalancerIP:". Since I installed ingress first and did 
+it external IP with "loadBalancerIP:". Since I installed ingress first and did
 not specify loadBalancerIP it picked the 1st available IP. So best to go back
-and specify this in the ingress controller to enforce this. (Even better would 
-be to get external DNS working so that I would refer to ingresses by internal DNS 
+and specify this in the ingress controller to enforce this. (Even better would
+be to get external DNS working so that I would refer to ingresses by internal DNS
 name only). For the moment I have added loadbalancerIP option to the installation
 of [ingress-nginx](../ingress-nginx/README.md).
 

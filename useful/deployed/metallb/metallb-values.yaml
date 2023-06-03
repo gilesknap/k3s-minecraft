@@ -1,12 +1,12 @@
-# pick the latest stable image version - the chart defaults to a specific tag 
+# pick the latest stable image version - the chart defaults to a specific tag
 # which is AMD64 only
 
 controller:
   image:
-    repository: metallb/controller
-    tag: v0.11
+    repository: bitnami/metallb-controller
+    tag: latest
 
 speaker:
   image:
-    repository: metallb/speaker
-    tag: v0.11
+    repository: bitnami/metallb-speaker
+    tag: latest

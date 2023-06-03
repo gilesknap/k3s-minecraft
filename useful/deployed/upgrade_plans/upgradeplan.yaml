@@ -9,14 +9,19 @@ spec:
   cordon: true
   nodeSelector:
     matchExpressions:
-    - key: node-role.kubernetes.io/master
-      operator: In
-      values:
-      - "true"
+      - key: node-role.kubernetes.io/master
+        operator: In
+        values:
+          - "true"
   serviceAccountName: system-upgrade
   upgrade:
     image: rancher/k3s-upgrade
   channel: https://update.k3s.io/v1-release/channels/stable
+  tolerations:
+    - key: "node-role.kubernetes.io"
+      operator: "Equals"
+      value: "master"
+      effect: "NoSchedule"
 ---
 # Agent plan
 apiVersion: upgrade.cattle.io/v1
@@ -29,18 +34,18 @@ spec:
   cordon: true
   nodeSelector:
     matchExpressions:
-    - key: node-role.kubernetes.io/master
-      operator: DoesNotExist
+      - key: node-role.kubernetes.io/master
+        operator: DoesNotExist
   prepare:
     args:
-    - prepare
-    - server-plan
+      - prepare
+      - server-plan
     image: rancher/k3s-upgrade
   serviceAccountName: system-upgrade
   upgrade:
     image: rancher/k3s-upgrade
   channel: https://update.k3s.io/v1-release/channels/stable
-  # I use the taint 'workstation' to include workstations for monitoring 
+  # I use the taint 'workstation' to include workstations for monitoring
   # but exclude them from most workloads
   tolerations:
     - key: "workstation"

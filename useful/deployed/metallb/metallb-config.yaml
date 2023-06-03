@@ -11,13 +11,13 @@ metadata:
   annotations:
     meta.helm.sh/release-name: my-metal
     meta.helm.sh/release-namespace: metal
-  creationTimestamp: "2022-02-11T16:28:50Z"
+  creationTimestamp: "2023-06-03T07:35:57Z"
   labels:
     app.kubernetes.io/instance: my-metal
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: metallb
-    helm.sh/chart: metallb-2.6.2
+    helm.sh/chart: metallb-4.5.2
   name: my-metal-metallb-config
   namespace: metal
-  resourceVersion: "3398024"
-  uid: 4d6debcf-4e28-4a5b-a165-d384ad6e3303
+  resourceVersion: "33302894"
+  uid: 02db691b-489b-45f6-b535-db4f423c3635
