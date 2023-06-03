@@ -3,5 +3,10 @@
         "bigdisk",
         "forcegame",
         "minecraft"
-    ]
+    ],
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#09350F",
+        "titleBar.activeBackground": "#0C4B15",
+        "titleBar.activeForeground": "#F3FDF4"
+    }
 }

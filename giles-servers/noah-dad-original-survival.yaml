@@ -34,15 +34,15 @@ minecraftServer:
   # 10 is default, larger is nice on high spec hardware
   # I believe 25 is the client max so larger is wasted
   viewDistance: 25
-  memory: 2g
+  memory: 4g
 
 # kubernetes memory/cpu reservation/limits
 resources:
   requests:
-    memory: 2Gi
+    memory: 4Gi
     cpu: 1
   limits:
-    memory: 3Gi
+    memory: 4Gi
     cpu: 8
 
 extraVolumes:
@@ -79,6 +79,6 @@ persistence:
     enabled: true
     existingClaim: noah-dad-original-survival-pvc
 
-# UNCOMMENT to choose which node to run on
+# don't run on the raspberry pis (as we have some nice Intel Nucs for this)
 nodeSelector:
-  kubernetes.io/hostname: gknuc
+  beta.kubernetes.io/arch: amd64

@@ -10,11 +10,9 @@ minecraftServer:
     serviceType: NodePort
     nodePort: 31401
 
-  # this allows all minecraft servers to share the same IP address for port forwarding
-  serviceType: LoadBalancer
-  loadBalancerIP: 192.168.0.205
-  servicePort: 31400
-
+  # use nodeport - cant use a loadbalancer with Google Wifi port forwarding :-(
+  serviceType: NodePort
+  nodePort: 31400
 
   downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-05-15-21:56:15-transformers-best.zip
   motd: "Noah's awesome transformers made in minecraft with two secret bases"
@@ -30,8 +28,6 @@ extraEnv:
   OVERRIDE_SERVER_PROPERTIES: false
   FORCE_WORLD_COPY: false
 
-
-
 securityContext:
   runAsUser: 1022
   fsGroup: 1022
@@ -42,8 +38,9 @@ persistence:
     enabled: true
     existingClaim: transformers-best-pvc
 
+# don't run on the raspberry pis (as we have some nice Intel Nucs for this)
 nodeSelector:
-  kubernetes.io/hostname: nuc1
+  beta.kubernetes.io/arch: amd64
 
 extraVolumes:
   - volumeMounts:

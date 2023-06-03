@@ -15,9 +15,9 @@ spec:
     - hard
     - nfsvers=4
   nfs:
-    # this folder was originally created by nfs auto provisioning, I moved it to the 
+    # this folder was originally created by nfs auto provisioning, I moved it to the
     # pv folder and performed chown -R 1022:1022 to enable it as a permanent PV
-    path: /share/k3sdata/pv/minecraft-millie-minecraft-datadir-pvc-8bc87ade-ee2b-492b-a438-c5ac8b6c1f86
+    path: /k3sdata/pv/minecraft-millie-minecraft-datadir-pvc-8bc87ade-ee2b-492b-a438-c5ac8b6c1f86
     server: 192.168.0.20
 ---
 apiVersion: v1

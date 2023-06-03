@@ -3,9 +3,7 @@ the current setup.
 
 helm charts already fixed up are:
 
-- noah-james
-- python-noah-dad
-- mansion-world
+- most are done now
 
 process (for e.g. mansion world)
 ```bash
