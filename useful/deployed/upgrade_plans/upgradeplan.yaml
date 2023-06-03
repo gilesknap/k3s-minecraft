@@ -18,9 +18,9 @@ spec:
     image: rancher/k3s-upgrade
   channel: https://update.k3s.io/v1-release/channels/stable
   tolerations:
-    - key: "node-role.kubernetes.io"
+    - key: "node-role.kubernetes.io/master"
       operator: "Equal"
-      value: "master"
+      value: "true"
       effect: "NoSchedule"
 ---
 # Agent plan

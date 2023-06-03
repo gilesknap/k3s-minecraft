@@ -25,9 +25,13 @@ look like this on the master node(s) :
 ```
 ExecStart=/usr/local/bin/k3s \
     server \
-    --no-deploy traefik \
     --disable servicelb \
-    --disable traefike
+    --disable traefik
+```
+after changes to the k3s.service file:
+```
+sudo systemctl daemon-reload
+sudo systemctl restart k3s
 ```
 
 Install metallb with helm
