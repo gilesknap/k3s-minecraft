@@ -14,7 +14,7 @@ k apply -n minecraft -f giles-servers/pvcs/mansion-world.yaml
 >> change the node affinity as follows:-
     # don't run on the raspberry pis (as we have some nice Intel Nucs for this)
         nodeSelector:
-        beta.kubernetes.io/arch: amd64
+        kubernetes.io/arch: amd64
 k8s-mcdeploy giles-servers/mansion-world.yaml
 ```
 Also verify that you are using NodePort as per giles-servers/pvcs/noah-james.yaml

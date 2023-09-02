@@ -53,4 +53,4 @@ persistence:
 
 # don't run on the raspberry pis (as we have some nice Intel Nucs for this)
 nodeSelector:
-  beta.kubernetes.io/arch: amd64
+  kubernetes.io/arch: amd64

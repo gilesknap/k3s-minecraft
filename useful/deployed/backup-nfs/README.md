@@ -13,5 +13,7 @@ kubectl apply -f cron_backup_nfs.yaml
 ```
 
 Note the backup folder NFS mount targeted by the above required no_root_squash
-because rsync needs full control to set the UIDs on the files it is 
-creating
+because rsync needs full control to set the UIDs on the files it is
+creating. HOWEVER, for speed I switched to running the pod directly on the
+node that has the backup filesystem attached. That way we can use hostPath
+for the backup and it is MUCH faster as NFS is rubbish for lots of small files.
