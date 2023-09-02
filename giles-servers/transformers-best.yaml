@@ -14,7 +14,7 @@ minecraftServer:
   serviceType: NodePort
   nodePort: 31400
 
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-05-15-21:56:15-transformers-best.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/2021-05-15-21:56:15-transformers-best.zip
   motd: "Noah's awesome transformers made in minecraft with two secret bases"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11
@@ -45,13 +45,13 @@ nodeSelector:
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk
 
 # kubernetes memory/cpu reservation/limits
 resources:

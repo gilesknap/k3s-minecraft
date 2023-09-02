@@ -13,7 +13,7 @@ minecraftServer:
   gameMode: survival
   whitelist: TransformerScorn,DispenserAD11,Bigbob2
   ops: TransformerScorn,DispenserAD11
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-06-03-10:30:33-fire-ice2.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/2021-06-03-10:30:33-fire-ice2.zip
   forcegameMode: true
   maxWorldSize: 29999984
   serviceType: NodePort
@@ -36,7 +36,7 @@ persistence:
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
       - name: mods
         mountPath: /mods
@@ -45,11 +45,11 @@ extraVolumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk
       - name: mods
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk/mods
+          path: /bigdisk/mods
 
 resources:
   requests:
@@ -58,7 +58,6 @@ resources:
   limits:
     memory: 4Gi
     cpu: 8
-  
 
 nodeSelector:
   kubernetes.io/hostname: gknuc

@@ -5,7 +5,7 @@ minecraftServer:
     serviceType: NodePort
     nodePort: 31501
   nodePort: 31500
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-05-15-21:56:20-king-ghidorah.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/2021-05-15-21:56:20-king-ghidorah.zip
   motd: "The Three Headed Monster!"
   gameMode: survival
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
@@ -43,10 +43,10 @@ nodeSelector:
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk

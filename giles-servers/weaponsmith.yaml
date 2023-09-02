@@ -7,7 +7,7 @@ minecraftServer:
     nodePort: 31601
   version: LATEST
   nodePort: 31600
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-09-26-18:07:08-weaponsmith.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/2021-09-26-18:07:08-weaponsmith.zip
   motd: "smith originally built in 21w05b"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,JJ33Mine,destroyerSB737
@@ -26,7 +26,7 @@ resources:
   limits:
     memory: 3Gi
     cpu: 8
-    
+
 extraEnv:
   ENABLE_ROLLING_LOGS: true
   OVERRIDE_SERVER_PROPERTIES: true
@@ -45,10 +45,10 @@ nodeSelector:
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk

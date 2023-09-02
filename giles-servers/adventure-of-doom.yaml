@@ -12,13 +12,13 @@ imagePullSecret: regcred
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk
 
 minecraftServer:
   # # Noahs friends get access, Noah and I get ops
@@ -32,7 +32,7 @@ minecraftServer:
   pvp: false
   serviceType: NodePort
   # restore the world from a backup on first execution
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2022-01-22Z23:18:11-adventure-of-doom.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/2022-01-22Z23:18:11-adventure-of-doom.zip
   # external port must be unique across all mc server instances
   nodePort: 30600
 

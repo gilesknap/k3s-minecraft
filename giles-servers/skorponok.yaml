@@ -12,14 +12,14 @@ extraVolumes:
   # define where the volume mounts in the container
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
     # define the remote nfs mount to attach to above
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk
 
 minecraftServer:
   # Noahs friends get access, Noah and I get ops
@@ -35,7 +35,7 @@ minecraftServer:
   # this means you get the node IP address on K3s
   serviceType: NodePort
   # restore the world from a backup on first execution
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/2021-05-15-22:00:56-skorponok.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/2021-05-15-22:00:56-skorponok.zip
   # external port must be unique across all mc server instances
   nodePort: 31000
 
@@ -45,7 +45,7 @@ minecraftServer:
     nodePort: 31001
     serviceType: NodePort
     enabled: true
-      
+
   viewDistance: 32
   memory: 2g
 

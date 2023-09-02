@@ -3,13 +3,13 @@ imagePullSecret: regcred
 extraVolumes:
   - volumeMounts:
       - name: bigdisk
-        mountPath: /share/bigdisk
+        mountPath: /bigdisk
         readOnly: true
     volumes:
       - name: bigdisk
         nfs:
           server: 192.168.0.20
-          path: /share/bigdisk
+          path: /bigdisk
 
 minecraftServer:
   rcon:
@@ -18,7 +18,7 @@ minecraftServer:
     serviceType: NodePort
   serviceType: NodePort
   nodePort: 31300
-  downloadWorldUrl: /share/bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/mansion-world.zip
+  downloadWorldUrl: /bigdisk/minecraft-k8s-backup/noah_single_player_best_2021_05/mansion-world.zip
   motd: "Noah and Dads early creative Mansion World, with Iron Golem Grandad"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11
