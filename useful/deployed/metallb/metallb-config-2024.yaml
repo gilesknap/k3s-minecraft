@@ -1,0 +1,19 @@
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: nat
+  namespace: metallb-system
+spec:
+  addresses:
+    - 192.168.0.201-192.168.0.250
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: nat-advertise
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - nat
+

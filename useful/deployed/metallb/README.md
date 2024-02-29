@@ -34,6 +34,12 @@ sudo systemctl daemon-reload
 sudo systemctl restart k3s
 ```
 
+UPDATE Feb 2024:
+```
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.3/config/manifests/metallb-native.yaml
+kubectl apply -f metallb-config-2024.yaml
+```
+
 Install metallb with helm
 (see https://bitnami.com/stack/metallb/helm)
 note that the metallb-values.yaml is no longer needed as the default chart
