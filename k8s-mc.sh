@@ -1,18 +1,19 @@
 #!/bin/bash
 # source this script for some helper functions to control minecraft on k3s
 
-if [  "$0" == "${BASH_SOURCE[0]}" ]
-then
-  echo "this script must be sourced to work, e.g.:"
-  echo "  source mc-k8s.sh"
-  exit 1
+if [[ $0 = $BASH_SOURCE ]]; then
+    echo "This script must be sourced"
+    exit 1
+elif [[ $ZSH_EVAL_CONTEXT == 'toplevel' ]]; then
+    echo "This script must be sourced"
+    exit 1
 fi
 
 export THIS_DIR=$(dirname "${BASH_SOURCE[0]}")
+export THIS_SHELL=$(basename $(ps -p$$ -ocmd=))
 
-export HELM_EXPERIMENTAL_OCI=1
-source <(helm completion bash)
-source <(kubectl completion bash)
+source <(helm completion $THIS_SHELL)
+source <(kubectl completion $THIS_SHELL)
 
 ###############################################################################
 ## Helper Functions
@@ -117,7 +118,7 @@ function k8s-mcwait()
     deployname="${1}"-minecraft
     downfirst="${2:-false}"
 
-    if [ "${downfirst}" == "true" ] ; then
+    if [[ ${downfirst} == "true" ]] ; then
         # first wait for the pod to be inactive
         echo "waiting for ${deployname} pod to delete pod"
         kubectl  wait  deployment ${deployname} --for=condition=available=false --timeout 30s -n minecraft
@@ -131,7 +132,7 @@ function k8s-mcwait()
     pod=$(kubectl get pods -l app=${deployname} -n minecraft -o name)
 
     # if there is no pod then the deployment is at 0 replicas
-    if [ ! -z "${pod}" ]; then
+    if [[ ! -z "${pod}" ]]; then
         # wait for the mc server to be healthy
         echo "waiting for minecraft server ${1}"
         kubectl  wait ${pod} --for=condition=ready --timeout 160s -n minecraft
@@ -177,7 +178,7 @@ function k8s-mcstart()
         echo "${1}" is already running
         export was_shutdown=false
     else
-      if [ ${deploy} ]; then
+      if [[ ${deploy} ]]; then
         # the server is not running, spin it up
         was_shutdown=true
 
@@ -270,7 +271,7 @@ function k8s-mcbackup()
 
     k8s-mcstart "${1}"
 
-    if [ "${pod}" ]; then
+    if [[ "${pod}" ]]; then
         zipname=$(date '+%Y-%m-%d_%H:%M:%S')-${shortname}.zip
 
         kubectl exec -n minecraft ${pod} -- rcon-cli save-off
@@ -285,7 +286,7 @@ function k8s-mcbackup()
             zip -qr ${MCBACKUP}/${zipname} ${tmp_dir}
             rm -r ${tmp_dir}
 
-            if [ "${was_shutdown}" == "true" ]; then
+            if [[ "${was_shutdown}" == "true" ]]; then
                 echo "stopping ${deploy} ..."
                 kubectl scale -n minecraft ${deploy} --replicas=0
             fi
