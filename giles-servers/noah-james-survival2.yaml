@@ -27,6 +27,7 @@ serviceAnnotations:
   metallb.universe.tf/allow-shared-ip: "minecraft"
 
 minecraftServer:
+  eula: true
   whitelist: TransformerScorn,DispenserAD11,BigBob2
   ops: TransformerScorn
   # always set game mode when a player connects
@@ -34,23 +35,23 @@ minecraftServer:
   levelSeed:
   maxWorldSize: 29999983
   gameMode: survival
-  motd: "Noah and James Survival World"
+  motd: "Noah and James 2nd Survival World"
   pvp: false
 
   # use nodeport - cant use a loadbalancer with Google Wifi port forwarding :-(
   serviceType: NodePort
-  nodePort: 30507
+  nodePort: 30509
 
   # restore the world from a backup on first execution
   # downloadWorldUrl: /bigdisk/minecraft-k8s-backup/22-01-21.21.50.00-noah-james.zip
   # how far from the player are chunks rendered (10 is default, larger is nice on high spec HW)
-  viewDistance: 32
+  viewDistance: 20
 
   # enable rcon for remote control - set to false if not required
   rcon:
     # external port must be unique across all mc server instances
-    serviceType: NodePort
-    nodePort: 30508
+    # serviceType: NodePort
+    # nodePort: 30508
     enabled: false
 
   # ensure that the resources matches java memory allocation
