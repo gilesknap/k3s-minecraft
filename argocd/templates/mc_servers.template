@@ -1,0 +1,30 @@
+{{- range $name := .Values.minecraft_servers }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ $.Values.project }}
+  destination:
+    namespace: {{ $.Values.destination.namespace }}
+    server: {{ $.Values.destination.server }}
+  source:
+    repoURL: minecraft-server-charts/minecraft
+    chart: minecraft
+    targetRevision: 4.23.7
+    helm:
+      valueFiles:
+        - ../../servers/{{ $name }}.yaml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # don't restart pods unless there has been a change
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+---
+{{- end -}}
