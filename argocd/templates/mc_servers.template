@@ -12,7 +12,7 @@ spec:
     namespace: {{ $.Values.destination.namespace }}
     server: {{ $.Values.destination.server }}
   source:
-    repoURL: minecraft-server-charts/minecraft
+    repoURL: https://itzg.github.io/minecraft-server-charts/
     chart: minecraft
     targetRevision: 4.23.7
     helm:
