@@ -17,7 +17,7 @@ spec:
     targetRevision: 4.23.7
     helm:
       valueFiles:
-        - ./servers/{{ $name }}.yaml
+        - servers/{{ $name }}.yaml
         - values.yaml
   syncPolicy:
     automated:
@@ -27,5 +27,6 @@ spec:
       # don't restart pods unless there has been a change
       - ApplyOutOfSyncOnly=true
       - RespectIgnoreDifferences=true
+      - CreateNamespace=true
 ---
 {{- end -}}
