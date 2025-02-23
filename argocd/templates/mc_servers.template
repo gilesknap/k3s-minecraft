@@ -17,10 +17,10 @@ spec:
     chart: minecraft
     targetRevision: 4.23.7
     helm:
-      values: |-
+      valuesObject:
         # https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft?modal=values
         {{- with $currentScope -}}
-        {{ .Files.Get (printf "servers/%s.yaml" $name) | nindent 8 }}
+        {{ .Files.Get (printf "servers/%s.yaml" $name) | toYaml | nindent 8 }}
         {{- end }}
         minecraftServer.eula: true
   syncPolicy:
