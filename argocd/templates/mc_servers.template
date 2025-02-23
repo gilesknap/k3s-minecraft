@@ -17,7 +17,7 @@ spec:
     targetRevision: 4.23.7
     helm:
       valueFiles:
-        - servers/{{ $name }}.yaml
+        - servers/millie.yaml
         - values.yaml
   syncPolicy:
     automated:
