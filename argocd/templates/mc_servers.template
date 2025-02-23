@@ -1,8 +1,9 @@
+{{ $currentScope := .}}
 {{- range $name := .Values.minecraft_servers }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ $name }}
+  name: minecraft-server-{{ $name }}
   namespace: {{ $.Release.Namespace }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -16,9 +17,11 @@ spec:
     chart: minecraft
     targetRevision: 4.23.7
     helm:
-      valueFiles:
-        - servers/millie.yaml
-        - values.yaml
+      values: |-
+        # https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft?modal=values
+        {{- with $currentScope -}}
+        {{ .Files.Get (printf "servers/%s.yaml" $name) | nindent 8 }}
+        {{- end }}
   syncPolicy:
     automated:
       prune: true
