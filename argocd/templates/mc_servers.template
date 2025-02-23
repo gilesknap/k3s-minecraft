@@ -22,6 +22,7 @@ spec:
         {{- with $currentScope -}}
         {{ .Files.Get (printf "servers/%s.yaml" $name) | nindent 8 }}
         {{- end }}
+        minecraftServer.eula: "TRUE"
   syncPolicy:
     automated:
       prune: true
