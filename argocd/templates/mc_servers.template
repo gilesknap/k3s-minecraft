@@ -17,7 +17,8 @@ spec:
     targetRevision: 4.23.7
     helm:
       valueFiles:
-        - ../../servers/{{ $name }}.yaml
+        - servers/{{ $name }}.yaml
+        - values.yaml
   syncPolicy:
     automated:
       prune: true
