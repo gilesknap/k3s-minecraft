@@ -20,7 +20,7 @@ spec:
       # https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft?modal=values
       valuesObject:
         {{- with $currentScope -}}
-        {{ .Files.Get (printf "servers/%s.yaml" $name) | toYaml | nindent 6 }}
+        {{- .Files.Get (printf "servers/%s.yaml" $name) | nindent 8 }}
         {{- end }}
         minecraftServer.eula: true
   syncPolicy:

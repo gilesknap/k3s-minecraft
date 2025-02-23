@@ -1,4 +1,3 @@
-imagePullSecret: regcred
 minecraftServer:
   rcon:
     enabled: false
@@ -6,7 +5,7 @@ minecraftServer:
     serviceType: NodePort
   version: LATEST
   nodePort: 31700
-  downloadWorldUrl: /bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
+  # downloadWorldUrl: /bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
   motd: "The Soj"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11,Bigbob2,destroyerSB737
@@ -23,30 +22,33 @@ extraEnv:
   OVERRIDE_SERVER_PROPERTIES: true
   FORCE_WORLD_COPY: false
 
-securityContext:
-  runAsUser: 1022
-  fsGroup: 1022
+# securityContext:
+#   runAsUser: 1022
+#   fsGroup: 1022
 
 # always reuse an existing nfs mount so the world survives chart deletion
 persistence:
+  storageClass: longhorn
   dataDir:
     enabled: true
-    existingClaim: millie-pvc
+    Size: 1Gi
+    accessModes:
+      - ReadWriteOnce
 
-# don't run on the raspberry pis (as we have some nice Intel Nucs for this)
-nodeSelector:
-  kubernetes.io/arch: amd64
+# # don't run on the raspberry pis (as we have some nice Intel Nucs for this)
+# nodeSelector:
+#   kubernetes.io/arch: amd64
 
-extraVolumes:
-  - volumeMounts:
-      - name: bigdisk
-        mountPath: /bigdisk
-        readOnly: true
-    volumes:
-      - name: bigdisk
-        nfs:
-          server: 192.168.0.20
-          path: /bigdisk
+# extraVolumes:
+#   - volumeMounts:
+#       - name: bigdisk
+#         mountPath: /bigdisk
+#         readOnly: true
+#     volumes:
+#       - name: bigdisk
+#         nfs:
+#           server: 192.168.0.20
+#           path: /bigdisk
 
 # kubernetes memory/cpu reservation/limits
 resources:
