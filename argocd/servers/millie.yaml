@@ -4,11 +4,11 @@ minecraftServer:
     nodePort: 31701
     serviceType: NodePort
   version: LATEST
-  nodePort: 31700
+  nodePort: 31702
   # downloadWorldUrl: /bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
   motd: "The Soj"
   gameMode: creative
-  whitelist: TransformerScorn,DispenserAD11,Bigbob2,destroyerSB737
+  whitelist: TransformerScorn,DispenserAD11
   ops: TransformerScorn,DispenserAD11
   forcegameMode: true
   maxWorldSize: 29999984

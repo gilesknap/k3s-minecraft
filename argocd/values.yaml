@@ -5,8 +5,10 @@ minecraft_servers:
   - millie
   # - science-lab
 
+# default values for override by the parent App ################################
+
 # Argo CD destination information
 destination:
   server: https://kubernetes.default.svc
   namespace: minecraft
-project: kubernetes # todo a separate project would be nice for this
+project: kubernetes
