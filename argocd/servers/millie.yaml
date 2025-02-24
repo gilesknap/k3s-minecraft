@@ -37,9 +37,9 @@ persistence:
     accessModes:
       - ReadWriteOnce
 
-# # don't run on the raspberry pis (as we have some nice Intel Nucs for this)
-# nodeSelector:
-#   kubernetes.io/arch: amd64
+# run on the turing pi nodes!
+nodeSelector:
+  kubernetes.io/arch: arm64
 
 # extraVolumes:
 #   - volumeMounts:
