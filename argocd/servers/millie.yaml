@@ -1,10 +1,12 @@
+# see the chart values defaults and descriptions here:
+# https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft?modal=values
 minecraftServer:
   rcon:
     enabled: false
     nodePort: 31701
     serviceType: NodePort
   version: LATEST
-  nodePort: 31702
+  nodePort: 31700
   # downloadWorldUrl: /bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
   motd: "The Soj"
   gameMode: creative

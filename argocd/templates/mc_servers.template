@@ -18,9 +18,12 @@ spec:
     helm:
       # https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft?modal=values
       valuesObject:
-        minecraftServer.eula: true
-        {{- with $ -}}
-        {{- .Files.Get (printf "servers/%s.yaml" $name) | nindent 8 }}
+        {{- with $ }}
+        {{- $values := .Files.Get (printf "servers/%s.yaml" $name) | fromYaml }}
+        # TODO conceive of an out of band way to provide this
+        {{- $eula := dict "minecraftServer" (dict "eula" true) }}
+        {{- $values := merge $values $eula }}
+        {{- $values | toYaml | nindent 8 }}
         {{- end }}
   syncPolicy:
     automated:
