@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: echo
+  namespace: argo-cd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: echo
+  project: kubernetes
+  sources:
+    - path: argocd/additions/backups
+      repoURL: git@github.com:gilesknap/k3s-minecraft
+      targetRevision: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - preserveResourcesOnDeletion=true
