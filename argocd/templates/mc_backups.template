@@ -1,0 +1,49 @@
+# create a longhorn PVC for backups
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minecraft-backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: longhorn
+  volumeMode: Filesystem
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-backup
+spec:
+  selector:
+    matchLabels:
+      app: minecraft-backup
+  template:
+    metadata:
+      labels:
+        app: minecraft-backup
+    spec:
+      containers:
+        - name: busybox
+          image: busybox:latest
+          command:
+            - sleep
+            - "Infinity"
+          volumeMounts:
+            - name: minecraft-backup
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
+            limits:
+              cpu: 50m
+              memory: 50Mi
+      volumes:
+        - name: minecraft-backup
+          persistentVolumeClaim:
+            claimName: minecraft-backup
