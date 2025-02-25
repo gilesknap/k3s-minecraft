@@ -1,59 +1,19 @@
-# create a retained storage class for backups
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  annotations:
-    longhorn.io/last-applied-configmap: |
-      kind: StorageClass
-      apiVersion: storage.k8s.io/v1
-      metadata:
-        name: longhorn
-        annotations:
-          storageclass.kubernetes.io/is-default-class: "true"
-      provisioner: driver.longhorn.io
-      allowVolumeExpansion: true
-      reclaimPolicy: "Delete"
-      volumeBindingMode: Immediate
-      parameters:
-        numberOfReplicas: "3"
-        staleReplicaTimeout: "30"
-        fromBackup: ""
-        fsType: "ext4"
-        dataLocality: "disabled"
-        unmapMarkSnapChainRemoved: "ignored"
-        disableRevisionCounter: "true"
-        dataEngine: "v1"
-    storageclass.kubernetes.io/is-default-class: "true"
-  creationTimestamp: "2025-02-23T09:53:35Z"
-  name: longhorn-retained
-  resourceVersion: "3475"
-  uid: e2b517aa-47fa-4abd-88fa-fcf374c51298
-parameters:
-  dataEngine: v1
-  dataLocality: disabled
-  disableRevisionCounter: "true"
-  fromBackup: ""
-  fsType: ext4
-  numberOfReplicas: "3"
-  staleReplicaTimeout: "30"
-  unmapMarkSnapChainRemoved: ignored
-provisioner: driver.longhorn.io
-reclaimPolicy: Retain
-volumeBindingMode: Immediate
----
 
 # create a longhorn PVC for backups
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: minecraft-backup
+  annotations:
+    # even when ArgoCD tears us down - keep the backup data
+    helm.sh/resource-policy: keep
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
-  storageClassName: longhorn-retained
+  storageClassName: longhorn
   volumeMode: Filesystem
 
 ---
