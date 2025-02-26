@@ -12,7 +12,7 @@ spec:
   project: kubernetes
   sources:
     - path: argocd/additions/backups
-      repoURL: git@github.com:gilesknap/k3s-minecraft
+      repoURL: https://github.com/gilesknap/k3s-minecraft
       targetRevision: argocd
   syncPolicy:
     automated:
