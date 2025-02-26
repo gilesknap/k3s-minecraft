@@ -7,6 +7,7 @@ extraVolumes:
   - volumeMounts:
       - name: minecraft-backup
         mountPath: /allbackups
+        readOnly: true
     volumes:
       - name: minecraft-backup
         persistentVolumeClaim:
