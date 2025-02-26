@@ -7,7 +7,7 @@ minecraftServer:
     serviceType: NodePort
   version: LATEST
   nodePort: 31700
-  downloadWorldUrl: /data/2021-05-15-21_57_22-millie.zip
+  downloadWorldUrl: /allbackups/2021-05-15-21_57_22-millie.zip
   motd: "The Soj"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11
@@ -24,13 +24,7 @@ extraEnv:
   OVERRIDE_SERVER_PROPERTIES: true
   FORCE_WORLD_COPY: false
 
-# securityContext:
-#   runAsUser: 1022
-#   fsGroup: 1022
-
-# always reuse an existing nfs mount so the world survives chart deletion
 persistence:
-  storageClass: longhorn
   dataDir:
     enabled: true
     Size: 1Gi
@@ -41,16 +35,15 @@ persistence:
 nodeSelector:
   kubernetes.io/arch: arm64
 
-# extraVolumes:
-#   - volumeMounts:
-#       - name: bigdisk
-#         mountPath: /bigdisk
-#         readOnly: true
-#     volumes:
-#       - name: bigdisk
-#         nfs:
-#           server: 192.168.0.20
-#           path: /bigdisk
+extraVolumes:
+  - volumeMounts:
+      - name: minecraft-backup
+        mountPath: /allbackups
+        readOnly: true
+  - volumes:
+      - name: minecraft-backup
+        persistentVolumeClaim:
+          claimName: minecraft-backup
 
 # kubernetes memory/cpu reservation/limits
 resources:
