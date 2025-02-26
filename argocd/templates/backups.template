@@ -1,14 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: echo
+  name: minecraft-backups
   namespace: argo-cd
   finalizers:
   - resources-finalizer.argocd.argoproj.io
 spec:
   destination:
     server: https://kubernetes.default.svc
-    namespace: echo
+    namespace: minecraft
   project: kubernetes
   sources:
     - path: argocd/additions/backups
