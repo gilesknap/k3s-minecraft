@@ -7,7 +7,7 @@ minecraftServer:
     serviceType: NodePort
   version: LATEST
   nodePort: 31700
-  # downloadWorldUrl: /bigdisk/MinecraftBackups/noah_single_player_best_2021_05/millie.zip
+  downloadWorldUrl: /data/2021-05-15-21_57_22-millie.zip
   motd: "The Soj"
   gameMode: creative
   whitelist: TransformerScorn,DispenserAD11
