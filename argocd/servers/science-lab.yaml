@@ -25,7 +25,8 @@ minecraftServer:
   pvp: false
   # this means you get the node IP address on K3s
   serviceType: NodePort
-  # restore the world from a backup on first execution
+  # restore the world from a backup on first executio
+
   downloadWorldUrl: /allbackups/2023-01-12_20_53_20-science-lab.zip
   # external node port must be unique across all mc server instances
   nodePort: 30500

@@ -18,6 +18,7 @@ minecraftServer:
   viewDistance: 32
   # Java VM memory reservation - make sure k8s resources matches
   memory: 2g
+  enableCommandBlock: true
 
 extraEnv:
   ENABLE_ROLLING_LOGS: true
