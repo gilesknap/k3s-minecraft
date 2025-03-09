@@ -10,5 +10,5 @@ minecraft_servers:
 # Argo CD destination information
 destination:
   server: https://kubernetes.default.svc
-  namespace: minecraft
-project: kubernetes
+  namespace:
+project:
