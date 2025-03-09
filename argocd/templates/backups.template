@@ -2,18 +2,18 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: minecraft-backups
-  namespace: argo-cd
+  namespace: {{ .Release.Namespace }}
   finalizers:
   - resources-finalizer.argocd.argoproj.io
 spec:
+  project:  {{ .Values.project }}
   destination:
-    server: https://kubernetes.default.svc
-    namespace: minecraft
-  project: kubernetes
+    namespace: {{ .Values.destination.namespace }}
+    server: {{ .Values.destination.server }}
   sources:
     - path: argocd/additions/backups
-      repoURL: https://github.com/gilesknap/k3s-minecraft
-      targetRevision: argocd
+      targetRevision: {{ .Values.minecraft_branch }}
+      repoURL:  {{ .Values.minecraft_remote }}
   syncPolicy:
     automated:
       prune: true
