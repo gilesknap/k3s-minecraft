@@ -1,9 +1,9 @@
 # list here the servers you want running.
 # each server should have a corresponding minecraft helm chart values file from
 # the argocd/servers folder called <server>.yaml
-minecraft_servers:
-  - millie
-  - science-lab
+minecraft_servers: []
+  # - millie
+  # - science-lab
 
 # default values for override by the parent App ################################
 
