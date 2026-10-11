@@ -144,7 +144,8 @@ the archive mount rejects writes. See the `e2e` job in
 
 ## Releasing
 
-- **Tag `vX.Y.Z`** publishes image `X.Y.Z`, `X.Y` and `latest`, and chart
+- **Tag `X.Y.Z`** (pure semver, no `v` prefix) publishes image `X.Y.Z`, `X.Y` and
+  `latest` (not for prereleases such as `1.0.0-rc.1`), and chart
   `X.Y.Z` with appVersion `X.Y.Z`.
 - **Push to `main`** publishes image `main` and `sha-<sha7>`, and the
   prerelease chart `0.0.0-main.<sha7>`. Because it is a prerelease, nothing
