@@ -49,15 +49,24 @@ in their report.
 - ConfigMap `<w>-mcdash` (label `mcdash/kind: world`) — the world record
   (`spec`: port, source, settings; `op`: pending multi-step operation). Exists
   from launch, before any Helm release, so it reserves the name and port while
-  seeding; rebuilt from the release's `mcdash:` values if lost.
+  seeding; rebuilt from the release's `mcdash:` values if lost. `create_world`
+  records op `{kind: create, step: install}` until the release is installed,
+  so an interrupted create is finished by the reconciler.
 - Secret `<w>-rcon` — key `rcon-password`, random.
 - Helm release `<w>` of the vendored itzg chart: `persistence.dataDir.existingClaim=<w>-data`,
   NodePort game service on the allocated port, RCON ClusterIP, nodeSelector,
   `ENFORCE_WHITELIST`, `online-mode` true, `EULA=TRUE`. Dashboard metadata lives in
   the release values under the top-level key `mcdash:` (`port`, `sourceBackup`,
   `created`, `settings`) — read back with `helm get values`. Helm releases are
-  the source of truth for which worlds exist.
-- Jobs `<w>-seed-<ts>` / `<w>-snap-<ts>` — image `$MCD_JOB_IMAGE`, run as
+  the source of truth for which worlds exist. `settings.seed` →
+  `minecraftServer.levelSeed` (env `SEED`) when non-empty; `settings.level_type`
+  → `minecraftServer.levelType` (env `LEVEL_TYPE`, written verbatim to
+  `level-type`): `flat|amplified|large_biomes` become
+  `minecraft:flat|minecraft:amplified|minecraft:large_biomes` for 1.19+,
+  `LATEST` and unparseable versions, and `FLAT|AMPLIFIED|LARGEBIOMES` for
+  older versions; `normal` sets nothing (server default). Both only take effect
+  when the server generates a world; on a seeded volume they are inert.
+- Jobs `<w>-seed-<ts>` / `<w>-snap-<ts>` (no seed Job for `create_world`) — image `$MCD_JOB_IMAGE`, run as
   `$MCD_UID`, mount `<w>-data` at `/data`, archive PVC read-only at `/archive`,
   store PVC at `/store`, labels `mcdash/world`, `mcdash/job: seed|snapshot`,
   `ttlSecondsAfterFinished: 3600`.
@@ -111,6 +120,19 @@ securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
 The chart creates: Deployment (1 replica, port 8080, `/healthz`), Service
 (ClusterIP 80→8080), ServiceAccount + Role + RoleBinding, the two PV/PVC
 pairs. It does **not** create an Ingress (tpi-k3s-ansible owns ingress/auth).
+
+## New worlds (`create_world`)
+
+`new_world_defaults()` suggests a free name (`new-world`, `new-world-2`, …)
+and `WorldSettings(memory=$MCD_DEFAULT_MEMORY)` (LATEST, VANILLA, survival,
+normal world type, random seed). `create_world(name, settings, actor)` is
+`launch` without a backup: same name/port checks, ConfigMap, Secret and PVC,
+then the release is installed at once with `replicaCount: 1` — no seed Job,
+so the world goes straight to `starting` → `running` while itzg generates it
+on the empty volume. `World.source_backup_id` is `""` (UI shows "new world");
+a later restore sets it to the restored backup. A failed install leaves the
+world `failed` and "Start" retries it. Snapshot, stop/start, restore and
+delete are unchanged.
 
 ## Runtime notes
 

@@ -12,7 +12,10 @@
   <div><dt>Memory</dt><dd>{{ world.memory_bytes|humansize }} <small class="muted">/ {{ world.settings.memory }}</small></dd></div>
   <div><dt>Last snapshot</dt><dd title="{{ world.last_snapshot|fmtdate }}">{{ world.last_snapshot|ago }}</dd></div>
   <div><dt>Created</dt><dd>{{ world.created|fmtdate }}</dd></div>
-  <div><dt>Source</dt><dd class="small wrap">{{ world.source_backup_id }}</dd></div>
+  <div><dt>Source</dt><dd class="small wrap">{% if world.source_backup_id %}{{ world.source_backup_id }}{% else %}new world{% endif %}</dd></div>
+  {% if world.settings.seed or world.settings.level_type != 'normal' %}
+  <div><dt>Generated</dt><dd class="small wrap">{{ LEVEL_TYPE_LABELS.get(world.settings.level_type, world.settings.level_type) }}{% if world.settings.seed %} · seed <code>{{ world.settings.seed }}</code>{% endif %}</dd></div>
+  {% endif %}
 </dl>
 <div class="actions">
   {% set busy = world.state in (WorldState.SEEDING, WorldState.SNAPSHOTTING) %}

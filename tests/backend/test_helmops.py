@@ -12,6 +12,7 @@ from mcdash.helmops import (
     HelmError,
     java_tag_for,
     jvm_memory,
+    level_type_for,
     render_values,
     settings_from_json,
     settings_to_json,
@@ -92,6 +93,32 @@ def test_render_values() -> None:
     assert plain["extraEnv"]["EXISTING_WHITELIST_FILE"] == "SKIP"
 
 
+@pytest.mark.parametrize(
+    "lt,version,want",
+    [
+        ("normal", "LATEST", None),
+        ("flat", "LATEST", "minecraft:flat"),
+        ("amplified", "1.21.4", "minecraft:amplified"),
+        ("large_biomes", "1.19", "minecraft:large_biomes"),
+        ("large_biomes", "26.1", "minecraft:large_biomes"),
+        ("flat", "24w10a", "minecraft:flat"),
+        ("flat", "1.18.2", "FLAT"),
+        ("large_biomes", "1.16.5", "LARGEBIOMES"),
+        ("bogus", "LATEST", None),
+    ],
+)
+def test_level_type(lt: str, version: str, want: str | None) -> None:
+    assert level_type_for(lt, version) == want
+
+
+def test_render_seed_and_level_type() -> None:
+    s = WorldSettings(seed="-42", level_type="amplified")
+    ms = render_values("w", s, 30565, Config())["minecraftServer"]
+    assert (ms["levelSeed"], ms["levelType"]) == ("-42", "minecraft:amplified")
+    ms = render_values("w", WorldSettings(), 30565, Config())["minecraftServer"]
+    assert "levelSeed" not in ms and "levelType" not in ms
+
+
 CHART = os.environ.get("MCD_TEST_ITZG_CHART", "")
 
 
@@ -100,7 +127,9 @@ CHART = os.environ.get("MCD_TEST_ITZG_CHART", "")
     reason="set MCD_TEST_ITZG_CHART to an unpacked itzg chart to run",
 )
 def test_render_against_real_chart(tmp_path: Path) -> None:
-    s = WorldSettings(whitelist=["noah"], motd="hi & bye")
+    s = WorldSettings(
+        whitelist=["noah"], motd="hi & bye", seed="12345", level_type="flat"
+    )
     v = render_values("king", s, 30565, Config(world_node="nuc2"), replicas=0)
     f = tmp_path / "v.json"
     f.write_text(json.dumps(v))
@@ -118,6 +147,8 @@ def test_render_against_real_chart(tmp_path: Path) -> None:
     assert '"29999984"' in out
     assert "ENFORCE_WHITELIST" in out
     assert "startupProbe:" in out
+    assert 'name: SEED\n          value: "12345"' in out
+    assert 'name: LEVEL_TYPE\n          value: "minecraft:flat"' in out
 
 
 def _fake_helm(tmp_path: Path, script: str) -> Helm:

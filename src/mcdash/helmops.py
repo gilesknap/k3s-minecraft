@@ -67,6 +67,29 @@ def java_tag_for(version: str | None) -> str | None:
     return None  # new-style versions (e.g. 26.1): latest image
 
 
+# itzg passes LEVEL_TYPE straight into server.properties ``level-type``.
+# 1.19+ wants a world-preset id; older servers want the legacy names.
+_LEVEL_TYPE_MODERN = {
+    "flat": "minecraft:flat",
+    "amplified": "minecraft:amplified",
+    "large_biomes": "minecraft:large_biomes",
+}
+_LEVEL_TYPE_LEGACY = {
+    "flat": "FLAT",
+    "amplified": "AMPLIFIED",
+    "large_biomes": "LARGEBIOMES",
+}
+
+
+def level_type_for(level_type: str, version: str | None) -> str | None:
+    """itzg ``LEVEL_TYPE`` for ``level_type``; ``None`` = server default."""
+    t = _version_tuple(version or "")
+    table = (
+        _LEVEL_TYPE_LEGACY if t is not None and t < (1, 19, 0) else _LEVEL_TYPE_MODERN
+    )
+    return table.get(level_type)
+
+
 def jvm_memory(k8s_qty: str) -> str:
     """``4Gi`` -> ``4G`` (itzg MEMORY / -Xmx), ``1536Mi`` -> ``1536M``."""
     m = re.fullmatch(r"\s*(\d+)\s*([KMGT]?)i?\s*", k8s_qty, re.IGNORECASE)
@@ -148,6 +171,13 @@ def render_values(
         ms["whitelist"] = ",".join(settings.whitelist)
     if settings.server_type is ServerType.FORGE and forge_version:
         ms["forgeVersion"] = forge_version
+    # Only used when the server generates a world (create_world); inert on a
+    # volume that already holds one.
+    if settings.seed:
+        ms["levelSeed"] = settings.seed
+    level_type = level_type_for(settings.level_type, settings.version)
+    if level_type:
+        ms["levelType"] = level_type
 
     extra_env: dict[str, Any] = {
         "ENABLE_WHITELIST": "TRUE",

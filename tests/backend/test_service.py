@@ -419,3 +419,144 @@ def test_ignores_other_helm_releases(svc: KubeDashboardService) -> None:
     ]
     helm.get_values = lambda r: {"mcdash": {"port": 30570}}  # would be adopted
     assert svc.list_worlds() == []
+
+
+# ------------------------------------------------------------------ new world
+
+
+def test_new_world_defaults(svc: KubeDashboardService) -> None:
+    name, s = svc.new_world_defaults()
+    assert name == "new-world"
+    assert (s.version, s.server_type, s.gamemode) == (
+        "LATEST",
+        ServerType.VANILLA,
+        "survival",
+    )
+    assert s.memory == svc.cfg.default_memory
+    assert (s.seed, s.level_type) == ("", "normal")
+    svc.create_world(name, s, ME)
+    assert svc.new_world_defaults()[0] == "new-world-2"
+
+
+def test_create_world_installs_without_seed_job(svc: KubeDashboardService) -> None:
+    kube, helm, _ = parts(svc)
+    _, s = svc.new_world_defaults()
+    s.seed, s.level_type = "12345", "flat"
+    # pod not ready yet: the fake Deployment comes up Ready, so hold it back
+    orig = helm.upgrade_install
+
+    def install_pending(release: str, values: dict[str, Any]) -> None:
+        orig(release, values)
+        kube.pods[release] = [
+            PodInfo(name=f"{release}-abc", phase="Pending", ready=False)
+        ]
+
+    helm.upgrade_install = install_pending  # type: ignore[method-assign]
+    w = svc.create_world("fresh", s, ME)
+    assert w.state is WorldState.STARTING
+    assert w.source_backup_id == "" and w.port == 30565
+    assert kube.jobs == {}
+    assert "fresh-data" in kube.pvcs and kube.secrets["fresh-rcon"]["rcon-password"]
+    v = helm.releases["fresh"]
+    assert v["replicaCount"] == 1
+    ms = v["minecraftServer"]
+    assert (ms["levelSeed"], ms["levelType"]) == ("12345", "minecraft:flat")
+    assert v["mcdash"]["sourceBackup"] == ""
+    assert v["mcdash"]["settings"]["seed"] == "12345"
+
+    svc.reconcile_once()  # nothing to advance, and not treated as a failure
+    assert svc.get_world("fresh").state is WorldState.STARTING
+    kube.pods["fresh"] = [
+        PodInfo(name="fresh-abc", phase="Running", ready=True, started=svc.now())
+    ]
+    w = svc.get_world("fresh")
+    assert w.state is WorldState.RUNNING and w.message == ""
+    assert (w.settings.seed, w.settings.level_type) == ("12345", "flat")
+    assert kube.jobs == {}
+    assert svc.store.read_audit()[-1]["action"] == "create_world"
+
+    # generation settings survive a settings update and a lost ConfigMap
+    w.settings.memory = "6Gi"
+    svc.update_settings("fresh", w.settings, ME)
+    assert helm.releases["fresh"]["minecraftServer"]["levelSeed"] == "12345"
+    kube.configmaps.clear()
+    w = svc.get_world("fresh")
+    assert w.source_backup_id == "" and w.settings.level_type == "flat"
+
+
+def test_create_world_conflicts_and_validation(svc: KubeDashboardService) -> None:
+    kube, _, _ = parts(svc)
+    _, s = svc.new_world_defaults()
+    launch_running(svc)  # king-ghidorah on 30565
+    w = svc.create_world("b", s, ME)
+    assert w.port == 30566
+    with pytest.raises(Conflict, match="taken"):
+        svc.create_world("b", s, ME)
+    with pytest.raises(Conflict, match="taken"):
+        svc.create_world("king-ghidorah", s, ME)
+    kube.pvcs.add("orphan-data")
+    with pytest.raises(Conflict, match="taken"):
+        svc.create_world("orphan", s, ME)
+    with pytest.raises(MCDashError):
+        svc.create_world("Bad Name", s, ME)
+    bad = svc.new_world_defaults()[1]
+    bad.level_type = "caves"
+    with pytest.raises(MCDashError, match="world type"):
+        svc.create_world("c", bad, ME)
+    bad.level_type, bad.seed = "normal", "x" * 65
+    with pytest.raises(MCDashError, match="seed"):
+        svc.create_world("c", bad, ME)
+    svc.create_world("c", s, ME)
+    with pytest.raises(Conflict, match="no free ports"):
+        svc.create_world("d", s, ME)
+
+
+def test_create_world_snapshot_restore_delete(svc: KubeDashboardService) -> None:
+    kube, helm, rcon = parts(svc)
+    name, s = svc.new_world_defaults()
+    svc.create_world(name, s, ME)
+    assert svc.get_world(name).state is WorldState.RUNNING
+    svc.snapshot(name, ME)
+    complete(svc, "snapshot")
+    (snap,) = svc.list_snapshots(name)
+    assert svc.get_world(name).state is WorldState.RUNNING
+    svc.restore(name, snap.id, ME)
+    complete(svc, "snapshot")
+    complete(svc, "seed")
+    w = svc.get_world(name)
+    assert w.state is WorldState.RUNNING and w.source_backup_id == snap.id
+    svc.delete(name, ME)
+    complete(svc, "snapshot")
+    with pytest.raises(NotFound):
+        svc.get_world(name)
+    assert not kube.pvcs and not helm.releases and not kube.configmaps
+
+
+def test_create_world_helm_failure_then_start(svc: KubeDashboardService) -> None:
+    kube, helm, _ = parts(svc)
+    _, s = svc.new_world_defaults()
+    helm.fail_next = "chart exploded"
+    w = svc.create_world("boom", s, ME)
+    assert w.state is WorldState.FAILED and "chart exploded" in w.message
+    assert "boom-data" in kube.pvcs and kube.jobs == {}
+    svc.reconcile_once()  # a failed op is left for the admin
+    assert svc.get_world("boom").state is WorldState.FAILED
+    svc.start("boom", ME)  # retries the install
+    assert svc.get_world("boom").state is WorldState.RUNNING
+    assert helm.releases["boom"]["replicaCount"] == 1
+
+
+def test_create_world_interrupted_install_resumes(svc: KubeDashboardService) -> None:
+    """Dashboard died after recording the world but before helm install."""
+    kube, helm, rcon = parts(svc)
+    _, s = svc.new_world_defaults()
+    svc._save(  # type: ignore[attr-defined]
+        "halfway",
+        {"port": 30565, "sourceBackup": "", "settings": {}, "created": ""},
+        {"kind": "create", "step": "install"},
+    )
+    fresh = KubeDashboardService(svc.cfg, kube, helm, rcon_factory=rcon.factory)
+    assert fresh.get_world("halfway").state is WorldState.STARTING
+    fresh.reconcile_once()
+    assert fresh.get_world("halfway").state is WorldState.RUNNING
+    assert "halfway-data" in kube.pvcs and "halfway-rcon" in kube.secrets

@@ -82,6 +82,13 @@ To be recovered from Drive and ingested later.
 - **Launch** list: every Archive and Backup zip is a row, sorted by world then
   newest first, with a heading per world. Snapshots are listed under their
   world and are launchable too.
+- **New world**: a world with no backup — name (suggested `new-world`), seed
+  (blank = random), world type (normal / superflat / amplified / large
+  biomes), version (default `LATEST`) and the usual settings. No seed Job: the
+  release is installed straight onto the empty PVC and itzg generates the
+  world (state: starting → running). Snapshot it to keep it; its snapshots are
+  launchable and promotable like any other. Useful for disposable test worlds
+  before any precious backup is copied in.
 - **Stop/Start**: `replicas` 0↔1 via helm values. Stop snapshots first. PVC
   and port are kept.
 - **Restore from…** (on an existing world): snapshot current state → stop →
@@ -92,7 +99,8 @@ To be recovered from Drive and ingested later.
 
 ## Seeding (backup → PVC)
 
-A seed **Job** created by the dashboard mounts the archive/backups read-only
+(Not used for a new world — see Worlds.) A seed **Job** created by the
+dashboard mounts the archive/backups read-only
 and the new PVC read-write, locates `world/level.dat` to strip the
 `tmp/tmp.XXXX/` prefix, extracts, and chowns to the itzg UID. The Helm release
 is installed only after the Job succeeds (world state: seeding → starting →

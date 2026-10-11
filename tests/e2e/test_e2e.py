@@ -1,7 +1,8 @@
 """End-to-end test against a real cluster (kind in CI).
 
-Drives the real web routes (GET /healthz, /, /backups, /launch,
-/worlds/{name}/status; POST /launch, /worlds/{name}/start|stop|snapshot|delete).
+Drives the real web routes (GET /healthz, /, /backups, /launch, /new,
+/worlds/{name}/status; POST /launch, /new,
+/worlds/{name}/start|stop|snapshot|restore|rcon|delete).
 World state is scraped from the ``badge state-<state>`` class that
 ``_macros.html`` renders in the status partial.
 
@@ -35,6 +36,8 @@ SERVICE = os.environ.get("E2E_SERVICE", "mcdash")
 DEPLOYMENT = os.environ.get("E2E_DEPLOYMENT", "mcdash")
 BACKUP_FILE = os.environ.get("E2E_BACKUP_FILE", "2024-01-02_03_04_05-e2e-world.zip")
 WORLD = os.environ.get("E2E_WORLD", "e2e")
+NEW_WORLD = os.environ.get("E2E_NEW_WORLD", f"{WORLD}-new")
+NEW_SEED = "8675309"
 PORT_MIN = int(os.environ.get("E2E_PORT_MIN", "30565"))
 PORT_MAX = int(os.environ.get("E2E_PORT_MAX", "30584"))
 MEMORY = os.environ.get("E2E_MEMORY", "1Gi")
@@ -233,12 +236,8 @@ def test_world_lifecycle(client: httpx.Client) -> None:
     # Snapshot now -> a zip appears under /store/snapshots/<world>/.
     before = set(snapshot_files(WORLD))
     post_ok(client, f"/worlds/{WORLD}/snapshot")
-    deadline = time.monotonic() + 300
-    while not (new := set(snapshot_files(WORLD)) - before):
-        assert time.monotonic() < deadline, "snapshot zip never appeared"
-        time.sleep(5)
+    snap = wait_snapshot(WORLD, before)
     wait_state(client, WORLD, "running", timeout=300)
-    (snap,) = new
     check = kubectl(
         "exec",
         f"deploy/{DEPLOYMENT}",
@@ -281,3 +280,71 @@ def test_world_lifecycle(client: httpx.Client) -> None:
         time.sleep(5)
     assert kubectl("get", "secret", f"{WORLD}-rcon", check=False).returncode != 0
     assert set(snapshot_files(WORLD)) - snaps_before_delete, "no final snapshot"
+
+
+def wait_snapshot(world: str, before: set[str]) -> str:
+    deadline = time.monotonic() + 300
+    while not (new := set(snapshot_files(world)) - before):
+        assert time.monotonic() < deadline, "snapshot zip never appeared"
+        time.sleep(5)
+    (snap,) = new
+    return snap
+
+
+def test_new_world_lifecycle(client: httpx.Client) -> None:
+    """A world with no backup: itzg generates it on the empty volume."""
+    assert client.get("/new").status_code == 200
+    post_ok(
+        client,
+        "/new",
+        {
+            "name": NEW_WORLD,
+            "seed": NEW_SEED,
+            "level_type": "flat",  # cheap to generate
+            "server_type": "VANILLA",
+            "version": "LATEST",
+            "memory": MEMORY,
+            "gamemode": "creative",
+            "difficulty": "peaceful",
+            "max_world_size": "1000",
+        },
+    )
+    # Installed straight away: no seed Job, never in the seeding state.
+    assert world_state(client, NEW_WORLD) in ("starting", "running")
+    jobs = json.loads(
+        kubectl("get", "jobs", "-l", f"mcdash/world={NEW_WORLD}", "-o", "json").stdout
+    )["items"]
+    assert jobs == [], [j["metadata"]["name"] for j in jobs]
+    wait_state(client, NEW_WORLD, "running")
+    assert "new world" in client.get(f"/worlds/{NEW_WORLD}/status").text
+
+    # The server generated a world from our seed and level type, and RCON works.
+    r = client.post(f"/worlds/{NEW_WORLD}/rcon", data={"command": "list"})
+    assert r.status_code == 200 and "players online" in r.text, r.text[:2000]
+    r = client.post(f"/worlds/{NEW_WORLD}/rcon", data={"command": "seed"})
+    assert r.status_code == 200 and NEW_SEED in r.text, r.text[:2000]
+    props = kubectl(
+        "exec", f"deploy/{NEW_WORLD}", "--", "cat", "/data/server.properties"
+    ).stdout
+    (level_type,) = [ln for ln in props.splitlines() if ln.startswith("level-type=")]
+    assert "flat" in level_type, level_type
+
+    # Snapshot -> it is listed under Backups and launchable like any other.
+    before = set(snapshot_files(NEW_WORLD))
+    post_ok(client, f"/worlds/{NEW_WORLD}/snapshot")
+    snap = wait_snapshot(NEW_WORLD, before)
+    wait_state(client, NEW_WORLD, "running", timeout=300)
+    snap_id = f"snapshot/{NEW_WORLD}/{snap}"
+    launch_url = f"/launch?backup={quote(snap_id)}"
+    assert launch_url in client.get("/backups").text
+    assert client.get(launch_url).status_code == 200
+
+    # Delete -> gone, port and volume released, final snapshot kept.
+    snaps_before_delete = set(snapshot_files(NEW_WORLD))
+    post_ok(client, f"/worlds/{NEW_WORLD}/delete", {"confirm": NEW_WORLD})
+    wait_state(client, NEW_WORLD, None, timeout=600)
+    deadline = time.monotonic() + 180
+    while kubectl("get", "pvc", f"{NEW_WORLD}-data", check=False).returncode == 0:
+        assert time.monotonic() < deadline, f"PVC {NEW_WORLD}-data not deleted"
+        time.sleep(5)
+    assert set(snapshot_files(NEW_WORLD)) - snaps_before_delete, "no final snapshot"

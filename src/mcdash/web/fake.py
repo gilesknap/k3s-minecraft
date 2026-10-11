@@ -175,10 +175,7 @@ class FakeDashboardService:
         self.get_backup(backup_id)
         if name in self.worlds:
             raise Conflict(f"A world called {name!r} already exists")
-        used = {w.port for w in self.worlds.values()}
-        port = next((p for p in range(PORT_MIN, PORT_MAX + 1) if p not in used), None)
-        if port is None:
-            raise Conflict("No free ports left in the range")
+        port = self._free_port()
         w = World(
             name=name,
             port=port,
@@ -191,6 +188,39 @@ class FakeDashboardService:
         )
         self.worlds[name] = w
         self._later(name, 5, WorldState.STARTING)
+        return w
+
+    def _free_port(self) -> int:
+        used = {w.port for w in self.worlds.values()}
+        port = next((p for p in range(PORT_MIN, PORT_MAX + 1) if p not in used), None)
+        if port is None:
+            raise Conflict("No free ports left in the range")
+        return port
+
+    def new_world_defaults(self) -> tuple[str, WorldSettings]:
+        name, n = "new-world", 2
+        while name in self.worlds:
+            name = f"new-world-{n}"
+            n += 1
+        return name, WorldSettings()
+
+    def create_world(self, name: str, settings: WorldSettings, actor: str) -> World:
+        self._record("create_world", name, settings, actor)
+        if name in self.worlds:
+            raise Conflict(f"A world called {name!r} already exists")
+        port = self._free_port()
+        w = World(
+            name=name,
+            port=port,
+            state=WorldState.STARTING,
+            settings=settings,
+            source_backup_id="",
+            created=datetime.now(UTC),
+            connect_address=f"{PUBLIC_HOST}:{port}",
+            message="Generating a new world",
+        )
+        self.worlds[name] = w
+        self._later(name, 6, WorldState.RUNNING)
         return w
 
     def list_worlds(self) -> list[World]:

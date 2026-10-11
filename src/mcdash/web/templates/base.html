@@ -16,7 +16,7 @@
     <a class="brand" href="/">⛏ mcdash</a>
     <nav>
       {% set path = request.url.path %}
-      <a href="/" {% if path == '/' or path.startswith('/worlds') %}aria-current="page"{% endif %}>Worlds</a>
+      <a href="/" {% if path == '/' or path.startswith('/worlds') or path == '/new' %}aria-current="page"{% endif %}>Worlds</a>
       <a href="/backups" {% if path.startswith('/backups') or path.startswith('/launch') %}aria-current="page"{% endif %}>Backups</a>
       <a href="/roster" {% if path.startswith('/roster') %}aria-current="page"{% endif %}>Roster</a>
     </nav>

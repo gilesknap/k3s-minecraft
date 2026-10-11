@@ -13,9 +13,11 @@ Each world has a ConfigMap ``<w>-mcdash`` (label ``mcdash/kind=world``) with:
   thread advances it idempotently from cluster state, so a dashboard restart
   resumes where it left off.
 
-Operations: ``launch`` (seed -> install), ``stop`` (snapshot -> scale 0),
-``snapshot``, ``restore`` (snapshot -> scale 0 -> drain -> seed -> scale 1),
-``delete`` (snapshot -> teardown). An op with ``error`` set means FAILED.
+Operations: ``launch`` (seed -> install), ``create`` (install only: a new
+world has no backup, the server generates it on the empty volume), ``stop``
+(snapshot -> scale 0), ``snapshot``, ``restore`` (snapshot -> scale 0 ->
+drain -> seed -> scale 1), ``delete`` (snapshot -> teardown). An op with
+``error`` set means FAILED.
 """
 
 from __future__ import annotations
@@ -47,6 +49,7 @@ from mcdash.helmops import (
 )
 from mcdash.k8s import JobInfo, JobSpec, KubeApi, PodInfo
 from mcdash.models import (
+    LEVEL_TYPES,
     Backup,
     Conflict,
     MCDashError,
@@ -80,6 +83,8 @@ BAD_WAIT_REASONS = {
 }
 GAMEMODES = {"0": "survival", "1": "creative", "2": "adventure", "3": "spectator"}
 DIFFICULTIES = {"0": "peaceful", "1": "easy", "2": "normal", "3": "hard"}
+NEW_WORLD_NAME = "new-world"
+MAX_SEED_LEN = 64
 
 
 class HelmApi(Protocol):
@@ -327,6 +332,8 @@ class KubeDashboardService:
                 return WorldState.SEEDING, "copying world data"
             if step == "teardown":
                 return WorldState.STOPPED, "deleting"
+            if step == "install":
+                return WorldState.STARTING, "installing server"
         if values is None:
             return WorldState.FAILED, "no helm release"
         if self._replicas(values) == 0:
@@ -461,6 +468,48 @@ class KubeDashboardService:
         for n in s.whitelist:
             if not n or len(n) > 16 or not all(c.isalnum() or c == "_" for c in n):
                 raise MCDashError(f"bad player name {n!r}")
+        if s.level_type not in LEVEL_TYPES:
+            raise MCDashError(
+                f"unknown world type {s.level_type!r} (one of {', '.join(LEVEL_TYPES)})"
+            )
+        if len(s.seed) > MAX_SEED_LEN or not s.seed.isprintable():
+            raise MCDashError(
+                f"seed must be at most {MAX_SEED_LEN} printable characters"
+            )
+
+    @staticmethod
+    def _check_name(name: str) -> None:
+        if not is_valid_world_name(name):
+            raise MCDashError(
+                f"{name!r} is not a valid world name (lowercase letters, digits, "
+                "'-', start with a letter, max 40 chars)"
+            )
+
+    def _reserve(
+        self, name: str, settings: WorldSettings, source: str, forge_version: str
+    ) -> dict[str, Any]:
+        """New world spec with a free port; caller holds the lock and saves it."""
+        specs, _, _ = self._records()
+        if name in specs or self.kube.pvc_exists(pvc_name(name)):
+            raise Conflict(f"world name {name!r} is taken")
+        return {
+            "port": self._allocate_port(specs),
+            "sourceBackup": source,
+            "created": self.now().isoformat(timespec="seconds"),
+            "settings": settings_to_json(settings),
+            "forgeVersion": forge_version,
+            "message": "",
+        }
+
+    def _create_volume_and_secret(self, name: str) -> None:
+        with contextlib.suppress(Conflict):
+            self.kube.create_secret(
+                rcon_secret_name(name),
+                name,
+                {RCON_SECRET_KEY: secrets.token_urlsafe(24)},
+            )
+        with contextlib.suppress(Conflict):
+            self.kube.create_pvc(pvc_name(name), name)
 
     def _seed_job(
         self, name: str, backup_id: str, settings: WorldSettings
@@ -488,41 +537,49 @@ class KubeDashboardService:
     def launch(
         self, backup_id: str, name: str, settings: WorldSettings, actor: str
     ) -> World:
-        if not is_valid_world_name(name):
-            raise MCDashError(
-                f"{name!r} is not a valid world name (lowercase letters, digits, "
-                "'-', start with a letter, max 40 chars)"
-            )
+        self._check_name(name)
         self._check_settings(settings)
         b = self.backups.get(backup_id)
         det = self.backups.detection(backup_id)
         with self._lock:
-            specs, _, _ = self._records()
-            if name in specs or self.kube.pvc_exists(pvc_name(name)):
-                raise Conflict(f"world name {name!r} is taken")
-            port = self._allocate_port(specs)
-            spec = {
-                "port": port,
-                "sourceBackup": b.id,
-                "created": self.now().isoformat(timespec="seconds"),
-                "settings": settings_to_json(settings),
-                "forgeVersion": det.forge_version or "",
-                "message": "",
-            }
+            spec = self._reserve(name, settings, b.id, det.forge_version or "")
             job, jspec = self._seed_job(name, b.id, settings)
             op = {"kind": "launch", "step": "seed", "job": job, "backup": b.id}
             self._save(name, spec, op)  # reserves name + port first
-            with contextlib.suppress(Conflict):
-                self.kube.create_secret(
-                    rcon_secret_name(name),
-                    name,
-                    {RCON_SECRET_KEY: secrets.token_urlsafe(24)},
-                )
-            with contextlib.suppress(Conflict):
-                self.kube.create_pvc(pvc_name(name), name)
+            self._create_volume_and_secret(name)
             self.kube.create_job(jspec)
-            self.store.audit(actor, "launch", name, backup=b.id, port=port)
+            self.store.audit(actor, "launch", name, backup=b.id, port=spec["port"])
             return self._world(name, spec, op, None, live=False)
+
+    def new_world_defaults(self) -> tuple[str, WorldSettings]:
+        name = unique_name(NEW_WORLD_NAME, self._taken_names())
+        return name, WorldSettings(memory=self.cfg.default_memory)
+
+    def create_world(self, name: str, settings: WorldSettings, actor: str) -> World:
+        """A fresh world: no seed Job, itzg generates it on the empty volume."""
+        self._check_name(name)
+        self._check_settings(settings)
+        with self._lock:
+            spec = self._reserve(name, settings, "", "")
+            op: dict[str, Any] | None = {"kind": "create", "step": "install"}
+            self._save(name, spec, op)  # reserves name + port first
+            self._create_volume_and_secret(name)
+            self.store.audit(
+                actor,
+                "create_world",
+                name,
+                port=spec["port"],
+                seed=settings.seed,
+                level_type=settings.level_type,
+            )
+            try:
+                self._install(name, spec, replicas=1)
+                op = None
+            except HelmError as e:  # "Start" retries the install
+                op = {**op, "error": str(e)}
+            self._save(name, spec, op)
+            values = None if op else self._releases().get(name)
+            return self._world(name, spec, op, values, live=False)
 
     def list_worlds(self) -> list[World]:
         specs, ops, rels = self._records()
@@ -625,7 +682,8 @@ class KubeDashboardService:
             spec, op, values = self._load(name)
             self._busy(name, op)
             extra = {"backup": backup_id, "forgeVersion": det.forge_version or ""}
-            if op and op.get("step") == "seed":  # data already broken: skip snapshot
+            if op and op.get("step") in ("seed", "install"):
+                # data broken, or never generated: nothing worth snapshotting
                 self._save(name, spec, {"kind": "restore", "step": "drain", **extra})
             else:
                 self._begin_snapshot(name, spec, values, "restore", **extra)
@@ -813,6 +871,11 @@ class KubeDashboardService:
                 if "forgeVersion" in op:
                     spec["forgeVersion"] = op["forgeVersion"]
                 spec["message"] = ""
+                self._install(name, spec, replicas=1)
+                self._save(name, spec, None)
+                return True
+            if step == "install":  # create_world interrupted mid-way
+                self._create_volume_and_secret(name)
                 self._install(name, spec, replicas=1)
                 self._save(name, spec, None)
                 return True

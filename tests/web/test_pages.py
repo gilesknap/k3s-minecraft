@@ -28,6 +28,7 @@ SNAP = "snapshot/noah-james/20261011T090000Z.zip"
         "/worlds/adventure-of-doom",
         "/worlds/noah-james/status",
         f"/launch?backup={quote(ARCHIVE)}",
+        "/new",
     ],
 )
 def test_page_renders(client: TestClient, url: str) -> None:
@@ -185,3 +186,22 @@ def test_unknown_world_404(client: TestClient) -> None:
 def test_roster_page(client: TestClient) -> None:
     html = client.get("/roster").text
     assert "JamesK" in html and "James (cousin)" in html
+
+
+def test_new_world_form(client: TestClient) -> None:
+    html = client.get("/new").text
+    assert 'action="/new"' in html and 'name="backup_id"' not in html
+    assert 'value="new-world"' in html
+    assert 'name="seed"' in html and 'name="level_type"' in html
+    for v in ("normal", "flat", "amplified", "large_biomes"):
+        assert f'value="{v}"' in html
+    assert 'name="version" value="LATEST"' in html
+    assert 'name="whitelist" value="NoahK"' in html  # roster offered
+    # the launch-from-backup form does not offer generation settings
+    launch = client.get(f"/launch?backup={quote(ARCHIVE)}").text
+    assert 'name="seed"' not in launch and 'action="/launch"' in launch
+
+
+@pytest.mark.parametrize("url", ["/", "/backups"])
+def test_new_world_button(client: TestClient, url: str) -> None:
+    assert 'href="/new"' in client.get(url).text

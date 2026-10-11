@@ -32,6 +32,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.datastructures import FormData
 
 from mcdash.models import (
+    LEVEL_TYPES,
     Backup,
     Conflict,
     DashboardService,
@@ -50,6 +51,12 @@ HERE = Path(__file__).parent
 log = logging.getLogger(__name__)
 GAMEMODES = ["survival", "creative", "adventure", "spectator"]
 DIFFICULTIES = ["peaceful", "easy", "normal", "hard"]
+LEVEL_TYPE_LABELS = {
+    "normal": "Normal",
+    "flat": "Superflat",
+    "amplified": "Amplified",
+    "large_biomes": "Large biomes",
+}
 PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{1,16}$")
 SSE_KEEPALIVE_S = 15.0
 
@@ -158,6 +165,9 @@ def settings_from_form(form: FormData, whitelist: list[str]) -> WorldSettings:
     memory = text("memory", "4Gi")
     if not re.fullmatch(r"\d+(\.\d+)?(Mi|Gi)", memory):
         raise MCDashError("Memory must look like 4Gi or 3584Mi")
+    level_type = text("level_type", "normal")
+    if level_type not in LEVEL_TYPES:
+        raise MCDashError(f"Unknown world type {level_type!r}")
     return WorldSettings(
         version=text("version") or "LATEST",
         server_type=server_type,
@@ -170,6 +180,8 @@ def settings_from_form(form: FormData, whitelist: list[str]) -> WorldSettings:
         motd=text("motd"),
         max_world_size=max_world_size,
         whitelist=whitelist,
+        seed=text("seed"),
+        level_type=level_type,
     )
 
 
@@ -218,6 +230,7 @@ def create_app(service: DashboardService) -> FastAPI:
         WorldState=WorldState,
         GAMEMODES=GAMEMODES,
         DIFFICULTIES=DIFFICULTIES,
+        LEVEL_TYPE_LABELS=LEVEL_TYPE_LABELS,
         ServerType=ServerType,
     )
 
@@ -366,6 +379,9 @@ def create_app(service: DashboardService) -> FastAPI:
         form = await request.form()
         world = service.get_world(name)
         settings = settings_from_form(form, list(world.settings.whitelist))
+        # generation-only: not on this form, keep what the world was made with
+        settings.seed = world.settings.seed
+        settings.level_type = world.settings.level_type
         service.update_settings(name, settings, actor)
         return done(request, f"/worlds/{name}", "Settings saved")
 
@@ -521,6 +537,29 @@ def create_app(service: DashboardService) -> FastAPI:
         settings = settings_from_form(form, whitelist_from_form(form))
         world: World = service.launch(backup_id, name, settings, actor)
         return done(request, f"/worlds/{world.name}", f"Launching {world.name}")
+
+    # -- new world (no backup) ----------------------------------------------
+    @app.get("/new", response_class=HTMLResponse)
+    def new_world_page(request: Request) -> Response:
+        name, settings = service.new_world_defaults()
+        return render(
+            request,
+            "launch.html",
+            backup=None,
+            name=name,
+            settings=settings,
+            roster=service.roster(),
+        )
+
+    @app.post("/new")
+    async def new_world(request: Request, actor: Actor) -> Response:
+        form = await request.form()
+        name = str(form.get("name") or "").strip()
+        if not name:
+            raise MCDashError("A world name is required")
+        settings = settings_from_form(form, whitelist_from_form(form))
+        world: World = service.create_world(name, settings, actor)
+        return done(request, f"/worlds/{world.name}", f"Creating {world.name}")
 
     # -- roster ------------------------------------------------------------
     @app.get("/roster", response_class=HTMLResponse)

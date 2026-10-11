@@ -311,3 +311,67 @@ def test_get_on_action_not_allowed(client: TestClient) -> None:
 def test_world_state_after_stop(client: TestClient, svc: FakeDashboardService) -> None:
     client.post("/worlds/noah-james/stop")
     assert svc.worlds["noah-james"].state is WorldState.SNAPSHOTTING
+
+
+# -- new world ------------------------------------------------------------------
+NEW_FORM = {
+    "name": "fresh",
+    "seed": "12345",
+    "level_type": "flat",
+    "server_type": "VANILLA",
+    "version": "LATEST",
+    "memory": "2Gi",
+    "gamemode": "creative",
+    "difficulty": "peaceful",
+    "max_world_size": "29999984",
+    "motd": "",
+    "whitelist": ["NoahK"],
+    "whitelist_extra": "Cousin_Ed",
+}
+
+
+def test_new_world(client: TestClient, svc: FakeDashboardService) -> None:
+    r = client.post("/new", data=NEW_FORM)
+    assert r.status_code == 303, r.text
+    assert r.headers["location"].startswith("/worlds/fresh")
+    call, name, settings, actor = svc.calls[-1]
+    assert (call, name, actor) == ("create_world", "fresh", ACTOR)
+    assert (settings.seed, settings.level_type) == ("12345", "flat")
+    assert (settings.gamemode, settings.memory) == ("creative", "2Gi")
+    assert settings.whitelist == ["NoahK", "Cousin_Ed"]
+    page = client.get("/worlds/fresh")
+    assert page.status_code == 200
+    assert "new world" in page.text and "Superflat" in page.text
+    assert "12345" in page.text
+
+
+def test_new_world_blank_seed_is_random(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    r = client.post("/new", data={**NEW_FORM, "seed": "  ", "level_type": "normal"})
+    assert r.status_code == 303
+    settings = svc.calls[-1][2]
+    assert (settings.seed, settings.level_type) == ("", "normal")
+
+
+def test_new_world_errors(client: TestClient, svc: FakeDashboardService) -> None:
+    r = client.post("/new", data={**NEW_FORM, "name": "noah-james"}, headers=HX)
+    assert r.status_code == 409 and r.headers["HX-Retarget"] == "#flash"
+    assert "already exists" in r.text
+    r = client.post("/new", data={**NEW_FORM, "level_type": "caves"}, headers=HX)
+    assert r.status_code == 400 and "world type" in r.text
+    r = client.post("/new", data={**NEW_FORM, "name": ""})
+    assert r.status_code == 400
+    assert not [c for c in svc.calls if c[0] == "create_world" and c[1] != "noah-james"]
+
+
+def test_settings_update_keeps_generation_settings(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    client.post("/new", data=NEW_FORM)
+    form = {k: v for k, v in NEW_FORM.items() if k not in ("seed", "level_type")}
+    r = client.post("/worlds/fresh/settings", data={**form, "memory": "3Gi"})
+    assert r.status_code == 303
+    call, name, settings, _ = svc.calls[-1]
+    assert (call, name, settings.memory) == ("update_settings", "fresh", "3Gi")
+    assert (settings.seed, settings.level_type) == ("12345", "flat")
