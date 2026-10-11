@@ -1,10 +1,9 @@
 """End-to-end test against a real cluster (kind in CI).
 
-NEEDS RECONCILIATION: written against the web routes as planned
-(GET /healthz, /, /backups, /worlds/{name}/status; POST /launch,
-/worlds/{name}/start|stop|snapshot|delete) while the web layer was being
-written concurrently. World state is scraped from the ``badge state-<state>``
-class in the status partial. Adjust here if the routes/markup change.
+Drives the real web routes (GET /healthz, /, /backups, /launch,
+/worlds/{name}/status; POST /launch, /worlds/{name}/start|stop|snapshot|delete).
+World state is scraped from the ``badge state-<state>`` class that
+``_macros.html`` renders in the status partial.
 
 Prerequisites (see .github/workflows/ci.yml, job ``e2e``):
 
@@ -187,6 +186,26 @@ def test_world_lifecycle(client: httpx.Client) -> None:
         },
     )
     wait_state(client, WORLD, "running")
+
+    # The seed Job ran as designed: archive mounted read-only (volume and
+    # mount), unprivileged, cleaned up by TTL.
+    jobs = json.loads(
+        kubectl(
+            "get", "jobs", "-l", f"mcdash/world={WORLD},mcdash/job=seed", "-o", "json"
+        ).stdout
+    )["items"]
+    assert jobs, "no seed Job found"
+    job = jobs[0]
+    assert job["status"].get("succeeded") == 1, job["status"]
+    assert job["spec"]["ttlSecondsAfterFinished"] == 3600
+    pod = job["spec"]["template"]["spec"]
+    assert pod["securityContext"]["runAsUser"] == 1000
+    assert pod["securityContext"]["runAsNonRoot"] is True
+    vols = {v["name"]: v for v in pod["volumes"]}
+    assert vols["archive"]["persistentVolumeClaim"]["readOnly"] is True
+    mounts = {m["name"]: m for m in pod["containers"][0]["volumeMounts"]}
+    assert mounts["archive"]["readOnly"] is True
+    assert mounts["store"]["readOnly"] is True  # seeding never writes the store
 
     # The game service is a NodePort in the configured range, matching the
     # connect address the dashboard shows.

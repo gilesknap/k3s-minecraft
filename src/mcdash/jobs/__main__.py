@@ -9,6 +9,20 @@ from pathlib import Path
 
 from mcdash.jobs.seed import SeedError, seed
 from mcdash.jobs.snapshot import SnapshotError, snapshot
+from mcdash.store import ArchiveWriteError, WriteGuard
+
+
+def archive_guard() -> WriteGuard:
+    """The archive is never a write target, whatever the arguments say.
+
+    Seeding wipes its destination first, so a mistaken ``--dest`` under the
+    archive must be refused before anything touches the disk (the readOnly
+    mount is the second line of defence).
+    """
+    roots = {Path("/archive")}
+    if os.environ.get("MCD_ARCHIVE_DIR"):
+        roots.add(Path(os.environ["MCD_ARCHIVE_DIR"]))
+    return WriteGuard(*roots)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,13 +38,14 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     try:
+        archive_guard().check(args.dest)
         if args.cmd == "seed":
             uid = int(os.environ.get("MCD_UID", "1000"))
             gid = int(os.environ.get("MCD_GID", "1000"))
             seed(args.src, args.dest, args.mode, uid, gid)
         else:
             snapshot(args.src, args.dest)
-    except (SeedError, SnapshotError, OSError, ValueError) as e:
+    except (SeedError, SnapshotError, ArchiveWriteError, OSError, ValueError) as e:
         print(f"{args.cmd}: error: {e}", file=sys.stderr)
         return 1
     return 0

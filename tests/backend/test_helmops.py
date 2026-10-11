@@ -117,6 +117,7 @@ def test_render_against_real_chart(tmp_path: Path) -> None:
     assert "name: king-rcon\n" in out or "name: king-rcon" in out
     assert '"29999984"' in out
     assert "ENFORCE_WHITELIST" in out
+    assert "startupProbe:" in out
 
 
 def _fake_helm(tmp_path: Path, script: str) -> Helm:

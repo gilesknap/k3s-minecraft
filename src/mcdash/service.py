@@ -23,6 +23,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import re
 import secrets
 import threading
 import time
@@ -144,6 +145,7 @@ class KubeDashboardService:
         self._players_cache: dict[str, tuple[float, list[str] | None]] = {}
         self._stop_evt = threading.Event()
         self._thread: threading.Thread | None = None
+        self._last_reconcile_error = ""
 
     @classmethod
     def from_config(cls, cfg: Config) -> KubeDashboardService:
@@ -161,7 +163,9 @@ class KubeDashboardService:
         out: dict[str, dict[str, Any]] = {}
         for r in self.helm.list():
             name = str(r.get("name", ""))
-            if not name or not str(r.get("chart", "")).startswith("minecraft-"):
+            # chart is "<name>-<version>": only the itzg "minecraft" chart, not
+            # e.g. this dashboard's own "minecraft-dashboard" release.
+            if not name or not re.fullmatch(r"minecraft-\d.*", str(r.get("chart", ""))):
                 continue
             rev = str(r.get("revision", ""))
             cached = self._values_cache.get(name)
@@ -831,9 +835,15 @@ class KubeDashboardService:
     def reconcile_once(self) -> None:
         try:
             _, ops, _ = self._records()
+        except MCDashError as e:  # e.g. no cluster: say so once, not every tick
+            if str(e) != self._last_reconcile_error:
+                log.warning("reconcile: cannot list worlds: %s", e)
+                self._last_reconcile_error = str(e)
+            return
         except Exception:
             log.exception("reconcile: cannot list worlds")
             return
+        self._last_reconcile_error = ""
         for name, op in ops.items():
             if op and not op.get("error"):
                 try:

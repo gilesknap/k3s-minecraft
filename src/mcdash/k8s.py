@@ -7,6 +7,7 @@ in-memory fake with the same methods.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -22,6 +23,12 @@ MANAGED_BY = {"app.kubernetes.io/managed-by": "mcdash"}
 WORLD_LABEL = "mcdash/world"
 JOB_LABEL = "mcdash/job"
 KIND_LABEL = "mcdash/kind"
+
+# (connect, read) seconds for ordinary API calls: never hang a web request.
+REQUEST_TIMEOUT = (5, 30)
+# A followed log with no new line for this long is re-opened, yielding a ""
+# heartbeat so the consumer can notice it has been abandoned.
+LOG_IDLE_TIMEOUT = 30.0
 
 
 @dataclass
@@ -127,10 +134,18 @@ class Kube:
     def __init__(self, cfg: Config) -> None:
         from kubernetes import client, config
 
+        # Without a cluster the dashboard still boots: the UI loads, backups
+        # are browsable, and cluster actions report this error instead of the
+        # pod crash-looping.
+        self.unavailable = ""
         try:
             config.load_incluster_config()
         except config.ConfigException:
-            config.load_kube_config()
+            try:
+                config.load_kube_config()
+            except (config.ConfigException, OSError) as e:
+                self.unavailable = f"no Kubernetes configuration ({e})"
+                log.error("Kubernetes unavailable: %s", e)
         self.cfg = cfg
         self.ns = cfg.namespace
         self.client = client
@@ -143,11 +158,36 @@ class Kube:
         labels = {**MANAGED_BY, WORLD_LABEL: world, **(extra or {})}
         return self.client.V1ObjectMeta(name=name, namespace=self.ns, labels=labels)
 
+    def _call(self, fn, *args, **kw) -> Any:
+        """Call the API with a timeout; network failures become MCDashError.
+
+        ``ApiException`` is passed through for the callers below to map.
+        """
+        from kubernetes.client.exceptions import ApiException
+
+        if getattr(self, "unavailable", ""):
+            raise MCDashError(f"Kubernetes unavailable: {self.unavailable}")
+        kw.setdefault("_request_timeout", REQUEST_TIMEOUT)
+        try:
+            return fn(*args, **kw)
+        except ApiException:
+            raise
+        except Exception as e:  # urllib3 / socket errors
+            raise MCDashError(f"cannot reach the Kubernetes API: {e}") from e
+
+    def _api(self, fn, *args, **kw) -> Any:
+        from kubernetes.client.exceptions import ApiException
+
+        try:
+            return self._call(fn, *args, **kw)
+        except ApiException as e:
+            raise MCDashError(f"kubernetes: {e.reason}") from e
+
     def _ignore_404(self, fn, *args, **kw) -> Any:
         from kubernetes.client.exceptions import ApiException
 
         try:
-            return fn(*args, **kw)
+            return self._call(fn, *args, **kw)
         except ApiException as e:
             if e.status == 404:
                 return None
@@ -157,7 +197,7 @@ class Kube:
         from kubernetes.client.exceptions import ApiException
 
         try:
-            return fn(*args, **kw)
+            return self._call(fn, *args, **kw)
         except ApiException as e:
             if e.status == 409:
                 raise Conflict(f"already exists: {e.reason}") from e
@@ -170,7 +210,9 @@ class Kube:
 
     def list_configmaps(self, kind: str) -> dict[str, dict[str, str]]:
         sel = f"app.kubernetes.io/managed-by=mcdash,{KIND_LABEL}={kind}"
-        res = self.core.list_namespaced_config_map(self.ns, label_selector=sel)
+        res = self._api(
+            self.core.list_namespaced_config_map, self.ns, label_selector=sel
+        )
         items: list[Any] = list(res.items)
         return {str(i.metadata.name): dict(i.data or {}) for i in items}
 
@@ -184,7 +226,7 @@ class Kube:
         if existing is None:
             self._create(self.core.create_namespaced_config_map, self.ns, body)
         else:
-            self.core.replace_namespaced_config_map(name, self.ns, body)
+            self._api(self.core.replace_namespaced_config_map, name, self.ns, body)
 
     def delete_configmap(self, name: str) -> None:
         self._ignore_404(self.core.delete_namespaced_config_map, name, self.ns)
@@ -289,6 +331,7 @@ class Kube:
             env=[
                 c.V1EnvVar(name="MCD_UID", value=str(cfg.uid)),
                 c.V1EnvVar(name="MCD_GID", value=str(cfg.gid)),
+                c.V1EnvVar(name="MCD_ARCHIVE_DIR", value=cfg.job_archive_mount),
                 c.V1EnvVar(name="PYTHONUNBUFFERED", value="1"),
             ],
             volume_mounts=mounts,
@@ -353,8 +396,10 @@ class Kube:
         return self._job_info(j) if j is not None else None
 
     def list_jobs(self, world: str) -> list[JobInfo]:
-        res = self.batch.list_namespaced_job(
-            self.ns, label_selector=f"{WORLD_LABEL}={world}"
+        res = self._api(
+            self.batch.list_namespaced_job,
+            self.ns,
+            label_selector=f"{WORLD_LABEL}={world}",
         )
         return [self._job_info(j) for j in res.items]
 
@@ -368,8 +413,10 @@ class Kube:
 
     # ------------------------------------------------------------ pods
     def list_server_pods(self, world: str) -> list[PodInfo]:
-        res = self.core.list_namespaced_pod(
-            self.ns, label_selector=server_selector(world)
+        res = self._api(
+            self.core.list_namespaced_pod,
+            self.ns,
+            label_selector=server_selector(world),
         )
         out = []
         items: list[Any] = list(res.items)
@@ -402,7 +449,8 @@ class Kube:
 
     def pod_metrics(self, world: str) -> tuple[int, int] | None:
         try:
-            res = self.custom.list_namespaced_custom_object(
+            res = self._call(
+                self.custom.list_namespaced_custom_object,
                 "metrics.k8s.io",
                 "v1beta1",
                 self.ns,
@@ -423,21 +471,53 @@ class Kube:
         return cpu, mem
 
     def stream_pod_log(self, pod: str, tail_lines: int = 200) -> Iterator[str]:
-        resp: Any = self.core.read_namespaced_pod_log(
-            pod,
-            self.ns,
-            follow=True,
-            tail_lines=tail_lines,
-            _preload_content=False,
-        )
-        buf = b""
-        try:
-            for chunk in resp.stream(4096):
-                buf += chunk
-                while b"\n" in buf:
-                    line, buf = buf.split(b"\n", 1)
-                    yield line.decode("utf-8", "replace")
+        """Follow ``pod``'s log until the container exits.
+
+        Never blocks longer than ``LOG_IDLE_TIMEOUT`` without yielding: on an
+        idle read timeout it yields ``""`` (a heartbeat, not a log line) and
+        re-opens the stream from just before the timeout. A consumer that has
+        lost interest stops iterating at the next heartbeat, so no thread or
+        connection outlives its viewer by more than that.
+        """
+        from kubernetes.client.exceptions import ApiException
+        from urllib3.exceptions import ProtocolError, ReadTimeoutError
+
+        kw: dict[str, Any] = {"tail_lines": tail_lines}
+        while True:
+            try:
+                resp: Any = self._call(
+                    self.core.read_namespaced_pod_log,
+                    pod,
+                    self.ns,
+                    follow=True,
+                    _preload_content=False,
+                    _request_timeout=(5, LOG_IDLE_TIMEOUT),
+                    **kw,
+                )
+            except ApiException as e:  # pod gone or not started
+                yield f"[log stream ended: {e.reason}]"
+                return
+            buf = b""
+            idle = False
+            try:
+                for chunk in resp.stream(4096):
+                    buf += chunk
+                    while b"\n" in buf:
+                        line, buf = buf.split(b"\n", 1)
+                        if line:
+                            yield line.decode("utf-8", "replace")
+                if buf:
+                    yield buf.decode("utf-8", "replace")
+            except (TimeoutError, ReadTimeoutError, ProtocolError):
+                idle = True
+            finally:
+                with contextlib.suppress(Exception):
+                    resp.release_conn()
+            if not idle:
+                return  # container exited: the server closed the stream
             if buf:
                 yield buf.decode("utf-8", "replace")
-        finally:
-            resp.release_conn()
+            yield ""  # heartbeat
+            # Nothing was logged for LOG_IDLE_TIMEOUT, so a short look-back
+            # catches lines racing the reconnect without duplicating any.
+            kw = {"since_seconds": 2}

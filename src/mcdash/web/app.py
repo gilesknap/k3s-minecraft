@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import re
 import threading
 from collections.abc import AsyncIterator
@@ -46,6 +47,7 @@ from mcdash.models import (
 )
 
 HERE = Path(__file__).parent
+log = logging.getLogger(__name__)
 GAMEMODES = ["survival", "creative", "adventure", "spectator"]
 DIFFICULTIES = ["peaceful", "easy", "normal", "hard"]
 PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{1,16}$")
@@ -274,6 +276,16 @@ def create_app(service: DashboardService) -> FastAPI:
             return resp
         return render(request, "error.html", status_code=code, code=code, text=str(exc))
 
+    @app.exception_handler(Exception)
+    async def unexpected_error(request: Request, exc: Exception) -> Response:
+        """Anything else (e.g. cluster unreachable): show it, keep the UI up."""
+        log.exception("%s %s failed", request.method, request.url.path)
+        resp = await mcdash_error(
+            request, MCDashError(f"Internal error: {type(exc).__name__}: {exc}")
+        )
+        resp.status_code = 500
+        return resp
+
     # -- misc --------------------------------------------------------------
     @app.get("/healthz", response_class=PlainTextResponse)
     def healthz() -> str:
@@ -396,16 +408,22 @@ def create_app(service: DashboardService) -> FastAPI:
             if not queue.full():
                 queue.put_nowait(item)
 
+        def post(item: tuple[str, str]) -> None:
+            with contextlib.suppress(RuntimeError):  # event loop already closed
+                loop.call_soon_threadsafe(put, item)
+
         def pump() -> None:
             it = service.stream_logs(name)
             try:
                 for line in it:
                     if stop.is_set():
                         break
-                    loop.call_soon_threadsafe(put, ("line", line))
-                loop.call_soon_threadsafe(put, ("end", ""))
+                    if not line:  # backend heartbeat: lets us notice `stop`
+                        continue
+                    post(("line", line))
+                post(("end", ""))
             except Exception as exc:  # surfaced to the browser, not fatal
-                loop.call_soon_threadsafe(put, ("error", str(exc)))
+                post(("error", str(exc)))
             finally:
                 close = getattr(it, "close", None)
                 if close is not None:

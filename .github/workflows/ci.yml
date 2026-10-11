@@ -28,11 +28,29 @@ jobs:
         with:
           enable-cache: true
 
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
       - name: Install project
         run: uv sync --locked
 
       - name: Ruff
-        run: uv run ruff check
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+
+      - name: Pyright
+        run: uv run pyright src/mcdash
+
+      # The same itzg chart version the Dockerfile vendors, so the render test
+      # (tests/backend/test_helmops.py) runs instead of skipping.
+      - name: Fetch the itzg chart
+        run: |
+          ver=$(sed -n 's/^ARG ITZG_CHART_VERSION=//p' Dockerfile)
+          helm pull minecraft --repo https://itzg.github.io/minecraft-server-charts \
+            --version "$ver" --untar --untardir "$RUNNER_TEMP/itzg"
+          echo "MCD_TEST_ITZG_CHART=$RUNNER_TEMP/itzg/minecraft" >> "$GITHUB_ENV"
 
       - name: Pytest (non-e2e)
         run: uv run pytest
@@ -137,6 +155,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # The image as the cluster runs it: read-only root, uid 1000, only /tmp
+      # writable. Entry points must resolve and helm must be able to run.
+      - name: Smoke-test the image
+        run: |
+          run() { docker run --rm --read-only --tmpfs /tmp --user 1000:1000 \
+            -e HOME=/tmp -e HELM_CACHE_HOME=/tmp/helm/cache \
+            -e HELM_CONFIG_HOME=/tmp/helm/config -e HELM_DATA_HOME=/tmp/helm/data \
+            mcdash:e2e "$@"; }
+          run mcdash --help
+          run python -m mcdash.jobs --help
+          run helm version
+          run sh -c 'helm template t "$MCD_ITZG_CHART" >/dev/null && echo chart ok'
+          run python -c 'import mcdash.web.app, pathlib, mcdash.web as w; \
+            assert (pathlib.Path(w.__file__).parent / "templates/base.html").is_file()'
+
       - name: Load image into kind
         run: kind load docker-image mcdash:e2e --name mcdash
 
@@ -171,3 +204,5 @@ jobs:
             echo "=== $p"; kubectl -n "$E2E_NAMESPACE" logs "$p" --all-containers --tail=100 || true
           done
           kubectl -n "$E2E_NAMESPACE" get events --sort-by=.lastTimestamp || true
+          kubectl -n "$E2E_NAMESPACE" get jobs -o yaml || true
+          kubectl -n local-path-storage logs deploy/local-path-provisioner --tail=100 || true

@@ -132,3 +132,27 @@ def test_seed_cli_bad_src(tmp_path: Path) -> None:
         ["seed", "--src", str(tmp_path / "nope.zip"), "--dest", str(tmp_path / "d")]
     )
     assert rc == 1
+
+
+@pytest.mark.parametrize("cmd", ["seed", "snapshot"])
+def test_jobs_refuse_archive_dest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cmd: str
+) -> None:
+    archive = tmp_path / "archive"
+    z = make_world_zip(archive / "w.zip")
+    monkeypatch.setenv("MCD_ARCHIVE_DIR", str(archive))
+    data = tmp_path / "data"
+    data.mkdir()
+    seed(z, data, "full", None, None)
+    before = sorted(p.name for p in archive.rglob("*"))
+    if cmd == "seed":
+        args = ["seed", "--src", str(z), "--dest", str(archive), "--mode", "full"]
+    else:
+        args = ["snapshot", "--src", str(data), "--dest", str(archive / "s.zip")]
+    assert main(args) == 1
+    # a symlink into the archive is resolved and refused too
+    link = tmp_path / "link"
+    link.symlink_to(archive)
+    args[args.index("--dest") + 1] = str(link / "x")
+    assert main(args) == 1
+    assert sorted(p.name for p in archive.rglob("*")) == before

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -406,3 +407,15 @@ def test_protocol_conformance(svc: KubeDashboardService) -> None:
     assert accepts(svc) is svc
     for meth in [m for m in dir(DashboardService) if not m.startswith("_")]:
         assert callable(getattr(svc, meth)), meth
+
+
+def test_ignores_other_helm_releases(svc: KubeDashboardService) -> None:
+    """The dashboard's own release (chart minecraft-dashboard-x) is not a world."""
+    helm: Any = svc.fake_helm  # type: ignore[attr-defined]
+    orig = helm.list
+    helm.list = lambda: [
+        *orig(),
+        {"name": "mcdash", "revision": "1", "chart": "minecraft-dashboard-0.1.0"},
+    ]
+    helm.get_values = lambda r: {"mcdash": {"port": 30570}}  # would be adopted
+    assert svc.list_worlds() == []

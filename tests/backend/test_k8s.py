@@ -114,3 +114,60 @@ def test_metrics_absent(cfg: Config) -> None:
         "items": [{"containers": [{"usage": {"cpu": "500m", "memory": "1Gi"}}]}]
     }
     assert k.pod_metrics("w") == (500, 1024**3)
+
+
+class _Resp:
+    def __init__(self, chunks: list[bytes], then: Exception | None = None) -> None:
+        self.chunks, self.then, self.released = chunks, then, False
+
+    def stream(self, n: int):
+        yield from self.chunks
+        if self.then:
+            raise self.then
+
+    def release_conn(self) -> None:
+        self.released = True
+
+
+def test_stream_pod_log_heartbeat_and_reconnect(cfg: Config) -> None:
+    from urllib3.exceptions import ReadTimeoutError
+
+    k = make_kube(cfg)
+    r1 = _Resp([b"a\nb", b"c\n"], ReadTimeoutError(None, "/log", "idle"))  # type: ignore[arg-type]
+    r2 = _Resp([b"d\n"])
+    k.core.read_namespaced_pod_log.side_effect = [r1, r2]
+    assert list(k.stream_pod_log("p")) == ["a", "bc", "", "d"]
+    first, second = k.core.read_namespaced_pod_log.call_args_list
+    assert first.kwargs["tail_lines"] == 200
+    assert first.kwargs["_request_timeout"][1] > 0  # bounded idle read
+    assert second.kwargs["since_seconds"] == 2 and "tail_lines" not in second.kwargs
+    assert r1.released and r2.released
+
+
+def test_stream_pod_log_consumer_can_stop(cfg: Config) -> None:
+    """A heartbeat hands control back, so an abandoned viewer is noticed."""
+    from urllib3.exceptions import ReadTimeoutError
+
+    k = make_kube(cfg)
+    k.core.read_namespaced_pod_log.side_effect = lambda *a, **kw: _Resp(
+        [],
+        ReadTimeoutError(None, "/log", "idle"),  # type: ignore[arg-type]
+    )
+    it = k.stream_pod_log("p")
+    assert next(it) == ""
+    it.close()  # what the web pump does once its viewer has gone
+
+
+def test_unavailable_cluster_raises_mcdash_error(cfg: Config) -> None:
+    import pytest
+
+    from mcdash.models import MCDashError
+
+    k = make_kube(cfg)
+    k.unavailable = "no Kubernetes configuration"
+    with pytest.raises(MCDashError, match="Kubernetes unavailable"):
+        k.list_configmaps("world")
+    k.unavailable = ""
+    k.core.list_namespaced_config_map.side_effect = OSError("connection refused")
+    with pytest.raises(MCDashError, match="cannot reach"):
+        k.list_configmaps("world")

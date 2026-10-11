@@ -177,6 +177,10 @@ def render_values(
         "persistence": {
             "dataDir": {"enabled": True, "existingClaim": pvc_name(world)},
         },
+        # First start of an old world (download, world upgrade, Forge install)
+        # can take many minutes; without a startup probe the chart's liveness
+        # probe (30s + 20 x 5s) kills it mid-upgrade.
+        "startupProbe": {"enabled": True, "failureThreshold": 90, "periodSeconds": 10},
         "podLabels": {"mcdash/world": world},
         "deploymentLabels": {"mcdash/world": world},
         "mcdash": {

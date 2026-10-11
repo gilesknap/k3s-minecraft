@@ -46,6 +46,10 @@ in their report.
 - PVC `<w>-data` — created by the dashboard (not the chart), storage class
   `$MCD_STORAGE_CLASS`, RWX. Labels `app.kubernetes.io/managed-by: mcdash`,
   `mcdash/world: <w>`.
+- ConfigMap `<w>-mcdash` (label `mcdash/kind: world`) — the world record
+  (`spec`: port, source, settings; `op`: pending multi-step operation). Exists
+  from launch, before any Helm release, so it reserves the name and port while
+  seeding; rebuilt from the release's `mcdash:` values if lost.
 - Secret `<w>-rcon` — key `rcon-password`, random.
 - Helm release `<w>` of the vendored itzg chart: `persistence.dataDir.existingClaim=<w>-data`,
   NodePort game service on the allocated port, RCON ClusterIP, nodeSelector,
@@ -64,6 +68,10 @@ Job CLI (run in the Job container):
 python -m mcdash.jobs seed --src /archive/<file>.zip|/store/<...>.zip --dest /data --mode vanilla|full
 python -m mcdash.jobs snapshot --src /data --dest /store/snapshots/<w>/<YYYYmmddTHHMMSSZ>.zip
 ```
+
+Both subcommands refuse a `--dest` inside the archive (`/archive` or
+`$MCD_ARCHIVE_DIR`, symlinks resolved) before touching the disk; the read-only
+mount is the second line of defence.
 
 `seed` locates `world/level.dat` (any prefix, e.g. `tmp/tmp.XXXX/`), strips the
 prefix, extracts `world/` + `ops.json`, `whitelist.json`, `banned-*.json`
@@ -103,3 +111,12 @@ securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
 The chart creates: Deployment (1 replica, port 8080, `/healthz`), Service
 (ClusterIP 80→8080), ServiceAccount + Role + RoleBinding, the two PV/PVC
 pairs. It does **not** create an Ingress (tpi-k3s-ansible owns ingress/auth).
+
+## Runtime notes
+
+- `DashboardService.stream_logs` may yield `""` as an idle heartbeat (at least
+  every 30 s); consumers skip it and use it to notice an abandoned viewer.
+- Without a reachable cluster `mcdash serve` still starts: `/healthz` and the
+  backup pages work, cluster-backed pages show the error.
+- The itzg release gets `startupProbe` (up to 15 min) so a first start that
+  upgrades an old world is not killed by the liveness probe.

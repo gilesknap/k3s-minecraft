@@ -141,3 +141,30 @@ def test_sse_stops_consuming_when_client_disconnects(
     assert b"data: line 0" in b"".join(sent)
     assert after <= before + 1
     assert before < 100_000
+
+
+@pytest.mark.parametrize("htmx", [False, True])
+def test_unexpected_error_renders_500(htmx: bool) -> None:
+    """E.g. the cluster is unreachable: an error page, not a bare traceback."""
+    svc = seeded()
+
+    def boom() -> list:
+        raise RuntimeError("api down")
+
+    svc.list_worlds = boom  # type: ignore[method-assign]
+    c = TestClient(create_app(svc), raise_server_exceptions=False)
+    r = c.get("/", headers=HX if htmx else {})
+    assert r.status_code == 500
+    assert "api down" in r.text
+    assert c.get("/healthz").status_code == 200
+
+
+def test_sse_skips_heartbeats(svc: FakeDashboardService) -> None:
+    def beating(name: str):
+        yield "one"
+        yield ""  # backend idle heartbeat
+        yield "two"
+
+    svc.stream_logs = beating  # type: ignore[method-assign]
+    body = TestClient(create_app(svc)).get("/worlds/noah-james/logs").text
+    assert "data: one\n\ndata: two\n\n" in body

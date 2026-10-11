@@ -77,8 +77,17 @@ spec:
               value: {{ .Values.worlds.uid | quote }}
             - name: MCD_GID
               value: {{ .Values.worlds.gid | quote }}
-            # Root filesystem is read-only: helm cache/config go to the tmp emptyDir.
+            # Root filesystem is read-only: everything helm (and Python's
+            # tempfile) writes goes to the tmp emptyDir.
             - name: HOME
+              value: /tmp
+            - name: HELM_CACHE_HOME
+              value: /tmp/helm/cache
+            - name: HELM_CONFIG_HOME
+              value: /tmp/helm/config
+            - name: HELM_DATA_HOME
+              value: /tmp/helm/data
+            - name: TMPDIR
               value: /tmp
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
