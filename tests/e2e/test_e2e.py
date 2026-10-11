@@ -222,14 +222,42 @@ def test_world_lifecycle(client: httpx.Client) -> None:
     status = client.get(f"/worlds/{WORLD}/status").text
     assert any(f":{p}" in status for p in node_ports), "connect address port mismatch"
 
+    # A real Minecraft server is up: it finished starting and answers RCON
+    # through the dashboard's console.
+    log = kubectl("logs", f"deploy/{WORLD}", "--tail=-1").stdout
+    assert "Done (" in log, f"server never finished starting:\n{log[-3000:]}"
+    r = client.post(f"/worlds/{WORLD}/rcon", data={"command": "list"})
+    assert r.status_code == 200, r.text[:2000]
+    assert "players online" in r.text, r.text[:2000]
+
     # Snapshot now -> a zip appears under /store/snapshots/<world>/.
     before = set(snapshot_files(WORLD))
     post_ok(client, f"/worlds/{WORLD}/snapshot")
     deadline = time.monotonic() + 300
-    while not (set(snapshot_files(WORLD)) - before):
+    while not (new := set(snapshot_files(WORLD)) - before):
         assert time.monotonic() < deadline, "snapshot zip never appeared"
         time.sleep(5)
     wait_state(client, WORLD, "running", timeout=300)
+    (snap,) = new
+    check = kubectl(
+        "exec",
+        f"deploy/{DEPLOYMENT}",
+        "--",
+        "python",
+        "-c",
+        "import sys, zipfile; n = zipfile.ZipFile(sys.argv[1]).namelist(); "
+        "assert 'world/level.dat' in n, n[:20]; print(len(n))",
+        f"/store/snapshots/{WORLD}/{snap}",
+        check=False,
+    )
+    assert check.returncode == 0, check.stderr
+
+    # Restore from that snapshot (snapshot -> stop -> reseed -> start).
+    snap_id = f"snapshot/{WORLD}/{snap}"
+    post_ok(client, f"/worlds/{WORLD}/restore", {"backup_id": snap_id})
+    time.sleep(2)
+    wait_state(client, WORLD, "running")
+    assert snap_id in client.get(f"/worlds/{WORLD}/status").text
 
     # Stop (snapshots first) -> stopped; start -> running again.
     post_ok(client, f"/worlds/{WORLD}/stop")
