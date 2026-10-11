@@ -1,2 +1,5 @@
 .history
-q
+backups/
+.venv/
+__pycache__/
+*.egg-info/
