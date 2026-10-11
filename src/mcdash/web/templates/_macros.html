@@ -19,7 +19,8 @@
 
 {# One backup row with its actions. back = page to return to after an action. #}
 {% macro backup_row(b, back, show_world=false) -%}
-<tr>
+<tr class="brow" data-name="{{ b.world_name }}">
+  {% if show_world %}<td data-label="World"><a href="/backups#w-{{ b.world_name }}">{{ b.world_name }}</a></td>{% endif %}
   <td data-label="Date" title="{{ b.id }}">{{ b.timestamp|fmtdate }}</td>
   <td data-label="Tier">{{ tier_badge(b) }}</td>
   <td data-label="Label" class="wrap">
@@ -27,7 +28,8 @@
     {% if b.description %}<div class="muted small">{{ b.description }}</div>{% endif %}
     {% if not b.label and not b.description %}<span class="muted small">{{ b.id.split('/')[-1] }}</span>{% endif %}
   </td>
-  <td data-label="Version">{{ version(b, true) }}</td>
+  <td data-label="Version">{{ b.mc_version or '?' }}</td>
+  <td data-label="Type">{{ b.server_type.value|lower }}</td>
   <td data-label="Size" class="num">{{ b.size_bytes|humansize }}</td>
   <td data-label="" class="actions">
     <a class="btn primary" href="/launch?backup={{ b.id|urlencode }}">Launch</a>
@@ -86,4 +88,21 @@
   </div>
   <label>Add others <input name="whitelist_extra" placeholder="names, comma separated" autocomplete="off"></label>
 </fieldset>
+{%- endmacro %}
+
+{# Sortable column header for the backups page. #}
+{% macro sort_th(field, label, sort, dir, cls='') -%}
+{%- set active = sort == field -%}
+{%- set next_dir = ('asc' if dir == 'desc' else 'desc') if active else default_dir(field) -%}
+<th{% if cls %} class="{{ cls }}"{% endif %}{% if active %} aria-sort="{{ 'ascending' if dir == 'asc' else 'descending' }}"{% endif %}>
+  <a class="sort{% if active %} active{% endif %}" href="/backups?sort={{ field }}&amp;dir={{ next_dir }}">{{ label }}
+  {%- if active %} <span aria-hidden="true">{{ '▲' if dir == 'asc' else '▼' }}</span>{% endif %}</a></th>
+{%- endmacro %}
+
+{% macro backup_head(sort, dir, show_world=false) -%}
+<thead><tr>
+  {% if show_world %}{{ sort_th('world', 'World', sort, dir) }}{% endif %}
+  {{ sort_th('date', 'Date', sort, dir) }}{{ sort_th('tier', 'Tier', sort, dir) }}{{ sort_th('label', 'Label', sort, dir) }}
+  {{ sort_th('version', 'Version', sort, dir) }}{{ sort_th('type', 'Type', sort, dir) }}{{ sort_th('size', 'Size', sort, dir, 'num') }}<th></th>
+</tr></thead>
 {%- endmacro %}

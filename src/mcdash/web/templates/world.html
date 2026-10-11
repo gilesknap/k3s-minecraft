@@ -52,7 +52,7 @@
   <h2>Snapshots <small class="muted">{{ snapshots|length }}</small></h2>
   {% if snapshots %}
   <table class="cards backups">
-    <thead><tr><th>Date</th><th>Tier</th><th>Label</th><th>Version</th><th class="num">Size</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Tier</th><th>Label</th><th>Version</th><th>Type</th><th class="num">Size</th><th></th></tr></thead>
     <tbody>{% for b in snapshots %}{{ backup_row(b, '/worlds/' ~ world.name) }}{% endfor %}</tbody>
   </table>
   {% else %}<p class="muted">No snapshots yet.</p>{% endif %}
