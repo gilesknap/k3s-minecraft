@@ -137,3 +137,9 @@ def test_store_roster_and_audit(cfg: Config) -> None:
     assert [r["action"] for r in recs] == ["launch", "stop"]
     assert recs[0]["actor"] == "a@b" and recs[1]["actor"] == "unknown"
     assert not list(cfg.dashboard_dir.glob(".*.tmp"))
+
+
+def test_atomic_write_is_world_readable(cfg: Config) -> None:
+    f = cfg.dashboard_dir / "x.json"
+    atomic_write_json(f, {"a": 1}, WriteGuard(cfg.archive_dir))
+    assert f.stat().st_mode & 0o777 == 0o644

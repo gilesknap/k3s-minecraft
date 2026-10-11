@@ -44,6 +44,9 @@ def atomic_write_bytes(path: Path, data: bytes, guard: WriteGuard) -> None:
     guard.check(path.parent)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
+        # mkstemp makes 0600; state and sidecars should be readable on the
+        # NAS (e.g. when graduating a promoted backup by hand).
+        os.fchmod(fd, 0o644)
         with os.fdopen(fd, "wb") as f:
             f.write(data)
             f.flush()
