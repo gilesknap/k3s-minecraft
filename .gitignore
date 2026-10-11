@@ -1,2 +1,7 @@
 .history
-q
+backups/
+.venv/
+__pycache__/
+*.egg-info/
+nas-minecraft/
+bachups-curated

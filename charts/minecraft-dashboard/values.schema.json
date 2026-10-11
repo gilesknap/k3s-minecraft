@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "definitions": {
+    "tier": {
+      "type": "object",
+      "properties": {
+        "nfs": {
+          "type": "object",
+          "properties": {
+            "server": {"type": "string"},
+            "path": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        "hostPath": {"type": "string"},
+        "existingClaim": {"type": "string"},
+        "size": {"type": "string"},
+        "mountOptions": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string"},
+        "pullPolicy": {"enum": ["Always", "IfNotPresent", "Never"]}
+      },
+      "required": ["repository"]
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "archive": {"$ref": "#/definitions/tier"},
+        "store": {"$ref": "#/definitions/tier"}
+      },
+      "required": ["archive", "store"]
+    },
+    "worlds": {
+      "type": "object",
+      "properties": {
+        "portMin": {"type": "integer", "minimum": 30000, "maximum": 32767},
+        "portMax": {"type": "integer", "minimum": 30000, "maximum": 32767},
+        "publicHost": {"type": "string"},
+        "node": {"type": "string"},
+        "storageClass": {"type": "string"},
+        "size": {"type": "string"},
+        "defaultMemory": {"type": "string"},
+        "snapshotKeep": {"type": "integer", "minimum": 1},
+        "uid": {"type": "integer"},
+        "gid": {"type": "integer"}
+      },
+      "additionalProperties": false
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": {"type": "string"},
+        "port": {"type": "integer"}
+      }
+    },
+    "extraEnv": {"type": "array"}
+  }
+}

@@ -1,0 +1,1 @@
+{% if oob_msg %}<div id="flash" hx-swap-oob="innerHTML">{% with level='ok', text=oob_msg %}{% include "_alert.html" %}{% endwith %}</div>{% endif %}

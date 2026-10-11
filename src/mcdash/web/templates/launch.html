@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tier_badge, whitelist_fields %}
+{# Launch from a backup, or (backup is none) create a new world. #}
+{% block title %}{{ 'Launch' if backup else 'New world' }} {{ name }}{% endblock %}
+{% block content %}
+{% set action = '/launch' if backup else '/new' %}
+{% if backup %}
+<h1>Launch a world</h1>
+<p class="source">From {{ tier_badge(backup) }} <strong>{{ backup.world_name }}</strong>
+  {{ backup.timestamp|fmtdate }} · {{ backup.mc_version or '?' }} {{ backup.server_type.value|lower }} · {{ backup.size_bytes|humansize }}
+  {% if backup.label %}· <em>{{ backup.label }}</em>{% endif %}<br>
+  <small class="muted">{{ backup.id }}</small></p>
+{% else %}
+<h1>New world</h1>
+<p class="source">A fresh world with no backup: the server generates it on first start.</p>
+{% endif %}
+<form class="card form-grid" method="post" action="{{ action }}" hx-post="{{ action }}">
+  {% if backup %}<input type="hidden" name="backup_id" value="{{ backup.id }}">{% endif %}
+  <label class="span2">World name
+    <input name="name" value="{{ name }}" required maxlength="40" pattern="[a-z0-9]([a-z0-9\-]*[a-z0-9])?" autocomplete="off">
+    <small class="muted">Lowercase letters, digits and dashes. Becomes the Helm release name.</small>
+  </label>
+  {% if not backup %}
+  <label>Seed
+    <input name="seed" value="{{ settings.seed }}" maxlength="64" placeholder="blank = random" autocomplete="off">
+  </label>
+  <label>World type
+    <select name="level_type">
+      {% for value, label in LEVEL_TYPE_LABELS.items() %}<option value="{{ value }}" {% if settings.level_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  {% include "_settings_fields.html" %}
+  <div class="span2">{{ whitelist_fields(roster, settings.whitelist) }}</div>
+  <div class="span2 formactions">
+    {% if backup %}
+    <button class="btn primary big">Launch</button>
+    <a class="btn" href="/backups">Cancel</a>
+    <small class="muted">The world is seeded from the backup into a new volume; the backup itself is never modified.</small>
+    {% else %}
+    <button class="btn primary big">Create world</button>
+    <a class="btn" href="/">Cancel</a>
+    <small class="muted">Snapshot it later to keep it; snapshots can be launched or promoted like any backup.</small>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

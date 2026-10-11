@@ -1,173 +1,166 @@
 # k3s-minecraft
-Minecraft servers managed in a lightweight Kubernetes cluster
 
-Thanks to https://github.com/itzg/docker-minecraft-server and https://k3s.io/
+A web dashboard for running Minecraft Java servers on a home Kubernetes
+cluster from a library of old world backups. You pick a backup, launch a
+server from it, watch it run, stop and start it while keeping its data, and
+snapshot its state back into the backup list.
 
-![alt text](images/pis.png "Raspberry Pi K3S cluster")
+Each world is a release of the [itzg minecraft chart](https://github.com/itzg/minecraft-server-charts)
+(running [itzg/docker-minecraft-server](https://github.com/itzg/docker-minecraft-server)).
+Players connect with an ordinary Minecraft client at `<public-host>:<port>`.
 
-# Intro
-This is a very easy set of instructions for setting up a Kubernetes cluster
-and deploying minecraft java edition servers.
+The worlds this was built for, and the story behind them, are in
+[MinecraftHistoryNoahAndDad.pdf](MinecraftHistoryNoahAndDad.pdf).
 
-It has been tested on Ubuntu 20.10 and Raspbian Bullseye.
+<!-- Screenshots: worlds list, launch form, world page (TODO) -->
 
-Give it a try, K3S provides a good uninstaller that will clean up your system
-if you decide to back out.
+## Features
 
-# Installation Steps
+- **Launch** any archived, promoted or snapshot zip as a new world. The
+  dashboard detects vanilla or Forge and the original Minecraft version, and
+  pre-fills the launch form from the backup's `server.properties`.
+- **Stop/Start** a world while keeping its data volume and port. Stopping a
+  world takes a snapshot first.
+- **Snapshots**: take one at any time; one is also taken on stop, on delete
+  and before a restore. The last 10 per world are kept. **Promote** a snapshot
+  to a named backup that is never pruned.
+- **Restore from** any backup into an existing world, keeping its port and
+  settings.
+- **Monitoring**: state, players online, uptime, CPU and memory, a streamed
+  log tail and an RCON console.
+- **Whitelist** editing from a player roster. The whitelist is always
+  enforced and `online-mode` is always on.
 
-## Install K3S lightweight Kubernetes
+## Architecture
 
-(If you are installing on a Raspberry Pi, first prepare the Pi with steps 
-[here](useful/README.md))
+The full design is in [docs/design.md](docs/design.md) and the interfaces
+between components in [docs/contracts.md](docs/contracts.md). In brief:
 
-Execute this command on your server to set up the cluster master
-(aka K3S Server node):
-```
-curl -sfL https://get.k3s.io | sh -
-```
+- The Python app (FastAPI with HTMX, rendered on the server) runs as one pod.
+  It drives `helm` against a copy of the itzg chart baked into the image. The
+  Helm releases are the source of truth for which worlds exist. There is no
+  database: other state is JSON on the store volume.
+- **Storage tiers** on an NFS server:
+  - **archive**: the precious original backups. The NAS directory is
+    `a-w`, the PersistentVolume is mounted with `ro` mount options, and the
+    pod mounts it `readOnly`. Nothing in the cluster can write to it.
+  - **store**: promoted backups, rolling snapshots and the dashboard's own
+    state.
+  - **worlds**: one dynamic RWX PVC per world.
+- **Seeding and snapshots** run as Kubernetes Jobs that use the dashboard's
+  own image (`python -m mcdash.jobs seed|snapshot ...`).
+- **Networking**: each world gets a NodePort from a fixed range (default
+  30565-30584) that it keeps for its whole life. The dashboard has a
+  ClusterIP Service only and does no authentication itself. Put it behind an
+  authenticating proxy; it logs `X-Auth-Request-Email` against each action.
 
-Install kubectl on the workstation from which you will be managing the cluster
-(workstation==server if you have one machine only)
-```
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-```
-Go to the server machine and copy over the kubectl configuration to your
-workstation
-```
-sudo scp /etc/rancher/k3s/k3s.yaml <YOUR_ACCOUNT>@<YOUR_WORKSTATION>:.kube/config
-# edit the file .kube/config replacing 127.0.0.1 with your server IP Address
-```
+## Deploying
 
-## Create a minecraft namespace and context
-From the workstation execute the following:
-```
-kubectl create namespace minecraft
-kubectl config set-context minecraft --namespace=minecraft --user=default --cluster=default
-kubectl config use-context minecraft
-```
+The image and chart are published to GHCR:
 
-This creates a namespace in which to create all of our minecraft assets,
-it then defines a context which uses that namespace as the default and sets
-this to be the current context.
+- image: `ghcr.io/gilesknap/k3s-minecraft:<version>` (amd64 + arm64)
+- chart: `oci://ghcr.io/gilesknap/charts/minecraft-dashboard`
 
-## Install helm
-Execute this on the workstation:
-```
-curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
-bash get_helm.sh
-```
+[tpi-k3s-ansible](https://github.com/gilesknap/tpi-k3s-ansible) deploys the
+chart through ArgoCD, together with the namespace, the oauth2-proxy Ingress,
+the Cloudflare tunnel route and the DDNS CronJob for the game hostname. To
+install it by hand:
 
-## Deploy a Minecraft Server to your Cluster
-Take a copy of the file **minecraft-helm.yaml** and call it **my-first-mc.yaml**.
-Edit the file and follow the comments to apply the settings you require for your
-server.
-
-Then install using helm. I recommend using the same release name (argument
-after --install) as the basename
-of the file so you can easily keep track of which file your servers got their
-settings from. You can omit the rcon password if you disabled rcon in the yaml.
-```
-export HELM_EXPERIMENTAL_OCI=1
-helm repo add minecraft-server-charts https://itzg.github.io/minecraft-server-charts/
-
-helm upgrade --install my-first-mc -f my-first-mc.yaml --set minecraftServer.eula=true,rcon.password=<YOUR_RCON_PWD> minecraft-server-charts/minecraft
+```bash
+helm install minecraft-dashboard oci://ghcr.io/gilesknap/charts/minecraft-dashboard \
+  --namespace minecraft --create-namespace -f my-values.yaml
 ```
 
-THAT IS ALL! You should see a minecraft server spin up with your server address
-and the port you specified in myfirst-mc.yaml.
-
-You can edit the yaml and repeat the above command to update settings without
-deleting your world data. You can remove the minecraft server including world
-data with:
-```
-helm delete my-first-mc
-```
-
-# Links
-
-|description    | link |
-|---------------|------|
-|itgz minecraft image:          |  https://github.com/itzg/docker-minecraft-server |
-|itgz helm chart:               |  https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft |
-|K3S:                           |  https://k3s.io/ |
-|Helm:                          |  https://helm.sh |
-|kubectl:                       |  https://kubernetes.io/docs/reference/kubectl/overview/ |
-#
-#
-# Additional Nice to Have Stuff
-
-## check the latest logs for k3s
-
-Go to your master / server and do:
-
-    sudo journalctl -fu k3s
-
-## Add a worker node (aka K3S Agent) to your cluster
-First get the node token on your server:
-```
-sudo cat /var/lib/rancher/k3s/server/node-token
-```
-Then execute the following on your new node to create a K3S Agent:
-```
-curl -sfL https://get.k3s.io | K3S_URL=https://gknuc:6443 K3S_TOKEN=<your token string>  sh -
+```yaml
+# my-values.yaml
+storage:
+  archive: {nfs: {server: 192.168.1.3, path: /bigdisk/minecraft-archive}}
+  store:   {nfs: {server: 192.168.1.3, path: /bigdisk/k8s-cluster/minecraft}}
+worlds:
+  publicHost: mc.example.org   # shown in connect addresses
+  node: nuc2                   # pin worlds to the node your router forwards to
+  storageClass: nfs-rwx        # RWX class for per-world PVCs
+  portMin: 30565
+  portMax: 30584
+  defaultMemory: 4Gi
+  snapshotKeep: 10
 ```
 
-## Do Backups of running servers and more ...
-Use the script included in this repo to save/restore backups and save typing
-for a few other commands. See details by invoking the following:
-```
-$ source k8s-mc.sh
-$ k8s-mchelp
+The chart creates a Deployment, a Service (port 80), a ServiceAccount with a
+Role limited to its namespace, and two static NFS PV/PVC pairs. The PVs have
+`Retain` reclaim and their names are prefixed with the namespace. It does
+**not** create an Ingress. For each storage tier, `storage.<tier>.existingClaim`
+uses a PVC you created yourself. `storage.<tier>.hostPath` exists only for
+testing (kind). See
+[charts/minecraft-dashboard/values.yaml](charts/minecraft-dashboard/values.yaml)
+for every value.
 
-    This script adds the following functions to bash. It assumes that your
-    servers have been deployed using:
-        https://artifacthub.io/packages/helm/minecraft-server-charts/minecraft
-    or using the k8s-mcdeploy function below.
+Your router must forward TCP `portMin`-`portMax` to the pinned node.
 
-    In all cases below <server name> is the helm chart release name.
+## NAS setup and ingesting the archive
 
-    k8s-mclist
-        list all minecraft servers deployed to the cluster
+1. On the NAS, create `minecraft-archive/` **outside** any directory the
+   cluster's dynamic provisioner uses. Also create the store directory with
+   `backups/`, `snapshots/` and `dashboard/` inside it, writable by uid 1000.
+2. Download the Google Drive backup folder. Drive splits it into wrapper zips
+   (`minecraft-k8s-backup-*-NNN.zip`), each holding per-world zips.
+3. Unpack them flat into the archive and lock it:
 
-    k8s-mcports
-        details of the ports exposed by servers and rcon
+   ```bash
+   chmod u+w /share/bigdisk/minecraft-archive           # only if already locked
+   scripts/ingest-archive.sh /share/bigdisk/minecraft-archive \
+       ~/Downloads/minecraft-k8s-backup-*.zip
+   chmod -R a-w /share/bigdisk/minecraft-archive
+   ```
 
-    k8s-mcstart <server name>
-        start the server (set replicas to 1)
+`ingest-archive.sh <dest-dir> <drive-zip>...` extracts every
+`minecraft-k8s-backup/*.zip` member into `<dest-dir>` with its original
+filename and timestamp. It checks each one with `unzip -t` and requires a
+`world/level.dat` entry before moving it into place. The script is
+idempotent: files already present with the same size are skipped, so you can
+re-run it when more parts turn up. It never overwrites an existing file: a
+size mismatch is reported as a conflict. It needs only `bash` and `unzip`
+(the BusyBox build is fine, as on QNAP), plus standard coreutils or BusyBox
+tools. Inner zips over 4 GiB need Info-ZIP `unzip` for Zip64.
 
-    k8s-mcstop <server name>
-        stop the server (set replicas to 0)
+## Developing
 
-    k8s-mcexec <server name>
-        execute bash in the server's container
-
-    k8s-mclog <server name> [-p] [-f]
-        get logs for the server
-        -p = log for previous instance after a restart of the pod
-        -f = attach to the log and monitor it
-
-    k8s-mcdeploy <my_server_def.yaml>
-        deploys a server to the cluster with release name my_server_def and
-        with values overrides from my_server_def.yaml
-
-        recommended: copy and edit minecraft-helm.yaml for most common options,
-        see in file comments for details.
-
-    k8s-mcbackups
-        List the backups in the folder [MCBACKUP not yet specified]
-
-    k8s-mcbackup <server name>
-        zips up the server data folder to a dated zip file and places it
-        in the folder [MCBACKUP not yet specified] (prompts for MCBACKUP if not set)
-
-    k8s-mcrestore <server name> <backup file name>
-        restore the world from backup for a server, overwriting its
-        current world
+```bash
+uv sync                               # create .venv with dev dependencies
+uv run ruff check
+uv run pytest                         # unit + web tests (e2e excluded)
+uv run python -m mcdash.web.devserver # UI on http://localhost:8080 with fake data
 ```
 
-More Useful Things to do with your Cluster
-------------------------------------------
+`mcdash index <dir>` prints what the dashboard detects in a directory of
+backup zips.
 
-see [More Useful Stuff](useful/README.md)
+The end-to-end test (`tests/e2e/`, pytest mark `e2e`) needs a cluster. CI
+runs it on kind: it builds the image, installs the chart with hostPath
+storage, writes a synthetic world zip (`tests/e2e/make_world_zip.py`) and
+goes through launch, snapshot, stop, start and delete. It also checks that
+the archive mount rejects writes. See the `e2e` job in
+[.github/workflows/ci.yml](.github/workflows/ci.yml).
+
+## Releasing
+
+- **Tag `X.Y.Z`** (pure semver, no `v` prefix) publishes image `X.Y.Z`, `X.Y` and
+  `latest` (not for prereleases such as `1.0.0-rc.1`), and chart
+  `X.Y.Z` with appVersion `X.Y.Z`.
+- **Push to `main`** publishes image `main` and `sha-<sha7>`, and the
+  prerelease chart `0.0.0-main.<sha7>`. Because it is a prerelease, nothing
+  picks it up unless you pin that exact version (useful for testing `main`
+  from tpi-k3s-ansible).
+
+The Dockerfile pins the `helm` binary (v3), the itzg chart version, uv and
+the Python base image. Renovate keeps them current (`renovate.json`).
+
+## Legacy
+
+The original version of this repo, with hand-written per-world Helm values,
+the `k8s-mc.sh` helpers and Raspberry Pi cluster notes, is in
+[legacy/](legacy/README.md).
+
+## License
+
+Apache 2.0. See [LICENSE](LICENSE).

@@ -1,0 +1,58 @@
+{{- if .Values.rbac.create }}
+{{- /*
+Namespace-scoped: the dashboard runs `helm` against the vendored itzg chart
+and creates world PVCs, Secrets and seed/snapshot Jobs in its own namespace.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "mcdash.fullname" . }}
+  labels:
+    {{- include "mcdash.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources:
+      - secrets
+      - services
+      - persistentvolumeclaims
+      - configmaps
+      - pods
+      - serviceaccounts
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods/log, events]
+    verbs: [get, list, watch]
+  - apiGroups: ["apps"]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["apps"]
+    resources: [replicasets]
+    verbs: [get, list, watch]
+  - apiGroups: ["batch"]
+    resources: [jobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: ["policy"]
+    resources: [poddisruptionbudgets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["networking.k8s.io"]
+    resources: [ingresses]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "mcdash.fullname" . }}
+  labels:
+    {{- include "mcdash.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "mcdash.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mcdash.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -1,0 +1,99 @@
+# Default values for minecraft-dashboard.
+# See docs/contracts.md in https://github.com/gilesknap/k3s-minecraft
+
+image:
+  repository: ghcr.io/gilesknap/k3s-minecraft
+  # Defaults to the chart appVersion. Also used as MCD_JOB_IMAGE.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  # Defaults to the fullname when empty.
+  name: ""
+  annotations: {}
+
+rbac:
+  # Namespace-scoped Role + RoleBinding for helm/kube operations on worlds.
+  create: true
+
+storage:
+  # Archive tier (precious, read-only). The chart creates a PV with
+  # mountOptions [nfsvers=4, ro] + accessModes [ReadOnlyMany] and a PVC bound
+  # to it by volumeName; the dashboard mounts it readOnly at /archive.
+  archive:
+    nfs:
+      server: ""
+      path: ""
+    # Test-only alternative to nfs (e.g. kind). When set, nfs is ignored.
+    hostPath: ""
+    # Use a pre-existing PVC instead of creating the PV/PVC pair.
+    existingClaim: ""
+    size: 1Ti
+    mountOptions:
+      - nfsvers=4
+      - ro
+  # Writable store: backups/, snapshots/<world>/, dashboard/. RWX.
+  store:
+    nfs:
+      server: ""
+      path: ""
+    hostPath: ""
+    existingClaim: ""
+    size: 1Ti
+    mountOptions:
+      - nfsvers=4
+
+worlds:
+  portMin: 30565
+  portMax: 30584
+  publicHost: ""
+  # Hostname to pin worlds and Jobs to (nodeSelector kubernetes.io/hostname).
+  node: ""
+  storageClass: nfs-rwx
+  size: 10Gi
+  defaultMemory: 4Gi
+  snapshotKeep: 10
+  # uid/gid the itzg server runs as; seed/snapshot Jobs chown to this.
+  uid: 1000
+  gid: 1000
+
+# Pod-level security context.
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container-level security context.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# Extra environment variables for the dashboard container.
+extraEnv: []
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

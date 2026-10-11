@@ -1,0 +1,72 @@
+{{- /*
+Static PV + PVC pairs for the archive (read-only) and store (read-write)
+tiers. storageClassName "" + volumeName + claimRef pin each PVC to its PV so
+nothing else can bind them. reclaimPolicy Retain: deleting the release never
+touches NAS data.
+*/}}
+{{- range $tier := list "archive" "store" }}
+{{- $cfg := index $.Values.storage $tier }}
+{{- if not $cfg.existingClaim }}
+{{- $ro := eq $tier "archive" }}
+{{- if not (or $cfg.hostPath (and $cfg.nfs.server $cfg.nfs.path)) }}
+{{- fail (printf "storage.%s: set nfs.server + nfs.path, hostPath, or existingClaim" $tier) }}
+{{- end }}
+{{- $pvc := include "mcdash.pvcName" (list $ $tier) }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "mcdash.pvName" (list $ $tier) }}
+  labels:
+    {{- include "mcdash.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $tier }}
+spec:
+  capacity:
+    storage: {{ $cfg.size }}
+  accessModes:
+    - {{ $ro | ternary "ReadOnlyMany" "ReadWriteMany" }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  volumeMode: Filesystem
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    namespace: {{ $.Release.Namespace }}
+    name: {{ $pvc }}
+  {{- if $cfg.hostPath }}
+  # Test-only (kind): hostPath does not support mountOptions; the archive is
+  # still protected by the readOnly volumeMount.
+  hostPath:
+    path: {{ $cfg.hostPath }}
+    type: Directory
+  {{- else }}
+  {{- with $cfg.mountOptions }}
+  mountOptions:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  nfs:
+    server: {{ $cfg.nfs.server }}
+    path: {{ $cfg.nfs.path }}
+    {{- if $ro }}
+    readOnly: true
+    {{- end }}
+  {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $pvc }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "mcdash.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $tier }}
+spec:
+  accessModes:
+    - {{ $ro | ternary "ReadOnlyMany" "ReadWriteMany" }}
+  storageClassName: ""
+  volumeName: {{ include "mcdash.pvName" (list $ $tier) }}
+  resources:
+    requests:
+      storage: {{ $cfg.size }}
+{{- end }}
+{{- end }}

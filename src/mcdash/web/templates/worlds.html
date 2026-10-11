@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Worlds{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>Worlds</h1>
+  <span class="actions">
+    <a class="btn" href="/new">+ New world</a>
+    <a class="btn primary" href="/backups">+ Launch from a backup</a>
+  </span>
+</div>
+<div id="worlds" hx-get="/worlds/table" hx-trigger="every 5s" hx-swap="innerHTML">
+  {% include "_worlds_table.html" %}
+</div>
+{% endblock %}

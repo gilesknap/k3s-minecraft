@@ -1,0 +1,6 @@
+The Minecraft dashboard is listening on service {{ include "mcdash.fullname" . }}:{{ .Values.service.port }}.
+This chart creates no Ingress and the app does no authentication - put it
+behind an authenticating proxy (e.g. oauth2-proxy) before exposing it.
+
+Quick look:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "mcdash.fullname" . }} 8080:{{ .Values.service.port }}

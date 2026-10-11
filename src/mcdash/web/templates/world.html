@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_macros.html" import backup_row, whitelist_fields %}
+{% block title %}{{ world.name }}{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>{{ world.name }}</h1>
+  <a href="/" class="muted">← All worlds</a>
+</div>
+
+<section class="card" id="world-status" hx-get="/worlds/{{ world.name }}/status" hx-trigger="every 5s" hx-swap="innerHTML">
+  {% include "_world_status.html" %}
+</section>
+
+<div class="grid2">
+<section class="card">
+  <h2>Console</h2>
+  <div id="rcon-scrollback" class="scrollback" aria-live="polite"><div class="muted small">RCON output appears here. Try <code>list</code>.</div></div>
+  <form class="inline" method="post" action="/worlds/{{ world.name }}/rcon"
+        hx-post="/worlds/{{ world.name }}/rcon" hx-target="#rcon-scrollback" hx-swap="beforeend"
+        hx-on::after-request="if(event.detail.successful){this.reset(); var s=document.getElementById('rcon-scrollback'); s.scrollTop=s.scrollHeight}">
+    <input name="command" placeholder="e.g. say hello, time set day" autocomplete="off" required aria-label="RCON command">
+    <button class="btn primary">Send</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Log <small class="muted" id="log-state">connecting…</small></h2>
+  <pre id="log" class="log" data-src="/worlds/{{ world.name }}/logs"></pre>
+</section>
+</div>
+
+<div class="grid2">
+<section class="card">
+  <h2>Whitelist</h2>
+  <form method="post" action="/worlds/{{ world.name }}/whitelist" hx-post="/worlds/{{ world.name }}/whitelist">
+    {{ whitelist_fields(roster, world.settings.whitelist) }}
+    <p><button class="btn primary">Save whitelist</button> <small class="muted">Applied live via RCON and kept across restarts.</small></p>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Settings</h2>
+  {% set settings = world.settings %}
+  <form class="form-grid" method="post" action="/worlds/{{ world.name }}/settings" hx-post="/worlds/{{ world.name }}/settings">
+    {% include "_settings_fields.html" %}
+    <div class="span2"><button class="btn primary">Save settings</button> <small class="muted">Takes effect at the next start.</small></div>
+  </form>
+</section>
+</div>
+
+<section class="card">
+  <h2>Snapshots <small class="muted">{{ snapshots|length }}</small></h2>
+  {% if snapshots %}
+  <table class="cards backups">
+    <thead><tr><th>Date</th><th>Tier</th><th>Label</th><th>Version</th><th class="num">Size</th><th></th></tr></thead>
+    <tbody>{% for b in snapshots %}{{ backup_row(b, '/worlds/' ~ world.name) }}{% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">No snapshots yet.</p>{% endif %}
+</section>
+
+<div class="grid2">
+<section class="card">
+  <h2>Restore from…</h2>
+  <form class="stack" method="post" action="/worlds/{{ world.name }}/restore" hx-post="/worlds/{{ world.name }}/restore"
+        hx-confirm="Restore {{ world.name }}? A snapshot of the current state is taken first, then the world is wiped and reseeded. Port, whitelist and settings are kept.">
+    <select name="backup_id" required aria-label="Backup to restore from">
+      <option value="">Choose a backup…</option>
+      {% for gname, items in backup_groups %}
+      <optgroup label="{{ gname }}">
+        {% for b in items %}<option value="{{ b.id }}">{{ b.timestamp|fmtdate }} · {{ b.tier.value }}{% if b.label %} · {{ b.label }}{% endif %} · {{ b.mc_version or '?' }}</option>{% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select>
+    <p class="small muted">A snapshot of the current state is taken first. The port, whitelist and settings are kept.</p>
+    <button class="btn">Restore</button>
+  </form>
+</section>
+
+<section class="card danger-zone">
+  <h2>Delete world</h2>
+  <form class="stack" method="post" action="/worlds/{{ world.name }}/delete" hx-post="/worlds/{{ world.name }}/delete">
+    <p class="small">A final snapshot is taken first (find it under Backups), then the server, its volume and its port are released. Type <code>{{ world.name }}</code> to confirm.</p>
+    <input name="confirm" required autocomplete="off" pattern="{{ world.name|e }}" aria-label="Type {{ world.name }} to confirm">
+    <button class="btn danger">Delete {{ world.name }}</button>
+  </form>
+</section>
+</div>
+{% endblock %}

@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mcdash.fullname" . }}
+  labels:
+    {{- include "mcdash.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # Single writer of the JSON state in /store/dashboard: never run two.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "mcdash.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mcdash.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "mcdash.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: dashboard
+          image: {{ include "mcdash.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["mcdash", "serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: MCD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MCD_ARCHIVE_DIR
+              value: /archive
+            - name: MCD_STORE_DIR
+              value: /store
+            - name: MCD_ARCHIVE_PVC
+              value: {{ include "mcdash.pvcName" (list . "archive") | quote }}
+            - name: MCD_STORE_PVC
+              value: {{ include "mcdash.pvcName" (list . "store") | quote }}
+            - name: MCD_JOB_IMAGE
+              value: {{ include "mcdash.image" . | quote }}
+            - name: MCD_PORT_MIN
+              value: {{ .Values.worlds.portMin | quote }}
+            - name: MCD_PORT_MAX
+              value: {{ .Values.worlds.portMax | quote }}
+            - name: MCD_PUBLIC_HOST
+              value: {{ .Values.worlds.publicHost | default "localhost" | quote }}
+            - name: MCD_WORLD_NODE
+              value: {{ .Values.worlds.node | quote }}
+            - name: MCD_STORAGE_CLASS
+              value: {{ .Values.worlds.storageClass | quote }}
+            - name: MCD_WORLD_SIZE
+              value: {{ .Values.worlds.size | quote }}
+            - name: MCD_DEFAULT_MEMORY
+              value: {{ .Values.worlds.defaultMemory | quote }}
+            - name: MCD_ITZG_CHART
+              value: /opt/charts/minecraft
+            - name: MCD_SNAPSHOT_KEEP
+              value: {{ .Values.worlds.snapshotKeep | quote }}
+            - name: MCD_UID
+              value: {{ .Values.worlds.uid | quote }}
+            - name: MCD_GID
+              value: {{ .Values.worlds.gid | quote }}
+            # Root filesystem is read-only: everything helm (and Python's
+            # tempfile) writes goes to the tmp emptyDir.
+            - name: HOME
+              value: /tmp
+            - name: HELM_CACHE_HOME
+              value: /tmp/helm/cache
+            - name: HELM_CONFIG_HOME
+              value: /tmp/helm/config
+            - name: HELM_DATA_HOME
+              value: /tmp/helm/data
+            - name: TMPDIR
+              value: /tmp
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: archive
+              mountPath: /archive
+              readOnly: true
+            - name: store
+              mountPath: /store
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: archive
+          persistentVolumeClaim:
+            claimName: {{ include "mcdash.pvcName" (list . "archive") }}
+            readOnly: true
+        - name: store
+          persistentVolumeClaim:
+            claimName: {{ include "mcdash.pvcName" (list . "store") }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

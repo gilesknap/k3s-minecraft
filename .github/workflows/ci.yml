@@ -1,0 +1,208 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # renovate: datasource=github-releases depName=helm/helm
+  HELM_VERSION: v3.22.0
+
+jobs:
+  test:
+    name: Lint and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install project
+        run: uv sync --locked
+
+      - name: Ruff
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+
+      - name: Pyright
+        run: uv run pyright src/mcdash
+
+      # The same itzg chart version the Dockerfile vendors, so the render test
+      # (tests/backend/test_helmops.py) runs instead of skipping.
+      - name: Fetch the itzg chart
+        run: |
+          ver=$(sed -n 's/^ARG ITZG_CHART_VERSION=//p' Dockerfile)
+          helm pull minecraft --repo https://itzg.github.io/minecraft-server-charts \
+            --version "$ver" --untar --untardir "$RUNNER_TEMP/itzg"
+          echo "MCD_TEST_ITZG_CHART=$RUNNER_TEMP/itzg/minecraft" >> "$GITHUB_ENV"
+
+      - name: Pytest (non-e2e)
+        run: uv run pytest
+
+  chart:
+    name: Helm chart lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Lint
+        run: |
+          helm lint --strict charts/minecraft-dashboard \
+            --set storage.archive.nfs.server=192.0.2.1 \
+            --set storage.archive.nfs.path=/archive \
+            --set storage.store.nfs.server=192.0.2.1 \
+            --set storage.store.nfs.path=/store
+
+      - name: Template (NFS and hostPath variants)
+        run: |
+          helm template t charts/minecraft-dashboard \
+            --set storage.archive.nfs.server=192.0.2.1 \
+            --set storage.archive.nfs.path=/archive \
+            --set storage.store.nfs.server=192.0.2.1 \
+            --set storage.store.nfs.path=/store >/dev/null
+          helm template t charts/minecraft-dashboard \
+            --set storage.archive.hostPath=/a \
+            --set storage.store.hostPath=/s >/dev/null
+
+  e2e:
+    name: End-to-end (kind)
+    runs-on: ubuntu-latest
+    needs: [test, chart]
+    timeout-minutes: 45
+    env:
+      E2E_NAMESPACE: mcdash
+      E2E_SERVICE: mcdash
+      E2E_DEPLOYMENT: mcdash
+      E2E_WORLD: e2e
+      E2E_MEMORY: 1Gi
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install project
+        run: uv sync --locked
+
+      - name: Prepare hostPath storage and the synthetic world
+        run: |
+          base="$RUNNER_TEMP/mcdash"
+          mkdir -p "$base/archive" "$base/store"
+          uv run python tests/e2e/make_world_zip.py "$base/archive"
+          # Archive: readable by all, writable by nobody (like the NAS).
+          chmod 0444 "$base"/archive/*.zip
+          chmod 0555 "$base/archive"
+          # Store: the dashboard and Jobs run as uid 1000.
+          chmod 0777 "$base/store"
+          cat >"$RUNNER_TEMP/kind.yaml" <<KIND
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+            - role: control-plane
+              extraMounts:
+                - hostPath: $base
+                  containerPath: /mcdash
+          KIND
+
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: mcdash
+          config: ${{ runner.temp }}/kind.yaml
+
+      # NEEDS VERIFICATION: world PVCs are RWX; kind's local-path provisioner
+      # only supports RWX in sharedFileSystemPath mode (single node is fine).
+      - name: Enable RWX on kind's local-path provisioner
+        run: |
+          kubectl -n local-path-storage patch configmap local-path-config \
+            --type merge \
+            -p '{"data":{"config.json":"{\"sharedFileSystemPath\":\"/var/local-path-provisioner\"}"}}'
+          kubectl -n local-path-storage rollout restart deployment local-path-provisioner
+          kubectl -n local-path-storage rollout status deployment local-path-provisioner --timeout=120s
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: mcdash:e2e
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The image as the cluster runs it: read-only root, uid 1000, only /tmp
+      # writable. Entry points must resolve and helm must be able to run.
+      - name: Smoke-test the image
+        run: |
+          run() { docker run --rm --read-only --tmpfs /tmp --user 1000:1000 \
+            -e HOME=/tmp -e HELM_CACHE_HOME=/tmp/helm/cache \
+            -e HELM_CONFIG_HOME=/tmp/helm/config -e HELM_DATA_HOME=/tmp/helm/data \
+            mcdash:e2e "$@"; }
+          run mcdash --help
+          run python -m mcdash.jobs --help
+          run helm version
+          run sh -c 'helm template t "$MCD_ITZG_CHART" >/dev/null && echo chart ok'
+          run python -c 'import mcdash.web.app, pathlib, mcdash.web as w; \
+            assert (pathlib.Path(w.__file__).parent / "templates/base.html").is_file()'
+
+      - name: Load image into kind
+        run: kind load docker-image mcdash:e2e --name mcdash
+
+      - name: Install dashboard chart
+        run: |
+          helm install mcdash charts/minecraft-dashboard \
+            --namespace "$E2E_NAMESPACE" --create-namespace \
+            --set fullnameOverride=mcdash \
+            --set image.repository=mcdash \
+            --set image.tag=e2e \
+            --set image.pullPolicy=Never \
+            --set storage.archive.hostPath=/mcdash/archive \
+            --set storage.store.hostPath=/mcdash/store \
+            --set worlds.node="" \
+            --set worlds.publicHost=localhost \
+            --set worlds.storageClass=standard \
+            --set worlds.size=1Gi \
+            --set worlds.defaultMemory="$E2E_MEMORY" \
+            --wait --timeout 5m
+
+      - name: Run e2e tests
+        run: uv run pytest -m e2e tests/e2e -v
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n "$E2E_NAMESPACE" get all,pvc,jobs,secrets -o wide || true
+          kubectl get pv -o wide || true
+          kubectl -n "$E2E_NAMESPACE" describe pods || true
+          kubectl -n "$E2E_NAMESPACE" logs deploy/mcdash --tail=300 || true
+          for p in $(kubectl -n "$E2E_NAMESPACE" get pods -o name); do
+            echo "=== $p"; kubectl -n "$E2E_NAMESPACE" logs "$p" --all-containers --tail=100 || true
+          done
+          kubectl -n "$E2E_NAMESPACE" get events --sort-by=.lastTimestamp || true
+          kubectl -n "$E2E_NAMESPACE" get jobs -o yaml || true
+          kubectl -n local-path-storage logs deploy/local-path-provisioner --tail=100 || true

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Roster{% endblock %}
+{% block content %}
+<h1>Player roster</h1>
+<p class="muted small">Players offered as checkboxes when choosing a world's whitelist.</p>
+<section class="card">
+{% if players %}
+<table class="cards roster">
+  <thead><tr><th>Player</th><th>Note</th><th></th></tr></thead>
+  <tbody>
+  {% for p in players %}
+  <tr>
+    <td data-label="Player" class="title"><strong>{{ p.name }}</strong></td>
+    <td data-label="Note">{{ p.note or '' }}</td>
+    <td class="actions">
+      <form method="post" action="/roster/remove" hx-post="/roster/remove" hx-confirm="Remove {{ p.name }} from the roster? (Existing whitelists are not changed.)">
+        <input type="hidden" name="name" value="{{ p.name }}">
+        <button class="btn danger">Remove</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">Nobody on the roster yet.</p>{% endif %}
+</section>
+<section class="card">
+  <h2>Add or update a player</h2>
+  <form class="inline" method="post" action="/roster/add" hx-post="/roster/add">
+    <input name="name" placeholder="Minecraft username" required pattern="[A-Za-z0-9_]{1,16}" autocomplete="off" aria-label="Minecraft username">
+    <input name="note" placeholder="Note (who is this?)" aria-label="Note">
+    <button class="btn primary">Save</button>
+  </form>
+  <p class="small muted">Saving an existing name updates its note.</p>
+</section>
+{% endblock %}
