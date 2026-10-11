@@ -12,11 +12,11 @@ import contextlib
 import logging
 import re
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from itertools import groupby
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, Request
@@ -210,6 +210,45 @@ def sort_backups(backups: list[Backup]) -> list[tuple[str, list[Backup]]]:
     return groups
 
 
+def _version_key(v: str | None) -> tuple[int, ...]:
+    """Numeric version order (1.9 < 1.12 < 1.16.5); unknown sorts first."""
+    if not v:
+        return (-1,)
+    parts = []
+    for p in v.split("."):
+        digits = "".join(ch for ch in p if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def _date_key(b: Backup) -> datetime:
+    return b.timestamp or datetime.min.replace(tzinfo=UTC)
+
+
+BACKUP_SORTS: dict[str, Callable[[Backup], Any]] = {
+    "world": lambda b: b.world_name,
+    "date": _date_key,
+    "tier": lambda b: b.tier.value,
+    "label": lambda b: (b.label or b.id.split("/")[-1]).lower(),
+    "version": lambda b: _version_key(b.mc_version),
+    "type": lambda b: b.server_type.value,
+    "size": lambda b: b.size_bytes,
+}
+
+
+def default_dir(field: str) -> str:
+    """First click on a column: newest / largest first, otherwise A-Z."""
+    return "desc" if field in ("date", "size", "version") else "asc"
+
+
+def sort_backups_by(backups: list[Backup], field: str, direction: str) -> list[Backup]:
+    """Flat sort by one field; ties go world A-Z, then newest first."""
+    ordered = sorted(backups, key=_date_key, reverse=True)
+    ordered.sort(key=lambda b: b.world_name)
+    ordered.sort(key=BACKUP_SORTS[field], reverse=direction == "desc")
+    return ordered
+
+
 def sse_event(data: str, event: str | None = None) -> str:
     lines = [f"event: {event}"] if event else []
     lines += [f"data: {part}" for part in (data.splitlines() or [""])]
@@ -232,6 +271,7 @@ def create_app(service: DashboardService) -> FastAPI:
         DIFFICULTIES=DIFFICULTIES,
         LEVEL_TYPE_LABELS=LEVEL_TYPE_LABELS,
         ServerType=ServerType,
+        default_dir=default_dir,
     )
 
     def render(
@@ -468,9 +508,26 @@ def create_app(service: DashboardService) -> FastAPI:
 
     # -- backups -----------------------------------------------------------
     @app.get("/backups", response_class=HTMLResponse)
-    def backups_page(request: Request) -> Response:
+    def backups_page(request: Request, sort: str = "world", dir: str = "") -> Response:
+        if sort not in BACKUP_SORTS:
+            sort = "world"
+        if dir not in ("asc", "desc"):
+            dir = default_dir(sort)
+        backups = service.list_backups()
+        if sort == "world":
+            groups = sort_backups(backups)
+            if dir == "desc":
+                groups.reverse()
+            return render(
+                request, "backups.html", grouped=True, groups=groups, sort=sort, dir=dir
+            )
         return render(
-            request, "backups.html", groups=sort_backups(service.list_backups())
+            request,
+            "backups.html",
+            grouped=False,
+            items=sort_backups_by(backups, sort, dir),
+            sort=sort,
+            dir=dir,
         )
 
     @app.post("/backups/label")

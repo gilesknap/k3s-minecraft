@@ -1,6 +1,7 @@
 """Every page renders against the seeded fake."""
 
-from urllib.parse import quote
+import re
+from urllib.parse import quote, unquote
 
 import pytest
 from fastapi.testclient import TestClient
@@ -103,7 +104,7 @@ def test_backups_grouped_newest_first(client: TestClient) -> None:
 
 def _row_for(html: str, backup_id: str) -> str:
     start = html.index(f"/launch?backup={quote(backup_id)}")
-    start = html.rindex("<tr>", 0, start)
+    start = html.rindex("<tr", 0, start)
     return html[start : html.index("</tr>", start)]
 
 
@@ -205,3 +206,58 @@ def test_new_world_form(client: TestClient) -> None:
 @pytest.mark.parametrize("url", ["/", "/backups"])
 def test_new_world_button(client: TestClient, url: str) -> None:
     assert 'href="/new"' in client.get(url).text
+
+
+def _launch_order(html: str) -> list[str]:
+    return re.findall(r'/launch\?backup=([^"]+)"', html)
+
+
+@pytest.mark.parametrize("field", ["date", "tier", "label", "version", "type", "size"])
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+def test_backups_flat_sort(client: TestClient, field: str, direction: str) -> None:
+    html = client.get(f"/backups?sort={field}&dir={direction}").text
+    assert 'class="bgroup"' not in html  # flat table, not grouped
+    assert 'data-label="World"' in html
+    assert 'aria-sort="' + ("ascending" if direction == "asc" else "descending") in html
+    rows = _launch_order(html)
+    assert len(rows) == len(set(rows)) > 1
+
+
+def test_backups_sort_size_desc_is_largest_first(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    order = [
+        unquote(r)
+        for r in _launch_order(client.get("/backups?sort=size&dir=desc").text)
+    ]
+    sizes = {b.id: b.size_bytes for b in svc.list_backups()}
+    assert [sizes[i] for i in order] == sorted(sizes.values(), reverse=True)
+
+
+def test_version_key_is_numeric() -> None:
+    from mcdash.web.app import _version_key
+
+    assert _version_key("1.9") < _version_key("1.12.2") < _version_key("1.16.5")
+    assert _version_key(None) < _version_key("1.0")
+
+
+def test_backups_world_sort_reverses_groups(client: TestClient) -> None:
+    asc = client.get("/backups?sort=world&dir=asc").text
+    desc = client.get("/backups?sort=world&dir=desc").text
+    a = re.findall(r'id="w-([^"]+)"', asc)
+    d = re.findall(r'id="w-([^"]+)"', desc)
+    assert a == sorted(a) and d == list(reversed(a))
+
+
+def test_backups_bad_sort_falls_back_to_grouped(client: TestClient) -> None:
+    html = client.get("/backups?sort=nonsense&dir=sideways").text
+    assert 'class="bgroup"' in html
+
+
+def test_header_link_toggles_direction(client: TestClient) -> None:
+    html = client.get("/backups?sort=date&dir=desc").text
+    assert "/backups?sort=date&amp;dir=asc" in html  # active column flips
+    assert (
+        "/backups?sort=size&amp;dir=desc" in html
+    )  # first click on size: largest first
+    assert "/backups?sort=label&amp;dir=asc" in html

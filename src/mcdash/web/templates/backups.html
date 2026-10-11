@@ -1,21 +1,25 @@
 {% extends "base.html" %}
-{% from "_macros.html" import backup_row %}
+{% from "_macros.html" import backup_row, backup_head %}
 {% block title %}Backups{% endblock %}
 {% block content %}
 <div class="pagehead">
   <h1>Backups</h1>
   <span class="actions">
-    <input type="search" id="filter" placeholder="Filter worlds…" aria-label="Filter worlds" data-filter=".bgroup">
+    <input type="search" id="filter" placeholder="Filter worlds…" aria-label="Filter worlds" data-filter="{{ '.bgroup' if grouped else '.brow' }}">
     <a class="btn" href="/new">+ New world</a>
   </span>
 </div>
 <p class="muted small">Every launchable zip: <span class="badge tier-archive">archive</span> precious originals (read-only),
-  <span class="badge tier-backup">backup</span> promoted saves, <span class="badge tier-snapshot">snapshot</span> rolling saves of running worlds.</p>
+  <span class="badge tier-backup">backup</span> promoted saves, <span class="badge tier-snapshot">snapshot</span> rolling saves of running worlds.
+  Click a column heading to sort; click again to reverse.</p>
+{% if grouped %}
+<p class="small sortbar">Grouped by world, {{ 'A–Z' if dir == 'asc' else 'Z–A' }}
+  (<a href="/backups?sort=world&amp;dir={{ 'desc' if dir == 'asc' else 'asc' }}">reverse</a>)</p>
 {% for world, items in groups %}
 <section class="bgroup" data-name="{{ world }}">
   <h2 id="w-{{ world }}">{{ world }} <small class="muted">{{ items|length }}</small></h2>
   <table class="cards backups">
-    <thead><tr><th>Date</th><th>Tier</th><th>Label</th><th>Version</th><th class="num">Size</th><th></th></tr></thead>
+    {{ backup_head(sort, dir) }}
     <tbody>
     {% for b in items %}{{ backup_row(b, '/backups') }}{% endfor %}
     </tbody>
@@ -24,4 +28,14 @@
 {% else %}
 <div class="empty"><p>No backups found. Check the archive and store mounts.</p></div>
 {% endfor %}
+{% else %}
+<p class="small sortbar"><a href="/backups">Group by world</a></p>
+<table class="cards backups">
+  {{ backup_head(sort, dir, show_world=true) }}
+  <tbody>
+  {% for b in items %}{{ backup_row(b, '/backups', show_world=true) }}{% endfor %}
+  </tbody>
+</table>
+{% if not items %}<div class="empty"><p>No backups found. Check the archive and store mounts.</p></div>{% endif %}
+{% endif %}
 {% endblock %}
