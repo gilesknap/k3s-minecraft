@@ -48,7 +48,7 @@ The Google Drive download is a set of split wrapper zips
 (`minecraft-k8s-backup-*-NNN.zip`) each containing inner per-world zips. The
 inner zips hold a full `/data` under a `tmp/tmp.XXXX/` prefix.
 
-- `scripts/ingest-archive.sh <drive-zips…> <dest>` extracts the inner zips
+- `scripts/ingest-archive.sh <dest> <drive-zips…>` extracts the inner zips
   **flat, keeping original filenames**, verifies each (`unzip -t` + a
   `world/level.dat` entry), and is idempotent (re-run to add files later).
 - Run on the NAS (or a host with `bigdisk` mounted), then lock the directory:

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }}{% endblock %}
+{% block content %}
+<h1>{{ {404: 'Not found', 409: 'Conflict', 403: 'Not allowed'}.get(code, 'Something went wrong') }}</h1>
+{% with level='error' %}{% include "_alert.html" %}{% endwith %}
+<p><a href="javascript:history.back()">← Back</a> · <a href="/">Worlds</a></p>
+{% endblock %}

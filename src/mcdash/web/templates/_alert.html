@@ -1,0 +1,4 @@
+<div class="alert alert-{{ level }}" role="{{ 'alert' if level == 'error' else 'status' }}">
+  <span>{{ text }}</span>
+  <button type="button" class="close" aria-label="Dismiss" onclick="this.parentElement.remove()">×</button>
+</div>

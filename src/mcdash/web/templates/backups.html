@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import backup_row %}
+{% block title %}Backups{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>Backups</h1>
+  <input type="search" id="filter" placeholder="Filter worlds…" aria-label="Filter worlds" data-filter=".bgroup">
+</div>
+<p class="muted small">Every launchable zip: <span class="badge tier-archive">archive</span> precious originals (read-only),
+  <span class="badge tier-backup">backup</span> promoted saves, <span class="badge tier-snapshot">snapshot</span> rolling saves of running worlds.</p>
+{% for world, items in groups %}
+<section class="bgroup" data-name="{{ world }}">
+  <h2 id="w-{{ world }}">{{ world }} <small class="muted">{{ items|length }}</small></h2>
+  <table class="cards backups">
+    <thead><tr><th>Date</th><th>Tier</th><th>Label</th><th>Version</th><th class="num">Size</th><th></th></tr></thead>
+    <tbody>
+    {% for b in items %}{{ backup_row(b, '/backups') }}{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% else %}
+<div class="empty"><p>No backups found. Check the archive and store mounts.</p></div>
+{% endfor %}
+{% endblock %}

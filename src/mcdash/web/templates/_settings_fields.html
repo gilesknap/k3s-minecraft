@@ -1,0 +1,32 @@
+  <label>Server type
+    <select name="server_type">
+      {% for t in ServerType %}<option value="{{ t.value }}" {% if settings.server_type == t %}selected{% endif %}>{{ t.value|title }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Version
+    <input name="version" value="{{ settings.version }}" required placeholder="LATEST or 1.16.5">
+  </label>
+  <label>Memory
+    <input name="memory" value="{{ settings.memory }}" required pattern="\d+(\.\d+)?(Mi|Gi)" placeholder="4Gi">
+  </label>
+  <label>Gamemode
+    <select name="gamemode">
+      {% for g in GAMEMODES %}<option {% if settings.gamemode == g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Difficulty
+    <select name="difficulty">
+      {% for d in DIFFICULTIES %}<option {% if settings.difficulty == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Max world size
+    <input name="max_world_size" type="number" min="1" max="29999984" value="{{ settings.max_world_size }}">
+  </label>
+  <label class="span2">MOTD
+    <input name="motd" value="{{ settings.motd }}" maxlength="120" placeholder="Shown in the server list">
+  </label>
+  <div class="span2 checks">
+    <label class="check"><input type="checkbox" name="force_gamemode" {% if settings.force_gamemode %}checked{% endif %}> Force gamemode</label>
+    <label class="check"><input type="checkbox" name="pvp" {% if settings.pvp %}checked{% endif %}> PvP</label>
+    <label class="check"><input type="checkbox" name="enable_command_block" {% if settings.enable_command_block %}checked{% endif %}> Command blocks</label>
+  </div>

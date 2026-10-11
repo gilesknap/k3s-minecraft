@@ -1,0 +1,42 @@
+{% from "_macros.html" import state_badge, copy_addr, version %}
+{% if worlds %}
+<table class="cards worlds">
+  <thead><tr>
+    <th>World</th><th>State</th><th>Connect</th><th>Version</th><th>Players</th>
+    <th>Uptime</th><th>CPU / mem</th><th>Last snapshot</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for w in worlds|sort(attribute='name') %}
+  <tr>
+    <td data-label="World" class="title"><a href="/worlds/{{ w.name }}"><strong>{{ w.name }}</strong></a></td>
+    <td data-label="State">{{ state_badge(w) }}{% if w.message %}<div class="small {{ 'err' if w.state == WorldState.FAILED else 'muted' }} msg">{{ w.message }}</div>{% endif %}</td>
+    <td data-label="Connect">{{ copy_addr(w.connect_address) }}</td>
+    <td data-label="Version">{{ version(w.settings) }}</td>
+    <td data-label="Players">
+      {%- if w.players_online is none %}<span class="muted">—</span>
+      {%- else %}<span title="{{ w.players_online|join(', ') }}">{{ w.players_online|length }}</span>{% if w.players_online %} <small class="muted">{{ w.players_online|join(', ') }}</small>{% endif %}{% endif -%}
+    </td>
+    <td data-label="Uptime">{{ w.uptime_seconds|duration }}</td>
+    <td data-label="CPU / mem">{% if w.cpu_millicores is none and w.memory_bytes is none %}<span class="muted">—</span>{% else %}{{ w.cpu_millicores|cpu }} · {{ w.memory_bytes|humansize }}{% endif %}</td>
+    <td data-label="Last snapshot"><span title="{{ w.last_snapshot|fmtdate }}">{{ w.last_snapshot|ago }}</span></td>
+    <td class="actions">
+      {% set busy = w.state in (WorldState.SEEDING, WorldState.SNAPSHOTTING) %}
+      {% if w.state in (WorldState.STOPPED, WorldState.FAILED) %}
+      <form method="post" action="/worlds/{{ w.name }}/start" hx-post="/worlds/{{ w.name }}/start" hx-target="#worlds"><button class="btn primary" {% if busy %}disabled{% endif %}>Start</button></form>
+      {% endif %}
+      {% if w.state in (WorldState.RUNNING, WorldState.STARTING, WorldState.FAILED) %}
+      <form method="post" action="/worlds/{{ w.name }}/stop" hx-post="/worlds/{{ w.name }}/stop" hx-target="#worlds"><button class="btn">Stop</button></form>
+      {% endif %}
+      <form method="post" action="/worlds/{{ w.name }}/snapshot" hx-post="/worlds/{{ w.name }}/snapshot" hx-target="#worlds"><button class="btn" {% if busy %}disabled{% endif %}>Snapshot now</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">
+  <p>No worlds yet.</p>
+  <p><a class="btn primary" href="/backups">Pick a backup to launch</a></p>
+</div>
+{% endif %}
+{% include "_oob_flash.html" %}

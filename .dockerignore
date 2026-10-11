@@ -1,0 +1,16 @@
+# Allowlist: only what the image build needs reaches the build context.
+# backups/ (multi-GB, precious) must NEVER be sent to the daemon.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+
+# Belt and braces: explicit excludes, even inside allowed paths.
+backups/
+.git/
+.venv/
+**/__pycache__/
+**/*.pyc
+legacy/
+tests/

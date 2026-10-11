@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="htmx-config" content='{"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true}]}'>
+  <title>{% block title %}Minecraft{% endblock %} · mcdash</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%235a8f3c'/><rect y='10' width='16' height='6' fill='%23866043'/></svg>">
+  <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">⛏ mcdash</a>
+    <nav>
+      {% set path = request.url.path %}
+      <a href="/" {% if path == '/' or path.startswith('/worlds') %}aria-current="page"{% endif %}>Worlds</a>
+      <a href="/backups" {% if path.startswith('/backups') or path.startswith('/launch') %}aria-current="page"{% endif %}>Backups</a>
+      <a href="/roster" {% if path.startswith('/roster') %}aria-current="page"{% endif %}>Roster</a>
+    </nav>
+    <span class="actor" title="Signed in as">{{ actor }}</span>
+  </header>
+  <main>
+    <div id="flash" aria-live="polite">{% if msg %}{% with level='ok', text=msg %}{% include "_alert.html" %}{% endwith %}{% endif %}</div>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

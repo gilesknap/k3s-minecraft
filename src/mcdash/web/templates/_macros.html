@@ -1,0 +1,89 @@
+{% macro state_badge(world) -%}
+<span class="badge state-{{ world.state.value }}"{% if world.message %} title="{{ world.message }}"{% endif %}>
+  {%- if world.state in (WorldState.SEEDING, WorldState.STARTING, WorldState.SNAPSHOTTING) %}<span class="spin" aria-hidden="true"></span>{% endif -%}
+  {{ world.state.value }}</span>
+{%- endmacro %}
+
+{% macro tier_badge(b) -%}
+<span class="badge tier-{{ b.tier.value }}">{{ b.tier.value }}</span>
+{%- endmacro %}
+
+{% macro copy_addr(addr) -%}
+<span class="addr"><code>{{ addr }}</code><button type="button" class="icon" data-copy="{{ addr }}" title="Copy address" aria-label="Copy {{ addr }}">⧉</button></span>
+{%- endmacro %}
+
+{% macro version(s_or_b, is_backup=false) -%}
+{% if is_backup %}{{ s_or_b.mc_version or '?' }} <small class="muted">{{ s_or_b.server_type.value|lower }}</small>
+{%- else %}{{ s_or_b.version }} <small class="muted">{{ s_or_b.server_type.value|lower }}</small>{% endif %}
+{%- endmacro %}
+
+{# One backup row with its actions. back = page to return to after an action. #}
+{% macro backup_row(b, back, show_world=false) -%}
+<tr>
+  <td data-label="Date" title="{{ b.id }}">{{ b.timestamp|fmtdate }}</td>
+  <td data-label="Tier">{{ tier_badge(b) }}</td>
+  <td data-label="Label" class="wrap">
+    {% if b.label %}<strong>{{ b.label }}</strong>{% endif %}
+    {% if b.description %}<div class="muted small">{{ b.description }}</div>{% endif %}
+    {% if not b.label and not b.description %}<span class="muted small">{{ b.id.split('/')[-1] }}</span>{% endif %}
+  </td>
+  <td data-label="Version">{{ version(b, true) }}</td>
+  <td data-label="Size" class="num">{{ b.size_bytes|humansize }}</td>
+  <td data-label="" class="actions">
+    <a class="btn primary" href="/launch?backup={{ b.id|urlencode }}">Launch</a>
+    {% if b.tier != Tier.SNAPSHOT %}
+    <details class="pop">
+      <summary class="btn">Edit label</summary>
+      <form class="stack" method="post" action="/backups/label" hx-post="/backups/label">
+        <input type="hidden" name="backup_id" value="{{ b.id }}">
+        <input type="hidden" name="back" value="{{ back }}">
+        <label>Label <input name="label" value="{{ b.label }}" maxlength="80"></label>
+        <label>Description <textarea name="description" rows="2">{{ b.description }}</textarea></label>
+        <button class="btn primary">Save</button>
+      </form>
+    </details>
+    {% else %}
+    <details class="pop">
+      <summary class="btn">Promote</summary>
+      <form class="stack" method="post" action="/backups/promote" hx-post="/backups/promote">
+        <input type="hidden" name="backup_id" value="{{ b.id }}">
+        <input type="hidden" name="back" value="{{ back }}">
+        <p class="small muted">Copies this snapshot into Backups, where it is never pruned.</p>
+        <label>Name <input name="label" required maxlength="80" placeholder="e.g. {{ b.world_name }}-castle-done"></label>
+        <label>Description <textarea name="description" rows="2"></textarea></label>
+        <button class="btn primary">Promote</button>
+      </form>
+    </details>
+    {% endif %}
+    {% if b.tier != Tier.ARCHIVE %}
+    <details class="pop">
+      <summary class="btn danger">Delete</summary>
+      <form class="stack" method="post" action="/backups/delete" hx-post="/backups/delete">
+        <input type="hidden" name="backup_id" value="{{ b.id }}">
+        <input type="hidden" name="back" value="{{ back }}">
+        <p class="small">Permanently delete this {{ b.tier.value }}? Type <code>{{ b.world_name }}</code> to confirm.</p>
+        <input name="confirm" required autocomplete="off" pattern="{{ b.world_name|e }}" aria-label="Type {{ b.world_name }} to confirm">
+        <button class="btn danger">Delete {{ b.tier.value }}</button>
+      </form>
+    </details>
+    {% endif %}
+  </td>
+</tr>
+{%- endmacro %}
+
+{% macro whitelist_fields(roster, selected) -%}
+<fieldset class="whitelist">
+  <legend>Whitelist</legend>
+  {% set sel = selected|map('lower')|list %}
+  <div class="checks">
+  {% for p in roster %}
+    <label class="check"><input type="checkbox" name="whitelist" value="{{ p.name }}" {% if p.name|lower in sel %}checked{% endif %}> {{ p.name }}{% if p.note %} <small class="muted">{{ p.note }}</small>{% endif %}</label>
+  {% endfor %}
+  {% set roster_names = roster|map(attribute='name')|map('lower')|list %}
+  {% for name in selected if name|lower not in roster_names %}
+    <label class="check"><input type="checkbox" name="whitelist" value="{{ name }}" checked> {{ name }} <small class="muted">not on roster</small></label>
+  {% endfor %}
+  </div>
+  <label>Add others <input name="whitelist_extra" placeholder="names, comma separated" autocomplete="off"></label>
+</fieldset>
+{%- endmacro %}

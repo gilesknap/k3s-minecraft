@@ -1,0 +1,43 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["dockerfile", "github-actions", "pep621", "custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Versions annotated with '# renovate:' comments (helm binary, itzg chart)",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/", "/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?\\s+(?:ARG |ENV )?[A-Z_]+[=:] ?\"?(?<currentValue>[^\"\\s]+)\"?"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "uv version build-arg",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": ["ARG UV_VERSION=(?<currentValue>\\S+)"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "ghcr.io/astral-sh/uv"
+    },
+    {
+      "customType": "regex",
+      "description": "Python base image build-arg",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": ["ARG PYTHON_IMAGE=(?<depName>[^:\\s]+):(?<currentValue>\\S+)"],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Stay on helm v3 (the dashboard drives the helm CLI)",
+      "matchDepNames": ["helm/helm"],
+      "allowedVersions": "<4.0.0"
+    },
+    {
+      "description": "Python minor upgrades of the base image are manual",
+      "matchDepNames": ["python"],
+      "matchUpdateTypes": ["major", "minor"],
+      "enabled": false
+    }
+  ]
+}

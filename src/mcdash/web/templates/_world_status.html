@@ -1,0 +1,27 @@
+{% from "_macros.html" import state_badge, copy_addr, version %}
+<div class="statusline">
+  {{ state_badge(world) }}
+  {{ copy_addr(world.connect_address) }}
+</div>
+{% if world.message %}<p class="{{ 'alert alert-error' if world.state == WorldState.FAILED else 'muted' }} small">{{ world.message }}</p>{% endif %}
+<dl class="facts">
+  <div><dt>Version</dt><dd>{{ version(world.settings) }}</dd></div>
+  <div><dt>Players</dt><dd>{% if world.players_online is none %}—{% else %}{{ world.players_online|length }}{% if world.players_online %}: {{ world.players_online|join(', ') }}{% endif %}{% endif %}</dd></div>
+  <div><dt>Uptime</dt><dd>{{ world.uptime_seconds|duration }}</dd></div>
+  <div><dt>CPU</dt><dd>{{ world.cpu_millicores|cpu }}</dd></div>
+  <div><dt>Memory</dt><dd>{{ world.memory_bytes|humansize }} <small class="muted">/ {{ world.settings.memory }}</small></dd></div>
+  <div><dt>Last snapshot</dt><dd title="{{ world.last_snapshot|fmtdate }}">{{ world.last_snapshot|ago }}</dd></div>
+  <div><dt>Created</dt><dd>{{ world.created|fmtdate }}</dd></div>
+  <div><dt>Source</dt><dd class="small wrap">{{ world.source_backup_id }}</dd></div>
+</dl>
+<div class="actions">
+  {% set busy = world.state in (WorldState.SEEDING, WorldState.SNAPSHOTTING) %}
+  {% if world.state in (WorldState.STOPPED, WorldState.FAILED) %}
+  <form method="post" action="/worlds/{{ world.name }}/start" hx-post="/worlds/{{ world.name }}/start" hx-target="#world-status"><button class="btn primary">Start</button></form>
+  {% endif %}
+  {% if world.state in (WorldState.RUNNING, WorldState.STARTING, WorldState.FAILED) %}
+  <form method="post" action="/worlds/{{ world.name }}/stop" hx-post="/worlds/{{ world.name }}/stop" hx-target="#world-status"><button class="btn" title="Takes a snapshot, then scales to zero. Data and port are kept.">Stop</button></form>
+  {% endif %}
+  <form method="post" action="/worlds/{{ world.name }}/snapshot" hx-post="/worlds/{{ world.name }}/snapshot" hx-target="#world-status"><button class="btn" {% if busy %}disabled{% endif %}>Snapshot now</button></form>
+</div>
+{% include "_oob_flash.html" %}
