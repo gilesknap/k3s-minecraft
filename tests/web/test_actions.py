@@ -244,8 +244,10 @@ def test_delete_snapshot_needs_no_typed_name(
     # the page asks OK/Cancel (hx-confirm); no typed name for snapshots
     html = client.get("/backups").text
     assert 'hx-confirm="Permanently delete this snapshot of' in html
-    r = client.post("/backups/delete", data={"backup_id": SNAP})
-    assert r.status_code == 303
+    # htmx-only form: without JS it must not post a delete
+    assert 'action="/backups/delete" hx-post="/backups/delete" hx-confirm' not in html
+    r = client.post("/backups/delete", data={"backup_id": SNAP, "confirm": "wrong"})
+    assert r.status_code == 303  # any typed value is ignored for snapshots
     assert svc.calls[-1] == ("delete_backup", SNAP, ACTOR)
     assert SNAP not in svc.backups
 

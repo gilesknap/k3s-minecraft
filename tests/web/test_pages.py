@@ -166,6 +166,9 @@ def test_world_page_sections(client: TestClient) -> None:
         "/backups/promote",
     ]:
         assert text.lower() in html.lower(), text
+    # snapshot rows offer the OK/Cancel delete and come back to this page
+    assert 'hx-confirm="Permanently delete this snapshot of' in html
+    assert 'name="back" value="/worlds/noah-james"' in html
     # current whitelist pre-ticked; roster member not on it unticked
     assert 'value="JamesK" checked' in html
     assert 'value="MillieM" >' in html

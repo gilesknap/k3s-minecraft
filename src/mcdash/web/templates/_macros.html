@@ -58,7 +58,9 @@
     </details>
     {% endif %}
     {% if b.tier == Tier.SNAPSHOT %}
-    <form method="post" action="/backups/delete" hx-post="/backups/delete" hx-confirm="Permanently delete this snapshot of {{ b.world_name }} ({{ b.timestamp|fmtdate }})?">
+    {# htmx-only on purpose: with no JS a click is a harmless GET of this page,
+       never an unconfirmed delete #}
+    <form hx-post="/backups/delete" hx-confirm="Permanently delete this snapshot of {{ b.world_name }} ({{ b.timestamp|fmtdate }})?">
       <input type="hidden" name="backup_id" value="{{ b.id }}">
       <input type="hidden" name="back" value="{{ back }}">
       <button class="btn danger">Delete</button>
