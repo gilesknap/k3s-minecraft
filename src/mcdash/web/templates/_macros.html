@@ -57,7 +57,13 @@
       </form>
     </details>
     {% endif %}
-    {% if b.tier != Tier.ARCHIVE %}
+    {% if b.tier == Tier.SNAPSHOT %}
+    <form method="post" action="/backups/delete" hx-post="/backups/delete" hx-confirm="Permanently delete this snapshot of {{ b.world_name }} ({{ b.timestamp|fmtdate }})?">
+      <input type="hidden" name="backup_id" value="{{ b.id }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <button class="btn danger">Delete</button>
+    </form>
+    {% elif b.tier != Tier.ARCHIVE %}
     <details class="pop">
       <summary class="btn danger">Delete</summary>
       <form class="stack" method="post" action="/backups/delete" hx-post="/backups/delete">

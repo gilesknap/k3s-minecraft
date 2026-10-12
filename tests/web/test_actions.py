@@ -238,19 +238,23 @@ def test_back_redirect_is_local_only(client: TestClient) -> None:
     assert r.headers["location"].startswith("/?msg=")
 
 
-def test_delete_snapshot(client: TestClient, svc: FakeDashboardService) -> None:
-    r = client.post("/backups/delete", data={"backup_id": SNAP, "confirm": "nope"})
-    assert r.status_code == 400
-    assert SNAP in svc.backups
-    r = client.post(
-        "/backups/delete", data={"backup_id": SNAP, "confirm": "noah-james"}
-    )
+def test_delete_snapshot_needs_no_typed_name(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    # the page asks OK/Cancel (hx-confirm); no typed name for snapshots
+    html = client.get("/backups").text
+    assert 'hx-confirm="Permanently delete this snapshot of' in html
+    r = client.post("/backups/delete", data={"backup_id": SNAP})
     assert r.status_code == 303
     assert svc.calls[-1] == ("delete_backup", SNAP, ACTOR)
     assert SNAP not in svc.backups
 
 
 def test_delete_backup_tier(client: TestClient, svc: FakeDashboardService) -> None:
+    # promoted backups still need the world name typed
+    r = client.post("/backups/delete", data={"backup_id": BACKUP, "confirm": "nope"})
+    assert r.status_code == 400
+    assert BACKUP in svc.backups
     r = client.post(
         "/backups/delete", data={"backup_id": BACKUP, "confirm": "noah-james"}
     )
