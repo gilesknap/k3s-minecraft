@@ -28,8 +28,9 @@ The worlds this was built for, and the story behind them, are in
   settings.
 - **Monitoring**: state, players online, uptime, CPU and memory, a streamed
   log tail and an RCON console.
-- **Whitelist** editing from a player roster. The whitelist is always
-  enforced and `online-mode` is always on.
+- **Whitelist** editing from a player roster, enforced by default. A world can
+  instead be marked **open to everyone** (no whitelist), which applies live.
+  `online-mode` is always on.
 
 ## Architecture
 

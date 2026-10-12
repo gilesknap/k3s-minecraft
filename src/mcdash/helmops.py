@@ -167,7 +167,9 @@ def render_values(
     }
     if settings.motd:
         ms["motd"] = settings.motd
-    if settings.whitelist:
+    # itzg enables the whitelist whenever WHITELIST is set, so an open world
+    # must not pass the names at all.
+    if settings.whitelist and not settings.open_to_all:
         ms["whitelist"] = ",".join(settings.whitelist)
     if settings.server_type is ServerType.FORGE and forge_version:
         ms["forgeVersion"] = forge_version
@@ -179,11 +181,15 @@ def render_values(
     if level_type:
         ms["levelType"] = level_type
 
+    whitelisted = not settings.open_to_all
     extra_env: dict[str, Any] = {
-        "ENABLE_WHITELIST": "TRUE",
-        "ENFORCE_WHITELIST": "TRUE",
-        # with a list, make whitelist.json match it; else keep the backup's file
-        "EXISTING_WHITELIST_FILE": "SYNCHRONIZE" if settings.whitelist else "SKIP",
+        "ENABLE_WHITELIST": "TRUE" if whitelisted else "FALSE",
+        "ENFORCE_WHITELIST": "TRUE" if whitelisted else "FALSE",
+        # with a list, make whitelist.json match it; else keep the file as is
+        # (the backup's, or the names an open world will need if closed again)
+        "EXISTING_WHITELIST_FILE": (
+            "SYNCHRONIZE" if settings.whitelist and whitelisted else "SKIP"
+        ),
         "OVERRIDE_SERVER_PROPERTIES": "TRUE",
         # not minecraftServer.maxWorldSize: the schema wants an int, which helm
         # renders as 2.9999984e+07 (float64) — pass the env var as a string

@@ -183,3 +183,16 @@ def test_helm_errors(tmp_path: Path) -> None:
     h2 = _fake_helm(tmp_path, 'echo "Error: boom" >&2; exit 1\n')
     with pytest.raises(HelmError, match="boom"):
         h2.list()
+
+
+def test_render_values_open_to_all() -> None:
+    s = WorldSettings(whitelist=["noah", "giles"], open_to_all=True)
+    v = render_values("w", s, 30565, Config())
+    # itzg turns the whitelist on whenever WHITELIST is set
+    assert "whitelist" not in v["minecraftServer"]
+    assert v["extraEnv"]["ENABLE_WHITELIST"] == "FALSE"
+    assert v["extraEnv"]["ENFORCE_WHITELIST"] == "FALSE"
+    assert v["extraEnv"]["EXISTING_WHITELIST_FILE"] == "SKIP"
+    # the names are kept for when the world is closed again
+    assert v["mcdash"]["settings"]["whitelist"] == ["noah", "giles"]
+    assert v["mcdash"]["settings"]["open_to_all"] is True

@@ -141,7 +141,9 @@ def parse_players(selected: list[str], extra: str) -> list[str]:
     return out
 
 
-def settings_from_form(form: FormData, whitelist: list[str]) -> WorldSettings:
+def settings_from_form(
+    form: FormData, whitelist: list[str], open_to_all: bool
+) -> WorldSettings:
     def text(key: str, default: str = "") -> str:
         v = form.get(key)
         return v.strip() if isinstance(v, str) else default
@@ -180,6 +182,7 @@ def settings_from_form(form: FormData, whitelist: list[str]) -> WorldSettings:
         motd=text("motd"),
         max_world_size=max_world_size,
         whitelist=whitelist,
+        open_to_all=open_to_all,
         seed=text("seed"),
         level_type=level_type,
     )
@@ -418,7 +421,10 @@ def create_app(service: DashboardService) -> FastAPI:
     async def world_settings(request: Request, name: str, actor: Actor) -> Response:
         form = await request.form()
         world = service.get_world(name)
-        settings = settings_from_form(form, list(world.settings.whitelist))
+        # access is edited by the whitelist form, not this one
+        settings = settings_from_form(
+            form, list(world.settings.whitelist), world.settings.open_to_all
+        )
         # generation-only: not on this form, keep what the world was made with
         settings.seed = world.settings.seed
         settings.level_type = world.settings.level_type
@@ -429,8 +435,12 @@ def create_app(service: DashboardService) -> FastAPI:
     async def world_whitelist(request: Request, name: str, actor: Actor) -> Response:
         form = await request.form()
         players = whitelist_from_form(form)
-        service.set_whitelist(name, players, actor)
-        return done(request, f"/worlds/{name}", f"Whitelist: {len(players)} players")
+        open_to_all = "open_to_all" in form
+        service.set_whitelist(name, players, actor, open_to_all=open_to_all)
+        msg = (
+            "Open to everyone" if open_to_all else f"Whitelist: {len(players)} players"
+        )
+        return done(request, f"/worlds/{name}", msg)
 
     @app.post("/worlds/{name}/rcon", response_class=HTMLResponse)
     def world_rcon(
@@ -591,7 +601,9 @@ def create_app(service: DashboardService) -> FastAPI:
         name = str(form.get("name") or "").strip()
         if not name:
             raise MCDashError("A world name is required")
-        settings = settings_from_form(form, whitelist_from_form(form))
+        settings = settings_from_form(
+            form, whitelist_from_form(form), "open_to_all" in form
+        )
         world: World = service.launch(backup_id, name, settings, actor)
         return done(request, f"/worlds/{world.name}", f"Launching {world.name}")
 
@@ -614,7 +626,9 @@ def create_app(service: DashboardService) -> FastAPI:
         name = str(form.get("name") or "").strip()
         if not name:
             raise MCDashError("A world name is required")
-        settings = settings_from_form(form, whitelist_from_form(form))
+        settings = settings_from_form(
+            form, whitelist_from_form(form), "open_to_all" in form
+        )
         world: World = service.create_world(name, settings, actor)
         return done(request, f"/worlds/{world.name}", f"Creating {world.name}")
 

@@ -88,6 +88,7 @@ td.actions > * + * { margin-left: .3rem; }
 .state-stopped { color: var(--s-stop); }
 .state-failed { color: var(--s-fail); }
 .state-running::before { content: ""; width: .5em; height: .5em; border-radius: 50%; background: currentColor; }
+.badge.open { color: var(--s-fail); }
 .tier-archive { color: var(--t-archive); }
 .tier-backup { color: var(--t-backup); }
 .tier-snapshot { color: var(--t-snapshot); }

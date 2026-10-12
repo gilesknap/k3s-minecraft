@@ -33,7 +33,7 @@
 <section class="card">
   <h2>Whitelist</h2>
   <form method="post" action="/worlds/{{ world.name }}/whitelist" hx-post="/worlds/{{ world.name }}/whitelist">
-    {{ whitelist_fields(roster, world.settings.whitelist) }}
+    {{ whitelist_fields(roster, world.settings.whitelist, world.settings.open_to_all) }}
     <p><button class="btn primary">Save whitelist</button> <small class="muted">Applied live via RCON and kept across restarts.</small></p>
   </form>
 </section>

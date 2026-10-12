@@ -193,8 +193,8 @@ def test_whitelist_live_without_restart(svc: KubeDashboardService) -> None:
     _, helm, rcon = parts(svc)
     name = launch_running(svc)
     upgrades = len(helm.calls)
-    svc.set_whitelist(name, ["noah", "giles"], ME)
-    svc.set_whitelist(name, ["giles", "millie"], ME)
+    svc.set_whitelist(name, ["noah", "giles"], ME, open_to_all=False)
+    svc.set_whitelist(name, ["giles", "millie"], ME, open_to_all=False)
     cmds = [c for _, c in rcon.log if c.startswith("whitelist")]
     assert cmds == [
         "whitelist add noah",
@@ -205,7 +205,7 @@ def test_whitelist_live_without_restart(svc: KubeDashboardService) -> None:
     assert len(helm.calls) == upgrades  # no pod restart
     assert svc.get_world(name).settings.whitelist == ["giles", "millie"]
     with pytest.raises(MCDashError):
-        svc.set_whitelist(name, ["bad name!"], ME)
+        svc.set_whitelist(name, ["bad name!"], ME, open_to_all=False)
     # persisted into release values at the next start
     svc.stop(name, ME)
     complete(svc, "snapshot")
@@ -230,10 +230,33 @@ def test_update_settings(svc: KubeDashboardService) -> None:
         svc.update_settings(name, s, ME)
 
 
+def test_open_to_all_live_and_persisted(svc: KubeDashboardService) -> None:
+    _, helm, rcon = parts(svc)
+    name = launch_running(svc)
+    upgrades = len(helm.calls)
+    svc.set_whitelist(name, ["noah"], ME, open_to_all=False)
+    svc.set_whitelist(name, ["noah"], ME, open_to_all=True)
+    svc.set_whitelist(name, ["noah"], ME, open_to_all=True)  # no change, no command
+    cmds = [c for _, c in rcon.log if c.startswith("whitelist")]
+    assert cmds == ["whitelist add noah", "whitelist off"]
+    assert len(helm.calls) == upgrades  # no pod restart
+    w = svc.get_world(name)
+    assert w.settings.open_to_all is True and w.settings.whitelist == ["noah"]
+    svc.stop(name, ME)
+    complete(svc, "snapshot")
+    svc.start(name, ME)
+    values = helm.releases[name]
+    assert "whitelist" not in values["minecraftServer"]
+    assert values["extraEnv"]["ENABLE_WHITELIST"] == "FALSE"
+    # closing it again turns the whitelist back on live
+    svc.set_whitelist(name, ["noah"], ME, open_to_all=False)
+    assert [c for _, c in rcon.log if c.startswith("whitelist")][-1] == "whitelist on"
+
+
 def test_restore(svc: KubeDashboardService) -> None:
     kube, helm, _ = parts(svc)
     name = launch_running(svc)
-    svc.set_whitelist(name, ["noah"], ME)
+    svc.set_whitelist(name, ["noah"], ME, open_to_all=False)
     snap = make_world_zip(svc.cfg.snapshots_dir / name / "20250101T000000Z.zip")
     assert snap.exists()
     sid = f"snapshot/{name}/20250101T000000Z.zip"

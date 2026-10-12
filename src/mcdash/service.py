@@ -715,18 +715,23 @@ class KubeDashboardService:
                 self._install(name, spec, replicas=self._replicas(values))
             self.store.audit(actor, "update_settings", name, settings=spec["settings"])
 
-    def set_whitelist(self, name: str, players: list[str], actor: str) -> None:
+    def set_whitelist(
+        self, name: str, players: list[str], actor: str, *, open_to_all: bool
+    ) -> None:
         players = list(dict.fromkeys(p.strip() for p in players if p.strip()))
         with self._lock:
             spec, op, values = self._load(name)
             settings = settings_from_json(spec.get("settings"))
-            old = settings.whitelist
+            old, was_open = settings.whitelist, settings.open_to_all
             settings.whitelist = players
+            settings.open_to_all = open_to_all
             self._check_settings(settings)
             pods = self.kube.list_server_pods(name) if values else []
             if self._replicas(values) and any(p.ready for p in pods):
                 cmds = [f"whitelist add {p}" for p in players if p not in old]
                 cmds += [f"whitelist remove {p}" for p in old if p not in players]
+                if open_to_all != was_open:
+                    cmds.append("whitelist off" if open_to_all else "whitelist on")
                 if cmds:
                     self._rcon_cmds(name, cmds)
             # Persisted in the world record; rendered into WHITELIST at the next
@@ -734,7 +739,9 @@ class KubeDashboardService:
             # are already in whitelist.json on the world volume.
             spec["settings"] = settings_to_json(settings)
             self._save(name, spec, op)
-            self.store.audit(actor, "set_whitelist", name, players=players)
+            self.store.audit(
+                actor, "set_whitelist", name, players=players, open_to_all=open_to_all
+            )
 
     # ================================================================ live
     def rcon(self, name: str, command: str, actor: str) -> str:

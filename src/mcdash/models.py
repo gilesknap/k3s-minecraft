@@ -78,6 +78,9 @@ class WorldSettings:
     motd: str = ""
     max_world_size: int = 29999984
     whitelist: list[str] = field(default_factory=list)
+    # No whitelist: any genuine (online-mode) account may join. The names above
+    # are kept, so closing the world again restores them.
+    open_to_all: bool = False
     seed: str = ""  # blank = random
     level_type: str = "normal"
 
@@ -162,7 +165,9 @@ class DashboardService(Protocol):
     def update_settings(
         self, name: str, settings: WorldSettings, actor: str
     ) -> None: ...
-    def set_whitelist(self, name: str, players: list[str], actor: str) -> None: ...
+    def set_whitelist(
+        self, name: str, players: list[str], actor: str, *, open_to_all: bool
+    ) -> None: ...
 
     # live
     def rcon(self, name: str, command: str, actor: str) -> str: ...
