@@ -152,10 +152,19 @@ a name and description.
 
 - `online-mode=true`, `EULA=true` (set by the dashboard; using it accepts the
   Mojang EULA).
-- **Whitelist enforced** (`ENFORCE_WHITELIST=true`). The dashboard keeps a
-  **player roster**; each world's whitelist is chosen from the roster plus
-  free-text. Edits apply live via RCON `whitelist add/remove` and persist into
-  the release values (`WHITELIST` env) so they survive restart.
+- **Whitelist enforced** (`ENFORCE_WHITELIST=true`) by default. The dashboard
+  keeps a **player roster**; each world's whitelist is chosen from the roster
+  plus free-text. Edits apply live via RCON `whitelist add/remove` and persist
+  into the release values (`WHITELIST` env) so they survive restart.
+- **Open to everyone** (`open_to_all`, per world): no whitelist, so any genuine
+  Minecraft account that knows the address can join. Applied live with RCON
+  `whitelist off`/`on`. An open world's release sets `ENABLE_WHITELIST` and
+  `ENFORCE_WHITELIST` false and omits `WHITELIST` (itzg turns the whitelist on
+  whenever it is set). The names stay in the settings, and closing the world
+  re-adds all of them via RCON before `whitelist on`, so they are restored
+  even if the world started open. Changing the mode while the server is still
+  starting is refused (the pod would come up with the old mode). Worlds are flagged "open to everyone" in
+  the UI.
 - Ops come from the backup.
 
 ## Dashboard access

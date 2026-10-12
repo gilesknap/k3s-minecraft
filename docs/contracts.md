@@ -55,7 +55,8 @@ in their report.
 - Secret `<w>-rcon` — key `rcon-password`, random.
 - Helm release `<w>` of the vendored itzg chart: `persistence.dataDir.existingClaim=<w>-data`,
   NodePort game service on the allocated port, RCON ClusterIP, nodeSelector,
-  `ENFORCE_WHITELIST`, `online-mode` true, `EULA=TRUE`. Dashboard metadata lives in
+  `ENFORCE_WHITELIST` (false, with no `WHITELIST`, for an `open_to_all` world),
+  `online-mode` true, `EULA=TRUE`. Dashboard metadata lives in
   the release values under the top-level key `mcdash:` (`port`, `sourceBackup`,
   `created`, `settings`) — read back with `helm get values`. Helm releases are
   the source of truth for which worlds exist. `settings.seed` →

@@ -4,6 +4,10 @@
   {{ world.state.value }}</span>
 {%- endmacro %}
 
+{% macro open_badge(world) -%}
+{%- if world.settings.open_to_all %} <span class="badge open" title="No whitelist: any Minecraft account can join">open to everyone</span>{% endif -%}
+{%- endmacro %}
+
 {% macro tier_badge(b) -%}
 <span class="badge tier-{{ b.tier.value }}">{{ b.tier.value }}</span>
 {%- endmacro %}
@@ -81,9 +85,10 @@
 </tr>
 {%- endmacro %}
 
-{% macro whitelist_fields(roster, selected) -%}
+{% macro whitelist_fields(roster, selected, open_to_all=false) -%}
 <fieldset class="whitelist">
   <legend>Whitelist</legend>
+  <label class="check"><input type="checkbox" name="open_to_all" {% if open_to_all %}checked{% endif %}> <strong>Open to everyone</strong> <small class="muted">no whitelist: any Minecraft account that knows the address can join. The names below are kept for when you close it again.</small></label>
   {% set sel = selected|map('lower')|list %}
   <div class="checks">
   {% for p in roster %}

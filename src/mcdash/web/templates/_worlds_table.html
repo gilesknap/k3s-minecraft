@@ -1,4 +1,4 @@
-{% from "_macros.html" import state_badge, copy_addr, version %}
+{% from "_macros.html" import state_badge, open_badge, copy_addr, version %}
 {% if worlds %}
 <table class="cards worlds">
   <thead><tr>
@@ -8,7 +8,7 @@
   <tbody>
   {% for w in worlds|sort(attribute='name') %}
   <tr>
-    <td data-label="World" class="title"><a href="/worlds/{{ w.name }}"><strong>{{ w.name }}</strong></a></td>
+    <td data-label="World" class="title"><a href="/worlds/{{ w.name }}"><strong>{{ w.name }}</strong></a>{{ open_badge(w) }}</td>
     <td data-label="State">{{ state_badge(w) }}{% if w.message %}<div class="small {{ 'err' if w.state == WorldState.FAILED else 'muted' }} msg">{{ w.message }}</div>{% endif %}</td>
     <td data-label="Connect">{{ copy_addr(w.connect_address) }}</td>
     <td data-label="Version">{{ version(w.settings) }}</td>

@@ -1,6 +1,6 @@
-{% from "_macros.html" import state_badge, copy_addr, version %}
+{% from "_macros.html" import state_badge, open_badge, copy_addr, version %}
 <div class="statusline">
-  {{ state_badge(world) }}
+  {{ state_badge(world) }}{{ open_badge(world) }}
   {{ copy_addr(world.connect_address) }}
 </div>
 {% if world.message %}<p class="{{ 'alert alert-error' if world.state == WorldState.FAILED else 'muted' }} small">{{ world.message }}</p>{% endif %}

@@ -98,6 +98,7 @@ def test_update_settings_keeps_whitelist(
     assert settings.max_world_size == 5000
     assert settings.motd == "hi"
     assert settings.whitelist == ["NoahK", "JamesK", "GilesDad"]
+    assert settings.open_to_all is False
 
 
 def test_settings_validation(client: TestClient, svc: FakeDashboardService) -> None:
@@ -122,7 +123,24 @@ def test_set_whitelist(client: TestClient, svc: FakeDashboardService) -> None:
         "noah-james",
         ["NoahK", "MillieM", "Steve", "alex"],
         ACTOR,
+        False,
     )
+
+
+def test_open_to_everyone(client: TestClient, svc: FakeDashboardService) -> None:
+    r = client.post(
+        "/worlds/noah-james/whitelist",
+        data={"whitelist": ["NoahK"], "open_to_all": "on"},
+    )
+    assert r.status_code == 303
+    assert svc.calls[-1] == ("set_whitelist", "noah-james", ["NoahK"], ACTOR, True)
+    html = client.get("/worlds/noah-james").text
+    assert 'name="open_to_all" checked' in html
+    assert "open to everyone</span>" in html
+    assert "open to everyone</span>" in client.get("/").text
+    # the settings form leaves access alone
+    client.post("/worlds/noah-james/settings", data={"memory": "4Gi"})
+    assert svc.calls[-1][2].open_to_all is True
 
 
 def test_whitelist_rejects_bad_name(
@@ -183,7 +201,13 @@ def test_launch(client: TestClient, svc: FakeDashboardService) -> None:
         ACTOR,
     )
     assert settings.whitelist == ["NoahK", "JamesK", "Cousin_Ed"]
+    assert settings.open_to_all is False
     assert settings.force_gamemode and settings.enable_command_block
+    r = client.post(
+        "/launch", data={**form, "name": "noah-james-3", "open_to_all": "on"}
+    )
+    assert r.status_code == 303, r.text
+    assert svc.calls[-1][3].open_to_all is True
     assert not settings.pvp
     assert settings.difficulty == "normal"
     assert client.get("/worlds/noah-james-2").status_code == 200

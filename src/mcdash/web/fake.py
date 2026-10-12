@@ -286,9 +286,13 @@ class FakeDashboardService:
         self._record("update_settings", name, settings, actor)
         self._world(name).settings = settings
 
-    def set_whitelist(self, name: str, players: list[str], actor: str) -> None:
-        self._record("set_whitelist", name, players, actor)
-        self._world(name).settings.whitelist = list(players)
+    def set_whitelist(
+        self, name: str, players: list[str], actor: str, *, open_to_all: bool
+    ) -> None:
+        self._record("set_whitelist", name, players, actor, open_to_all)
+        settings = self._world(name).settings
+        settings.whitelist = list(players)
+        settings.open_to_all = open_to_all
 
     # -- live --------------------------------------------------------------
     def rcon(self, name: str, command: str, actor: str) -> str:
