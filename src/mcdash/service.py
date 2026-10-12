@@ -727,8 +727,20 @@ class KubeDashboardService:
             settings.open_to_all = open_to_all
             self._check_settings(settings)
             pods = self.kube.list_server_pods(name) if values else []
-            if self._replicas(values) and any(p.ready for p in pods):
-                cmds = [f"whitelist add {p}" for p in players if p not in old]
+            live = any(p.ready for p in pods)
+            if self._replicas(values) and not live and open_to_all != was_open:
+                # The pod would come up with the access mode of the last install
+                # while the record says otherwise.
+                raise Conflict(
+                    f"{name} is starting; change who can join once it is running"
+                )
+            if self._replicas(values) and live:
+                # While a world was open its whitelist.json was never synced, so
+                # closing it must (re)add every name, not just the new ones.
+                closing = was_open and not open_to_all
+                cmds = [
+                    f"whitelist add {p}" for p in players if closing or p not in old
+                ]
                 cmds += [f"whitelist remove {p}" for p in old if p not in players]
                 if open_to_all != was_open:
                     cmds.append("whitelist off" if open_to_all else "whitelist on")

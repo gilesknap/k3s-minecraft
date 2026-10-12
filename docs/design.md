@@ -160,8 +160,10 @@ a name and description.
   Minecraft account that knows the address can join. Applied live with RCON
   `whitelist off`/`on`. An open world's release sets `ENABLE_WHITELIST` and
   `ENFORCE_WHITELIST` false and omits `WHITELIST` (itzg turns the whitelist on
-  whenever it is set); the names stay in the settings and in `whitelist.json`,
-  so closing the world restores them. Worlds are flagged "open to everyone" in
+  whenever it is set). The names stay in the settings, and closing the world
+  re-adds all of them via RCON before `whitelist on`, so they are restored
+  even if the world started open. Changing the mode while the server is still
+  starting is refused (the pod would come up with the old mode). Worlds are flagged "open to everyone" in
   the UI.
 - Ops come from the backup.
 

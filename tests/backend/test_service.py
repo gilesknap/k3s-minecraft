@@ -253,6 +253,35 @@ def test_open_to_all_live_and_persisted(svc: KubeDashboardService) -> None:
     assert [c for _, c in rcon.log if c.startswith("whitelist")][-1] == "whitelist on"
 
 
+def test_closing_a_world_that_started_open_readds_every_name(
+    svc: KubeDashboardService,
+) -> None:
+    _, helm, rcon = parts(svc)
+    name, settings = svc.launch_defaults(KING)
+    settings.whitelist = ["noah", "giles"]
+    settings.open_to_all = True
+    svc.launch(KING, name, settings, ME)
+    complete(svc, "seed")
+    assert "whitelist" not in helm.releases[name]["minecraftServer"]
+    # the names were never put on the server, so closing must add all of them
+    svc.set_whitelist(name, ["noah", "giles"], ME, open_to_all=False)
+    cmds = [c for _, c in rcon.log if c.startswith("whitelist")]
+    assert cmds == ["whitelist add noah", "whitelist add giles", "whitelist on"]
+
+
+def test_access_change_refused_while_starting(svc: KubeDashboardService) -> None:
+    kube, _, rcon = parts(svc)
+    name = launch_running(svc)
+    kube.pods[name] = [PodInfo(name="p", phase="Pending", ready=False)]
+    with pytest.raises(Conflict):
+        svc.set_whitelist(name, [], ME, open_to_all=True)
+    assert svc.get_world(name).settings.open_to_all is False
+    # a names-only edit is still saved for the next start, as before
+    svc.set_whitelist(name, ["noah"], ME, open_to_all=False)
+    assert svc.get_world(name).settings.whitelist == ["noah"]
+    assert not [c for _, c in rcon.log if c.startswith("whitelist")]
+
+
 def test_restore(svc: KubeDashboardService) -> None:
     kube, helm, _ = parts(svc)
     name = launch_running(svc)

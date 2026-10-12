@@ -196,3 +196,5 @@ def test_render_values_open_to_all() -> None:
     # the names are kept for when the world is closed again
     assert v["mcdash"]["settings"]["whitelist"] == ["noah", "giles"]
     assert v["mcdash"]["settings"]["open_to_all"] is True
+    # a hand-edited string in the stored record is not truthy
+    assert settings_from_json({"open_to_all": "false"}).open_to_all is False

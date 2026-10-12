@@ -203,6 +203,11 @@ def test_launch(client: TestClient, svc: FakeDashboardService) -> None:
     assert settings.whitelist == ["NoahK", "JamesK", "Cousin_Ed"]
     assert settings.open_to_all is False
     assert settings.force_gamemode and settings.enable_command_block
+    r = client.post(
+        "/launch", data={**form, "name": "noah-james-3", "open_to_all": "on"}
+    )
+    assert r.status_code == 303, r.text
+    assert svc.calls[-1][3].open_to_all is True
     assert not settings.pvp
     assert settings.difficulty == "normal"
     assert client.get("/worlds/noah-james-2").status_code == 200

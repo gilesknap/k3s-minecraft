@@ -126,6 +126,8 @@ def settings_from_json(d: dict[str, Any] | None) -> WorldSettings:
             kw["server_type"] = ServerType.VANILLA
     if "whitelist" in kw:
         kw["whitelist"] = [str(x) for x in kw["whitelist"] or []]
+    if "open_to_all" in kw:
+        kw["open_to_all"] = kw["open_to_all"] is True
     return WorldSettings(**kw)
 
 
