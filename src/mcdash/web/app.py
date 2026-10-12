@@ -566,7 +566,10 @@ def create_app(service: DashboardService) -> FastAPI:
         b = service.get_backup(backup_id)
         if b.tier is Tier.ARCHIVE:
             raise Forbidden("Archive backups are read-only and cannot be deleted")
-        check_confirm(confirm, b.world_name)
+        # Snapshots are rolling and plentiful: an OK/Cancel dialog in the page is
+        # enough. Promoted backups are curated, so they keep the typed name.
+        if b.tier is not Tier.SNAPSHOT:
+            check_confirm(confirm, b.world_name)
         service.delete_backup(backup_id, actor)
         return done(request, _local(back), f"Deleted {backup_id}")
 
