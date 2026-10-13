@@ -14,6 +14,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/">⛏ mcdash</a>
+    <span class="version" title="Dashboard release">{{ version }}</span>
     <nav>
       {% set path = request.url.path %}
       <a href="/" {% if path == '/' or path.startswith('/worlds') or path == '/new' %}aria-current="page"{% endif %}>Worlds</a>

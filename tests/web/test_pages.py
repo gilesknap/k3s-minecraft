@@ -349,3 +349,15 @@ def test_launch_form_server_properties(client: TestClient) -> None:
     # Forge 1.16.5 has no simulation-distance / pause-when-empty-seconds
     assert re.search(r'name="simulation_distance"[^>]*value=""', html)
     assert 'name="hardcore"' not in html
+
+
+@pytest.mark.parametrize("env, shown", [("0.4.1", "0.4.1"), ("", "dev")])
+def test_version_shown_in_header(
+    svc: FakeDashboardService, monkeypatch: pytest.MonkeyPatch, env: str, shown: str
+) -> None:
+    monkeypatch.setenv("MCD_VERSION", env)
+    c = TestClient(create_app(svc))
+    for url in ("/", "/backups", "/worlds/noah-james"):
+        assert f'<span class="version" title="Dashboard release">{shown}</span>' in (
+            c.get(url).text
+        )

@@ -33,6 +33,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import FormData
 
+from mcdash.config import app_version
 from mcdash.models import (
     LEVEL_TYPES,
     SETTING_RANGES,
@@ -329,6 +330,7 @@ def create_app(service: DashboardService) -> FastAPI:
         SETTING_RANGES=SETTING_RANGES,
         ServerType=ServerType,
         default_dir=default_dir,
+        version=app_version(),
     )
 
     def render(
