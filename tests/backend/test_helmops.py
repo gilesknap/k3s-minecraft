@@ -18,7 +18,13 @@ from mcdash.helmops import (
     settings_to_json,
     startup_rcon_commands,
 )
-from mcdash.models import MCDashError, NotFound, ServerType, WorldSettings
+from mcdash.models import (
+    MCDashError,
+    NotFound,
+    ServerType,
+    WorldSettings,
+    normalize_gamemode,
+)
 
 
 @pytest.mark.parametrize(
@@ -232,6 +238,21 @@ def test_render_values_open_to_all() -> None:
 def test_startup_rcon_commands(gamemode: str, version: str, want: list[str]) -> None:
     s = WorldSettings(gamemode=gamemode, version=version)
     assert startup_rcon_commands(s) == want
+
+
+@pytest.mark.parametrize("gamemode", ["adventure", "Adventure ", "2", "a", "A"])
+def test_startup_rcon_commands_gamemode_aliases(gamemode: str) -> None:
+    # itzg/server.properties spellings of adventure all trigger the forceload
+    assert startup_rcon_commands(WorldSettings(gamemode=gamemode)) == [
+        "forceload add ~ ~"
+    ]
+
+
+def test_normalize_gamemode() -> None:
+    assert normalize_gamemode(" 2 ") == "adventure"
+    assert normalize_gamemode("sp") == "spectator"
+    assert normalize_gamemode("creative") == "creative"
+    assert normalize_gamemode("weird") == "weird"
 
 
 def test_render_values_forceload_spawn() -> None:

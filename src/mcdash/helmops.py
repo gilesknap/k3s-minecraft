@@ -17,7 +17,13 @@ from pathlib import Path
 from typing import Any
 
 from mcdash.config import Config
-from mcdash.models import MCDashError, NotFound, ServerType, WorldSettings
+from mcdash.models import (
+    MCDashError,
+    NotFound,
+    ServerType,
+    WorldSettings,
+    normalize_gamemode,
+)
 
 VERIFIED_CHART_VERSION = "5.2.0"
 RCON_PORT = 25575
@@ -99,7 +105,8 @@ FORCELOAD_SPAWN_CMD = "forceload add ~ ~"
 def startup_rcon_commands(settings: WorldSettings) -> list[str]:
     """RCON commands itzg runs once the server is up (``RCON_CMDS_STARTUP``).
 
-    Adventure worlds force-load the spawn chunk. On 26.x a dedicated server
+    Adventure worlds force-load the spawn chunk. On 26.3 (seen and verified in
+    its code; later 26.x assumed) a dedicated server
     whose default game type (server.properties ``gamemode``, applied over
     level.dat ``GameType`` at every start) is adventure finds a respawn
     position without loading the spawn chunk; if it is unloaded the player
@@ -109,7 +116,7 @@ def startup_rcon_commands(settings: WorldSettings) -> list[str]:
     does not exist (< 1.14, e.g. old Forge worlds); ``LATEST`` and versions
     that do not parse (snapshots, 26.x-style ids) are treated as new.
     """
-    if settings.gamemode.strip().lower() != "adventure":
+    if normalize_gamemode(settings.gamemode) != "adventure":
         return []
     t = _version_tuple(settings.version or "")
     if t is not None and t < FORCELOAD_MIN_VERSION:
