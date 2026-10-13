@@ -242,6 +242,50 @@ logs `X-Auth-Request-Email` against each action. No public status page.
   and nothing is audited; sending a command is unchanged.
 - Deferred: Grafana via the chart's `mc-monitor` exporter.
 
+### RCON connections
+
+Vanilla Minecraft logs every RCON connect and disconnect at INFO, with no
+setting to silence it, and the worlds page polls `list` every few seconds. So
+the dashboard keeps **one authenticated RCON connection per world**
+(`RconPool` in `rcon.py`) and reuses it for everything: player polling, the
+console, live whitelist edits and snapshot `save-off`/`save-on`. A world's
+log shows one "RCON Client ... started" line per server start or idle period,
+not one per poll.
+
+- **Locking**: one lock per world, held for a whole batch of commands, so
+  packets never interleave on a socket. There is no global lock around RCON
+  I/O: a hung server (5 s socket timeout) only delays callers for that world.
+- **Liveness**: before a reused connection is used, a zero-timeout `select`
+  checks it. The server never sends unprompted, so a readable socket means it
+  closed (EOF/RST) or the stream is out of step: the connection is replaced
+  before anything is sent.
+- **Retry rules**: any failed command drops the connection.
+  - Connect or authentication failure: raised as before pooling (one
+    attempt). An authentication failure also drops the cached password so
+    the next call re-reads the Secret.
+  - Failure before the command packet was fully written (send error, no
+    connection, server says the session is not authenticated): the command
+    did not run, so it is retried once on a new connection.
+  - Failure after the command packet was written (timeout, EOF, sentinel
+    send error): the server may have run it, so the error is surfaced, never
+    retried. This covers console input, `whitelist add/remove` and
+    `save-off`/`save-on`. Only the read-only `list` poll is retried once.
+  - In a batch (`save-off` + `save-all flush`, whitelist edits) a retry
+    resumes at the failed command; commands that ran are never re-sent.
+- **Eviction**: on any Helm install/upgrade of the world (start, stop,
+  restore, settings change), on delete teardown, when the ready server pod
+  changes (name, container start time or restart count, checked whenever the
+  pods are listed: status polls, console, snapshot, whitelist), and when the
+  RCON password changes (it is part of the connection key). A peer that
+  vanished without closing the socket looks alive to the liveness check, so
+  the console lists the pods before every command. Eviction never waits: if
+  a command is in flight the connection is dropped before the next one.
+- **Idle timeout**: the reconciler loop (every 3 s) closes connections unused
+  for 5 minutes, without waiting on a busy world.
+- Server side: vanilla's RCON client thread blocks on read with no idle
+  timeout, and the itzg image only sets the RCON port and password. If a
+  server does close an idle connection, the liveness check replaces it.
+
 ## Rollout
 
 1. **NAS (manual)**: create `minecraft-archive/` and

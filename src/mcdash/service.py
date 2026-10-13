@@ -72,7 +72,14 @@ from mcdash.naming import (
     sanitize_world_name,
     unique_name,
 )
-from mcdash.rcon import RconClient, RconError, parse_list
+from mcdash.rcon import (
+    RconApi,
+    RconAuthError,
+    RconClient,
+    RconError,
+    RconPool,
+    parse_list,
+)
 from mcdash.store import Store, read_json
 
 log = logging.getLogger(__name__)
@@ -101,11 +108,6 @@ class HelmApi(Protocol):
     def get_values(self, release: str) -> dict[str, Any]: ...
 
 
-class RconApi(Protocol):
-    def command(self, cmd: str) -> str: ...
-    def close(self) -> None: ...
-
-
 RconFactory = Callable[[str, int, str], RconApi]
 
 
@@ -113,6 +115,18 @@ def _default_rcon(host: str, port: int, password: str) -> RconApi:
     c = RconClient(host, port, password, timeout=5.0)
     c.connect()
     return c
+
+
+def _pod_target(pods: list[PodInfo]) -> tuple[str, str, int] | None:
+    """Identity of the server pod RCON reaches, or None when none is ready.
+
+    A new pod, or a container restart in the same pod, changes it.
+    """
+    for p in pods:
+        if p.ready and not p.deleting:
+            started = p.started.isoformat() if p.started else ""
+            return (p.name, started, p.restarts)
+    return None
 
 
 def _bool(v: str | None) -> bool:
@@ -160,6 +174,8 @@ class KubeDashboardService:
         self.now = clock
         self.cache_ttl = cache_ttl
         self._lock = threading.RLock()
+        # one reused RCON connection per world (see RconPool for retry rules)
+        self.rcon_pool = RconPool()
         self._values_cache: dict[str, tuple[str, dict[str, Any]]] = {}
         self._secret_cache: dict[str, str] = {}
         self._players_cache: dict[str, tuple[float, list[str] | None]] = {}
@@ -294,6 +310,8 @@ class KubeDashboardService:
         )
         self.helm.upgrade_install(name, values)
         self._values_cache.pop(name, None)
+        # an upgrade may replace or stop the server pod
+        self.rcon_pool.evict(name)
 
     def _rcon_password(self, name: str) -> str:
         pw = self._secret_cache.get(name)
@@ -308,14 +326,36 @@ class KubeDashboardService:
     def _rcon_host(self, name: str) -> str:
         return f"{name}-rcon.{self.cfg.namespace}.svc"
 
-    def _rcon_cmds(self, name: str, cmds: list[str]) -> list[str]:
-        client = self.rcon_factory(
-            self._rcon_host(name), RCON_PORT, self._rcon_password(name)
+    def _rcon_cmds(
+        self,
+        name: str,
+        cmds: list[str],
+        *,
+        pods: list[PodInfo] | None = None,
+        retry_sent: bool = False,
+    ) -> list[str]:
+        """Run ``cmds`` on ``name``'s pooled RCON connection.
+
+        ``pods`` (when the caller already listed them) evicts a connection
+        to a server pod that has since been replaced. ``retry_sent`` is only
+        for read-only commands: see ``RconPool.run``.
+        """
+        if pods is not None:
+            self.rcon_pool.note_target(name, _pod_target(pods))
+        host, password = self._rcon_host(name), self._rcon_password(name)
+
+        def connect() -> RconApi:
+            try:
+                return self.rcon_factory(host, RCON_PORT, password)
+            except RconAuthError:
+                # the Secret may have been replaced: re-read it next time
+                self._secret_cache.pop(name, None)
+                raise
+
+        # the password is part of the key: a changed Secret means a new session
+        return self.rcon_pool.run(
+            name, (host, password), connect, cmds, retry_sent=retry_sent
         )
-        try:
-            return [client.command(c) for c in cmds]
-        finally:
-            client.close()
 
     def _replicas(self, values: dict[str, Any] | None) -> int:
         if not values:
@@ -384,7 +424,8 @@ class KubeDashboardService:
         if hit and time.monotonic() - hit[0] < self.cache_ttl:
             return hit[1]
         try:
-            players: list[str] | None = parse_list(self._rcon_cmds(name, ["list"])[0])
+            out = self._rcon_cmds(name, ["list"], retry_sent=True)[0]
+            players: list[str] | None = parse_list(out)
         except (RconError, MCDashError, OSError):
             players = None
         self._players_cache[name] = (time.monotonic(), players)
@@ -399,6 +440,7 @@ class KubeDashboardService:
         live: bool = True,
     ) -> World:
         pods = self.kube.list_server_pods(name) if values else []
+        self.rcon_pool.note_target(name, _pod_target(pods))
         state, msg = self._derive(op, values, pods)
         w = World(
             name=name,
@@ -652,7 +694,7 @@ class KubeDashboardService:
         pods = self.kube.list_server_pods(name) if values else []
         if self._replicas(values) and any(p.ready for p in pods):
             try:
-                self._rcon_cmds(name, ["save-off", "save-all flush"])
+                self._rcon_cmds(name, ["save-off", "save-all flush"], pods=pods)
                 op["paused"] = True
             except (RconError, MCDashError, OSError) as e:
                 log.warning("%s: could not pause saving: %s", name, e)
@@ -762,7 +804,7 @@ class KubeDashboardService:
                 if open_to_all != was_open:
                     cmds.append("whitelist off" if open_to_all else "whitelist on")
                 if cmds:
-                    self._rcon_cmds(name, cmds)
+                    self._rcon_cmds(name, cmds, pods=pods)
             # Persisted in the world record; rendered into WHITELIST at the next
             # install/upgrade (avoids restarting a running server). Live changes
             # are already in whitelist.json on the world volume.
@@ -777,7 +819,10 @@ class KubeDashboardService:
         self._load(name)
         self.store.audit(actor, "rcon", name, command=command)
         try:
-            return self._rcon_cmds(name, [command])[0]
+            # list the pods first: console input is never retried once sent, so
+            # a connection to a replaced pod must be dropped before sending
+            pods = self.kube.list_server_pods(name)
+            return self._rcon_cmds(name, [command], pods=pods)[0]
         except (RconError, OSError) as e:
             raise MCDashError(f"RCON: {e}") from e
 
@@ -948,7 +993,8 @@ class KubeDashboardService:
     def _save_on(self, name: str, op: dict[str, Any]) -> None:
         if op.get("paused"):
             try:
-                self._rcon_cmds(name, ["save-on"])
+                pods = self.kube.list_server_pods(name)
+                self._rcon_cmds(name, ["save-on"], pods=pods)
             except (RconError, MCDashError, OSError) as e:
                 log.warning("%s: save-on failed: %s", name, e)
 
@@ -1046,6 +1092,7 @@ class KubeDashboardService:
                 self.kube.delete_pvc(pvc_name(name))
                 self.kube.delete_secret(rcon_secret_name(name))
                 self._secret_cache.pop(name, None)
+                self.rcon_pool.evict(name)
                 self.kube.delete_configmap(self._cm(name))
                 return False
         except (HelmError, MCDashError) as e:
@@ -1055,6 +1102,8 @@ class KubeDashboardService:
         return False
 
     def reconcile_once(self) -> None:
+        for name in self.rcon_pool.sweep_idle():
+            log.debug("%s: closed idle RCON connection", name)
         try:
             _, ops, _ = self._records()
         except MCDashError as e:  # e.g. no cluster: say so once, not every tick
@@ -1092,3 +1141,4 @@ class KubeDashboardService:
         self._stop_evt.set()
         if self._thread:
             self._thread.join(timeout=10)
+        self.rcon_pool.close_all()
