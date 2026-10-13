@@ -18,6 +18,10 @@ from mcdash.models import ServerType
 
 MAX_SMALL_MEMBER = 32 * 1024 * 1024  # refuse to read bigger level.dat/properties
 
+# Bump when detect_zip() changes its result for the same zip, so cached
+# detections (backups index.json) are recomputed.
+DETECT_VERSION = 2
+
 _FORGE_JAR = re.compile(
     r"^forge-(?P<mc>\d+(?:\.\d+)+)-(?P<forge>[\w.\-]+?)(?:-universal|-server)?\.jar$"
 )
@@ -158,22 +162,29 @@ def detect_zip(path: str | Path) -> Detection:
         det = Detection(prefix=prefix, world_dir=world_dir)
 
         forge = False
-        forge_mc: str | None = None
+        # (mc, forge) pairs; a root installer jar beats libraries/. A server
+        # upgraded in place keeps the old jars, so the newest one is current.
+        jars: set[tuple[str, str]] = set()
+        libs: set[tuple[str, str]] = set()
         versions: set[str] = set()
         for r in rel:
             if r.startswith("mods/") and r.lower().endswith(".jar"):
                 forge = True
             elif "/" not in r and (m := _FORGE_JAR.match(r)):
                 forge = True
-                forge_mc, det.forge_version = m["mc"], m["forge"]
+                jars.add((m["mc"], m["forge"]))
             elif m := _FORGE_LIB.match(r):
                 forge = True
-                if det.forge_version is None:
-                    forge_mc, det.forge_version = m["mc"], m["forge"]
+                libs.add((m["mc"], m["forge"]))
             elif r.startswith("libraries/net/minecraftforge/"):
                 forge = True
             if m := _VERSION_DIR.match(r):
                 versions.add(m["v"])
+        forge_mc: str | None = None
+        if candidates := jars or libs:
+            forge_mc, det.forge_version = max(
+                candidates, key=lambda mf: (version_key(mf[0]), version_key(mf[1]))
+            )
         if forge:
             det.server_type = ServerType.FORGE
 

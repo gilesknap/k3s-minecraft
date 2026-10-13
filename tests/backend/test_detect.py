@@ -38,6 +38,31 @@ def test_forge_via_libraries_only(tmp_path: Path) -> None:
     assert d.forge_version == "14.23.5"
 
 
+def test_forge_picks_newest_installer_jar(tmp_path: Path) -> None:
+    # A server upgraded in place keeps the old installer jar (real fire-ice2).
+    z = make_world_zip(
+        tmp_path / "f.zip",
+        forge=True,
+        extra={
+            "tmp/tmp.w92y4CF76G/forge-1.16.5-36.2.0.jar": b"jar",
+            "tmp/tmp.w92y4CF76G/forge-1.16.5-36.10.0.jar": b"jar",
+        },
+    )
+    assert detect_zip(z).forge_version == "36.10.0"
+
+
+def test_forge_installer_jar_beats_libraries(tmp_path: Path) -> None:
+    z = make_world_zip(
+        tmp_path / "f.zip",
+        forge=True,
+        extra={
+            "tmp/tmp.w92y4CF76G/libraries/net/minecraftforge/forge/"
+            "1.16.5-36.9.0/x.jar": b""
+        },
+    )
+    assert detect_zip(z).forge_version == "36.1.0"
+
+
 def test_version_fallback_to_versions_dir(tmp_path: Path) -> None:
     z = make_world_zip(
         tmp_path / "v.zip", version=None, versions_dirs=("1.9.4", "1.16.5", "1.10")
