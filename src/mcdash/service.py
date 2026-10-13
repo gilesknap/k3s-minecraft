@@ -578,9 +578,16 @@ class KubeDashboardService:
 
     def _check_settings(self, s: WorldSettings) -> None:
         jvm_memory(s.memory or self.cfg.default_memory)  # raises on bad sizes
-        for n in s.whitelist:
+        for n in [*s.whitelist, *s.ops]:
             if not n or len(n) > 16 or not all(c.isalnum() or c == "_" for c in n):
                 raise MCDashError(f"bad player name {n!r}")
+        if not s.open_to_all:
+            listed = {n.lower() for n in s.whitelist}
+            missing = [n for n in s.ops if n.lower() not in listed]
+            if missing:
+                raise MCDashError(
+                    f"admins must be on the whitelist: {', '.join(missing)}"
+                )
         if s.level_type not in LEVEL_TYPES:
             raise MCDashError(
                 f"unknown world type {s.level_type!r} (one of {', '.join(LEVEL_TYPES)})"
@@ -844,15 +851,30 @@ class KubeDashboardService:
             self.store.audit(actor, "update_settings", name, settings=spec["settings"])
 
     def set_whitelist(
-        self, name: str, players: list[str], actor: str, *, open_to_all: bool
+        self,
+        name: str,
+        players: list[str],
+        actor: str,
+        *,
+        open_to_all: bool,
+        ops: list[str] | None = None,
     ) -> None:
         players = list(dict.fromkeys(p.strip() for p in players if p.strip()))
         with self._lock:
             spec, op, values = self._load(name)
             settings = settings_from_json(spec.get("settings"))
             old, was_open = settings.whitelist, settings.open_to_all
+            old_ops = settings.ops
+            new_ops = old_ops if ops is None else ops
+            new_ops = list(dict.fromkeys(p.strip() for p in new_ops if p.strip()))
+            if not open_to_all:
+                # taking someone off the whitelist takes away their admin too
+                kept = {p.lower() for p in players}
+                gone = {p.lower() for p in old} - kept
+                new_ops = [p for p in new_ops if p.lower() not in gone]
             settings.whitelist = players
             settings.open_to_all = open_to_all
+            settings.ops = new_ops
             self._check_settings(settings)
             pods = self.kube.list_server_pods(name) if values else []
             live = any(p.ready for p in pods)
@@ -872,15 +894,24 @@ class KubeDashboardService:
                 cmds += [f"whitelist remove {p}" for p in old if p not in players]
                 if open_to_all != was_open:
                     cmds.append("whitelist off" if open_to_all else "whitelist on")
+                was_op = {p.lower() for p in old_ops}
+                is_op = {p.lower() for p in new_ops}
+                cmds += [f"op {p}" for p in new_ops if p.lower() not in was_op]
+                cmds += [f"deop {p}" for p in old_ops if p.lower() not in is_op]
                 if cmds:
                     self._rcon_cmds(name, cmds, pods=pods)
-            # Persisted in the world record; rendered into WHITELIST at the next
-            # install/upgrade (avoids restarting a running server). Live changes
-            # are already in whitelist.json on the world volume.
+            # Persisted in the world record; rendered into WHITELIST/OPS at the
+            # next install/upgrade (avoids restarting a running server). Live
+            # changes are already in whitelist.json/ops.json on the world volume.
             spec["settings"] = settings_to_json(settings)
             self._save(name, spec, op)
             self.store.audit(
-                actor, "set_whitelist", name, players=players, open_to_all=open_to_all
+                actor,
+                "set_whitelist",
+                name,
+                players=players,
+                open_to_all=open_to_all,
+                ops=new_ops,
             )
 
     # ================================================================ live

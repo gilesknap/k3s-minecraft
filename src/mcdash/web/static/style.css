@@ -150,6 +150,8 @@ label small { font-weight: normal; }
 .form-grid .span2 { grid-column: 1 / -1; }
 .checks { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; }
 label.check { flex-direction: row; align-items: center; gap: .4rem; font-weight: normal; }
+.player { display: inline-flex; align-items: center; gap: .5rem; }
+label.check.admin { color: var(--muted); }
 fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: .5rem .8rem .8rem; margin: 0; }
 fieldset .checks { margin-bottom: .6rem; }
 legend { font-size: .9em; font-weight: 600; padding: 0 .3rem; }

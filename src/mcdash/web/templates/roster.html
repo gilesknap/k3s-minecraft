@@ -2,7 +2,7 @@
 {% block title %}Roster{% endblock %}
 {% block content %}
 <h1>Player roster</h1>
-<p class="muted small">Players offered as checkboxes when choosing a world's whitelist.</p>
+<p class="muted small">Players offered as checkboxes when choosing a world's whitelist and admins.</p>
 <section class="card">
 {% if players %}
 <table class="cards roster">
@@ -13,7 +13,7 @@
     <td data-label="Player" class="title"><strong>{{ p.name }}</strong></td>
     <td data-label="Note">{{ p.note or '' }}</td>
     <td class="actions">
-      <form method="post" action="/roster/remove" hx-post="/roster/remove" hx-confirm="Remove {{ p.name }} from the roster? (Existing whitelists are not changed.)">
+      <form method="post" action="/roster/remove" hx-post="/roster/remove" hx-confirm="Remove {{ p.name }} from the roster? (Existing whitelists and admins are not changed.)">
         <input type="hidden" name="name" value="{{ p.name }}">
         <button class="btn danger">Remove</button>
       </form>

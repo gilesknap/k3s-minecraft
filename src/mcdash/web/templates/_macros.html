@@ -85,21 +85,32 @@
 </tr>
 {%- endmacro %}
 
-{% macro whitelist_fields(roster, selected, open_to_all=false) -%}
+{# One whitelist checkbox per player, each with an "admin" (op) checkbox. #}
+{% macro player_check(name, on_list, is_op, note='') -%}
+<span class="player"><label class="check"><input type="checkbox" name="whitelist" value="{{ name }}" {% if on_list %}checked{% endif %}> {{ name }}{% if note %} <small class="muted">{{ note }}</small>{% endif %}</label>
+<label class="check admin" title="Operator: can use admin commands"><input type="checkbox" name="ops" value="{{ name }}" {% if is_op %}checked{% endif %}> <small>admin</small></label></span>
+{%- endmacro %}
+
+{% macro whitelist_fields(roster, selected, open_to_all=false, ops=[]) -%}
 <fieldset class="whitelist">
   <legend>Whitelist</legend>
   <label class="check"><input type="checkbox" name="open_to_all" {% if open_to_all %}checked{% endif %}> <strong>Open to everyone</strong> <small class="muted">no whitelist: any Minecraft account that knows the address can join. The names below are kept for when you close it again.</small></label>
   {% set sel = selected|map('lower')|list %}
+  {% set op_sel = ops|map('lower')|list %}
   <div class="checks">
   {% for p in roster %}
-    <label class="check"><input type="checkbox" name="whitelist" value="{{ p.name }}" {% if p.name|lower in sel %}checked{% endif %}> {{ p.name }}{% if p.note %} <small class="muted">{{ p.note }}</small>{% endif %}</label>
+    {{ player_check(p.name, p.name|lower in sel, p.name|lower in op_sel, p.note) }}
   {% endfor %}
   {% set roster_names = roster|map(attribute='name')|map('lower')|list %}
   {% for name in selected if name|lower not in roster_names %}
-    <label class="check"><input type="checkbox" name="whitelist" value="{{ name }}" checked> {{ name }} <small class="muted">not on roster</small></label>
+    {{ player_check(name, true, name|lower in op_sel, 'not on roster') }}
+  {% endfor %}
+  {% for name in ops if name|lower not in roster_names and name|lower not in sel %}
+    {{ player_check(name, false, true, 'not on roster') }}
   {% endfor %}
   </div>
   <label>Add others <input name="whitelist_extra" placeholder="names, comma separated" autocomplete="off"></label>
+  <p class="small muted">Admins are operators (<code>/op</code>) and must be on the whitelist unless the world is open to everyone; taking someone off the whitelist removes their admin. With no admins ticked, the world keeps the ops it already has (e.g. from its backup); once any are ticked, the world's ops are set to exactly those at its next start.</p>
 </fieldset>
 {%- endmacro %}
 

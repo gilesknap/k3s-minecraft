@@ -99,6 +99,7 @@ def test_update_settings_keeps_whitelist(
     assert settings.motd == "hi"
     assert settings.whitelist == ["NoahK", "JamesK", "GilesDad"]
     assert settings.open_to_all is False
+    assert settings.ops == ["GilesDad"]
 
 
 def test_settings_validation(client: TestClient, svc: FakeDashboardService) -> None:
@@ -115,6 +116,7 @@ def test_set_whitelist(client: TestClient, svc: FakeDashboardService) -> None:
         data={
             "whitelist": ["NoahK", "MillieM"],
             "whitelist_extra": "Steve, alex noahk",
+            "ops": ["MillieM", "millieM"],
         },
     )
     assert r.status_code == 303
@@ -124,7 +126,21 @@ def test_set_whitelist(client: TestClient, svc: FakeDashboardService) -> None:
         ["NoahK", "MillieM", "Steve", "alex"],
         ACTOR,
         False,
+        ["MillieM"],
     )
+    html = client.get("/worlds/noah-james").text
+    assert 'name="ops" value="MillieM" checked' in html
+    assert 'name="ops" value="GilesDad" >' in html
+
+
+def test_ops_rejects_bad_name(client: TestClient, svc: FakeDashboardService) -> None:
+    n = len(svc.calls)
+    r = client.post(
+        "/worlds/noah-james/whitelist", data={"whitelist": ["NoahK"], "ops": "x y"}
+    )
+    assert r.status_code == 400
+    assert "not a valid Minecraft player name" in r.text
+    assert len(svc.calls) == n
 
 
 def test_open_to_everyone(client: TestClient, svc: FakeDashboardService) -> None:
@@ -133,7 +149,14 @@ def test_open_to_everyone(client: TestClient, svc: FakeDashboardService) -> None
         data={"whitelist": ["NoahK"], "open_to_all": "on"},
     )
     assert r.status_code == 303
-    assert svc.calls[-1] == ("set_whitelist", "noah-james", ["NoahK"], ACTOR, True)
+    assert svc.calls[-1] == (
+        "set_whitelist",
+        "noah-james",
+        ["NoahK"],
+        ACTOR,
+        True,
+        [],
+    )
     html = client.get("/worlds/noah-james").text
     assert 'name="open_to_all" checked' in html
     assert "open to everyone</span>" in html
@@ -189,6 +212,7 @@ def test_launch(client: TestClient, svc: FakeDashboardService) -> None:
         "enable_command_block": "on",
         "whitelist": ["NoahK", "JamesK"],
         "whitelist_extra": "Cousin_Ed",
+        "ops": ["JamesK"],
     }
     r = client.post("/launch", data=form)
     assert r.status_code == 303, r.text
@@ -202,6 +226,7 @@ def test_launch(client: TestClient, svc: FakeDashboardService) -> None:
     )
     assert settings.whitelist == ["NoahK", "JamesK", "Cousin_Ed"]
     assert settings.open_to_all is False
+    assert settings.ops == ["JamesK"]
     assert settings.force_gamemode and settings.enable_command_block
     r = client.post(
         "/launch", data={**form, "name": "noah-james-3", "open_to_all": "on"}

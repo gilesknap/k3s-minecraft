@@ -103,6 +103,9 @@ class WorldSettings:
     # No whitelist: any genuine (online-mode) account may join. The names above
     # are kept, so closing the world again restores them.
     open_to_all: bool = False
+    # Operators (admins). Must be on the whitelist unless open_to_all. Empty =
+    # leave the world's ops.json (e.g. the backup's) alone.
+    ops: list[str] = field(default_factory=list)
     seed: str = ""  # blank = random
     level_type: str = "normal"
 
@@ -223,7 +226,13 @@ class DashboardService(Protocol):
         self, name: str, settings: WorldSettings, actor: str
     ) -> None: ...
     def set_whitelist(
-        self, name: str, players: list[str], actor: str, *, open_to_all: bool
+        self,
+        name: str,
+        players: list[str],
+        actor: str,
+        *,
+        open_to_all: bool,
+        ops: list[str] | None = None,  # None = keep (less anyone removed)
     ) -> None: ...
 
     # live
