@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import gzip
 import io
+import threading
+import time
 import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -231,33 +233,91 @@ class FakeHelm:
 
 
 class FakeRcon:
-    """Records commands; shared across connections via ``log``."""
+    """Records commands; shared across connections via ``log``.
+
+    Test controls: ``connects`` counts connections opened; ``drop_all()``
+    simulates the server closing every open connection (``alive()`` turns
+    false); ``fail_unsent`` / ``fail_sent`` make the next command on an
+    existing connection fail before / after the request was sent; ``block``
+    (host substring -> Event) holds commands to that host until set.
+    """
 
     def __init__(self) -> None:
         self.log: list[tuple[str, str]] = []
         self.players = ["noah", "giles"]
         self.fail = False
+        self.connects = 0
+        self.conns: list[FakeRcon._Conn] = []
+        self.fail_unsent = 0
+        self.fail_sent = 0
+        self.block: dict[str, threading.Event] = {}
+        self.blocked = threading.Event()  # set when a command starts waiting on block
+        self.in_flight: dict[int, int] = {}  # id(conn) -> concurrent commands
+        self.overlaps = 0
+        self._mu = threading.Lock()
 
     def factory(self, host: str, port: int, password: str) -> FakeRcon._Conn:
         if self.fail:
             from mcdash.rcon import RconError
 
             raise RconError("connection refused")
-        return FakeRcon._Conn(self, host)
+        self.connects += 1
+        c = FakeRcon._Conn(self, host)
+        self.conns.append(c)
+        return c
+
+    def drop_all(self) -> None:
+        for c in self.conns:
+            c.server_closed = True
+
+    @property
+    def open_conns(self) -> list[FakeRcon._Conn]:
+        return [c for c in self.conns if not c.closed]
 
     class _Conn:
         def __init__(self, outer: FakeRcon, host: str) -> None:
             self.outer = outer
             self.host = host
+            self.closed = False
+            self.server_closed = False
+
+        def alive(self) -> bool:
+            return not (self.closed or self.server_closed)
 
         def command(self, cmd: str) -> str:
-            self.outer.log.append((self.host, cmd))
-            if cmd == "list":
-                p = self.outer.players
-                return (
-                    f"There are {len(p)} of a max of 20 players online: " + ", ".join(p)
-                )
-            return f"ok {cmd}"
+            from mcdash.rcon import RconError, RconUnsentError
+
+            o = self.outer
+            if self.closed:
+                raise RconUnsentError("not connected")
+            if o.fail_unsent:
+                o.fail_unsent -= 1
+                raise RconUnsentError("RCON send failed: broken pipe")
+            with o._mu:
+                n = o.in_flight.get(id(self), 0) + 1
+                o.in_flight[id(self)] = n
+                if n > 1:
+                    o.overlaps += 1
+            try:
+                o.log.append((self.host, cmd))  # the server got it
+                if o.fail_sent:
+                    o.fail_sent -= 1
+                    raise RconError("RCON connection closed")
+                for key, evt in o.block.items():
+                    if key in self.host:
+                        o.blocked.set()
+                        evt.wait(5)
+                time.sleep(0.001)  # widen any interleaving window
+                if cmd == "list":
+                    p = o.players
+                    return (
+                        f"There are {len(p)} of a max of 20 players online: "
+                        + ", ".join(p)
+                    )
+                return f"ok {cmd}"
+            finally:
+                with o._mu:
+                    o.in_flight[id(self)] -= 1
 
         def close(self) -> None:
-            pass
+            self.closed = True

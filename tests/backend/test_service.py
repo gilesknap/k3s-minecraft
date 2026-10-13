@@ -421,7 +421,8 @@ def test_rcon_logs_metrics(svc: KubeDashboardService) -> None:
     assert (w.cpu_millicores, w.memory_bytes) == (250, 2 * 1024**3)
     assert svc.rcon(name, "say hi", ME) == "ok say hi"
     assert svc.store.read_audit()[-1]["command"] == "say hi"
-    rcon.fail = True
+    rcon.fail = True  # server gone: the pooled connection dies, no new one
+    rcon.drop_all()
     with pytest.raises(MCDashError):
         svc.rcon(name, "list", ME)
     assert svc.get_world(name).players_online is None
