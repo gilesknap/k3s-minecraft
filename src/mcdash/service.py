@@ -146,6 +146,43 @@ def _parse_dt(s: Any) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
+def check_players(s: WorldSettings) -> None:
+    """Player names are valid; on a closed world every admin is whitelisted."""
+    for n in [*s.whitelist, *s.ops]:
+        if not n or len(n) > 16 or not all(c.isalnum() or c == "_" for c in n):
+            raise MCDashError(f"bad player name {n!r}")
+    if not s.open_to_all:
+        listed = {n.lower() for n in s.whitelist}
+        missing = [n for n in s.ops if n.lower() not in listed]
+        if missing:
+            raise MCDashError(f"admins must be on the whitelist: {', '.join(missing)}")
+
+
+def next_ops(
+    old_whitelist: list[str], ops: list[str], players: list[str], open_to_all: bool
+) -> list[str]:
+    """The ops a whitelist edit leaves: de-duplicated, and on a closed world
+    without anyone just taken off the whitelist (that takes their admin too)."""
+    new_ops = list(dict.fromkeys(p.strip() for p in ops if p.strip()))
+    if not open_to_all:
+        kept = {p.lower() for p in players}
+        gone = {p.lower() for p in old_whitelist} - kept
+        new_ops = [p for p in new_ops if p.lower() not in gone]
+    return new_ops
+
+
+def check_ops_change(
+    name: str, old_ops: list[str], new_ops: list[str], *, live: bool
+) -> None:
+    """Refuse to clear the last admin of a world that is not running and ready.
+
+    With no ops the next start leaves ops.json untouched (EXISTING_OPS_FILE=SKIP),
+    so the old ops would persist; only RCON ``deop`` on a live server removes them.
+    """
+    if old_ops and not new_ops and not live:
+        raise Conflict(f"{name} is not running; start it to remove its last admin")
+
+
 @dataclass(frozen=True)
 class _CommandSource:
     tree: CommandTree | None
@@ -578,16 +615,7 @@ class KubeDashboardService:
 
     def _check_settings(self, s: WorldSettings) -> None:
         jvm_memory(s.memory or self.cfg.default_memory)  # raises on bad sizes
-        for n in [*s.whitelist, *s.ops]:
-            if not n or len(n) > 16 or not all(c.isalnum() or c == "_" for c in n):
-                raise MCDashError(f"bad player name {n!r}")
-        if not s.open_to_all:
-            listed = {n.lower() for n in s.whitelist}
-            missing = [n for n in s.ops if n.lower() not in listed]
-            if missing:
-                raise MCDashError(
-                    f"admins must be on the whitelist: {', '.join(missing)}"
-                )
+        check_players(s)
         if s.level_type not in LEVEL_TYPES:
             raise MCDashError(
                 f"unknown world type {s.level_type!r} (one of {', '.join(LEVEL_TYPES)})"
@@ -865,13 +893,9 @@ class KubeDashboardService:
             settings = settings_from_json(spec.get("settings"))
             old, was_open = settings.whitelist, settings.open_to_all
             old_ops = settings.ops
-            new_ops = old_ops if ops is None else ops
-            new_ops = list(dict.fromkeys(p.strip() for p in new_ops if p.strip()))
-            if not open_to_all:
-                # taking someone off the whitelist takes away their admin too
-                kept = {p.lower() for p in players}
-                gone = {p.lower() for p in old} - kept
-                new_ops = [p for p in new_ops if p.lower() not in gone]
+            new_ops = next_ops(
+                old, old_ops if ops is None else ops, players, open_to_all
+            )
             settings.whitelist = players
             settings.open_to_all = open_to_all
             settings.ops = new_ops
@@ -884,6 +908,11 @@ class KubeDashboardService:
                 raise Conflict(
                     f"{name} is starting; change who can join once it is running"
                 )
+            if values is not None:
+                # Other admin changes made while stopped or starting are applied
+                # by the next start's SYNCHRONIZE; only an empty list cannot be.
+                running = bool(self._replicas(values)) and live
+                check_ops_change(name, old_ops, new_ops, live=running)
             if self._replicas(values) and live:
                 # While a world was open its whitelist.json was never synced, so
                 # closing it must (re)add every name, not just the new ones.

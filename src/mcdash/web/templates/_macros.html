@@ -110,7 +110,7 @@
   {% endfor %}
   </div>
   <label>Add others <input name="whitelist_extra" placeholder="names, comma separated" autocomplete="off"></label>
-  <p class="small muted">Admins are operators (<code>/op</code>) and must be on the whitelist unless the world is open to everyone; taking someone off the whitelist removes their admin. With no admins ticked, the world keeps the ops it already has (e.g. from its backup); once any are ticked, the world's ops are set to exactly those at its next start.</p>
+  <p class="small muted">Admins are operators (<code>/op</code>) and must be on the whitelist unless the world is open to everyone; taking someone off the whitelist removes their admin. With none ticked, the world keeps the ops it already has (e.g. from its backup); once any are ticked, other ops are removed at its next start. Save a name typed into Add others before ticking it as admin. Removing the last admin needs the world running.</p>
 </fieldset>
 {%- endmacro %}
 

@@ -263,6 +263,45 @@ def test_ops_must_be_whitelisted(svc: KubeDashboardService) -> None:
         svc.launch(KING, n2, s, ME)
 
 
+def test_last_admin_removal_needs_running_world(svc: KubeDashboardService) -> None:
+    _, helm, _ = parts(svc)
+    name = launch_running(svc)
+    wl = ["noah", "giles"]
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=["noah", "giles"])
+    svc.stop(name, ME)
+    complete(svc, "snapshot")
+    # dropping one of two admins while stopped: SYNCHRONIZE at the next start
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=["noah"])
+    assert svc.get_world(name).settings.ops == ["noah"]
+    # but an empty list renders SKIP, so the old op would persist
+    with pytest.raises(Conflict, match="start it to remove its last admin"):
+        svc.set_whitelist(name, wl, ME, open_to_all=False, ops=[])
+    # ...including by taking the last admin off the whitelist
+    with pytest.raises(Conflict, match="last admin"):
+        svc.set_whitelist(name, ["giles"], ME, open_to_all=False)
+    w = svc.get_world(name)
+    assert (w.settings.whitelist, w.settings.ops) == (wl, ["noah"])
+    svc.start(name, ME)
+    assert helm.releases[name]["minecraftServer"]["ops"] == "noah"
+    # running and ready: deop over RCON clears it
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=[])
+    assert svc.get_world(name).settings.ops == []
+
+
+def test_last_admin_removal_while_starting(svc: KubeDashboardService) -> None:
+    kube, _, rcon = parts(svc)
+    name = launch_running(svc)
+    wl = ["noah", "giles"]
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=wl)
+    kube.pods[name] = [PodInfo(name="p", phase="Pending", ready=False)]
+    sent = len(rcon.log)
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=["noah"])
+    with pytest.raises(Conflict, match="last admin"):
+        svc.set_whitelist(name, wl, ME, open_to_all=False, ops=[])
+    assert svc.get_world(name).settings.ops == ["noah"]
+    assert len(rcon.log) == sent  # nothing sent to a pod that is not ready
+
+
 def test_update_settings(svc: KubeDashboardService) -> None:
     _, helm, _ = parts(svc)
     name = launch_running(svc)

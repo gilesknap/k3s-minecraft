@@ -143,6 +143,22 @@ def test_ops_rejects_bad_name(client: TestClient, svc: FakeDashboardService) -> 
     assert len(svc.calls) == n
 
 
+def test_last_admin_on_stopped_world_is_409(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    settings = svc.worlds["fire-ice2"].settings
+    settings.ops = ["GilesDad"]
+    r = client.post(
+        "/worlds/fire-ice2/whitelist",
+        data={"whitelist": ["NoahK", "GilesDad"]},
+        headers=HX,
+    )
+    assert r.status_code == 409
+    assert r.headers["HX-Retarget"] == "#flash"
+    assert "start it to remove its last admin" in r.text
+    assert svc.worlds["fire-ice2"].settings.ops == ["GilesDad"]
+
+
 def test_open_to_everyone(client: TestClient, svc: FakeDashboardService) -> None:
     r = client.post(
         "/worlds/noah-james/whitelist",

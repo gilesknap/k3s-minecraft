@@ -31,6 +31,7 @@ from mcdash.models import (
     WorldSettings,
     WorldState,
 )
+from mcdash.service import check_ops_change, check_players, next_ops
 
 PUBLIC_HOST = "mc.gkcluster.org"
 # An extract of the 26.3 data generator's commands.json and registries.json.
@@ -332,11 +333,17 @@ class FakeDashboardService:
         ops: list[str] | None = None,
     ) -> None:
         self._record("set_whitelist", name, players, actor, open_to_all, ops)
-        settings = self._world(name).settings
-        settings.whitelist = list(players)
-        settings.open_to_all = open_to_all
-        if ops is not None:
-            settings.ops = list(ops)
+        w = self._world(name)
+        old = w.settings
+        new_ops = next_ops(
+            old.whitelist, old.ops if ops is None else ops, players, open_to_all
+        )
+        settings = replace(
+            old, whitelist=list(players), open_to_all=open_to_all, ops=new_ops
+        )
+        check_players(settings)
+        check_ops_change(name, old.ops, new_ops, live=w.state is WorldState.RUNNING)
+        w.settings = settings
 
     # -- live --------------------------------------------------------------
     def rcon(self, name: str, command: str, actor: str) -> str:
