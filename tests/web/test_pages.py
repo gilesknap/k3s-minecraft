@@ -133,6 +133,7 @@ def test_launch_form_prefilled(client: TestClient) -> None:
     for player in ("NoahK", "JamesK", "GilesDad", "MillieM"):
         assert f'name="whitelist" value="{player}"' in html
     assert 'name="whitelist_extra"' in html
+    assert 'name="ops" value="NoahK"' in html  # an admin box per player
 
 
 def test_launch_form_command_blocks(client: TestClient) -> None:
@@ -172,6 +173,9 @@ def test_world_page_sections(client: TestClient) -> None:
     # current whitelist pre-ticked; roster member not on it unticked
     assert 'value="JamesK" checked' in html
     assert 'value="MillieM" >' in html
+    # admins ticked separately
+    assert 'name="ops" value="GilesDad" checked' in html
+    assert 'name="ops" value="JamesK" >' in html
 
 
 def test_world_page_console_hooks(client: TestClient) -> None:
@@ -225,6 +229,7 @@ def test_unknown_world_404(client: TestClient) -> None:
 def test_roster_page(client: TestClient) -> None:
     html = client.get("/roster").text
     assert "JamesK" in html and "James (cousin)" in html
+    assert "whitelist and admins" in html
 
 
 def test_new_world_form(client: TestClient) -> None:

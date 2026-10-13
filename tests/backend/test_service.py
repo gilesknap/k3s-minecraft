@@ -18,7 +18,7 @@ from mcdash.models import (
     ServerType,
     WorldState,
 )
-from mcdash.service import KubeDashboardService
+from mcdash.service import KubeDashboardService, next_ops
 
 from .helpers import FakeHelm, FakeKube, FakeRcon, make_world_zip
 
@@ -211,6 +211,116 @@ def test_whitelist_live_without_restart(svc: KubeDashboardService) -> None:
     complete(svc, "snapshot")
     svc.start(name, ME)
     assert helm.releases[name]["minecraftServer"]["whitelist"] == "giles,millie"
+
+
+def test_ops_live_and_persisted(svc: KubeDashboardService) -> None:
+    _, helm, rcon = parts(svc)
+    name = launch_running(svc)
+    upgrades = len(helm.calls)
+    assert "ops" not in helm.releases[name]["minecraftServer"]
+    assert helm.releases[name]["extraEnv"]["EXISTING_OPS_FILE"] == "SKIP"
+    svc.set_whitelist(name, ["noah", "giles"], ME, open_to_all=False, ops=["giles"])
+    svc.set_whitelist(name, ["noah", "giles"], ME, open_to_all=False, ops=["noah"])
+    # ops=None keeps them; taking giles off the whitelist leaves noah an op
+    svc.set_whitelist(name, ["noah", "giles"], ME, open_to_all=False)
+    assert svc.get_world(name).settings.ops == ["noah"]
+    ops = [c for _, c in rcon.log if c.split()[0] in ("op", "deop")]
+    assert ops == ["op giles", "op noah", "deop giles"]
+    assert len(helm.calls) == upgrades  # no pod restart
+    svc.stop(name, ME)
+    complete(svc, "snapshot")
+    svc.start(name, ME)
+    values = helm.releases[name]
+    assert values["minecraftServer"]["ops"] == "noah"
+    assert values["extraEnv"]["EXISTING_OPS_FILE"] == "SYNCHRONIZE"
+
+
+def test_ops_must_be_whitelisted(svc: KubeDashboardService) -> None:
+    _, _, rcon = parts(svc)
+    name = launch_running(svc)
+    svc.set_whitelist(name, ["noah", "giles"], ME, open_to_all=False, ops=["giles"])
+    with pytest.raises(MCDashError, match="must be on the whitelist: steve"):
+        svc.set_whitelist(name, ["noah"], ME, open_to_all=False, ops=["steve"])
+    assert svc.get_world(name).settings.whitelist == ["noah", "giles"]
+    # removing a player from the whitelist drops their admin, even if ticked
+    svc.set_whitelist(name, ["noah"], ME, open_to_all=False, ops=["Giles"])
+    w = svc.get_world(name)
+    assert (w.settings.whitelist, w.settings.ops) == (["noah"], [])
+    sent = [c for _, c in rcon.log if c != "list"]
+    assert sent[-2:] == ["whitelist remove giles", "deop giles"]
+    # an open world takes any valid name...
+    svc.set_whitelist(name, ["noah"], ME, open_to_all=True, ops=["steve"])
+    assert svc.get_world(name).settings.ops == ["steve"]
+    with pytest.raises(MCDashError, match="bad player name"):
+        svc.set_whitelist(name, ["noah"], ME, open_to_all=True, ops=["bad name!"])
+    # ...but closing it again needs them whitelisted
+    with pytest.raises(MCDashError, match="must be on the whitelist"):
+        svc.set_whitelist(name, ["noah"], ME, open_to_all=False)
+    # launching checks the same rule
+    n2, s = svc.launch_defaults(KING)
+    s.whitelist, s.ops = ["noah"], ["giles"]
+    with pytest.raises(MCDashError, match="must be on the whitelist"):
+        svc.launch(KING, n2, s, ME)
+
+
+def test_last_admin_removal_needs_running_world(svc: KubeDashboardService) -> None:
+    _, helm, _ = parts(svc)
+    name = launch_running(svc)
+    wl = ["noah", "giles"]
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=["noah", "giles"])
+    svc.stop(name, ME)
+    complete(svc, "snapshot")
+    # dropping one of two admins while stopped: SYNCHRONIZE at the next start
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=["noah"])
+    assert svc.get_world(name).settings.ops == ["noah"]
+    # but an empty list renders SKIP, so the old op would persist
+    with pytest.raises(Conflict, match="start it to remove its last admin"):
+        svc.set_whitelist(name, wl, ME, open_to_all=False, ops=[])
+    # ...including by taking the last admin off the whitelist
+    with pytest.raises(
+        Conflict, match="taking noah off the whitelist would remove .* last admin"
+    ):
+        svc.set_whitelist(name, ["giles"], ME, open_to_all=False)
+    w = svc.get_world(name)
+    assert (w.settings.whitelist, w.settings.ops) == (wl, ["noah"])
+    svc.start(name, ME)
+    assert helm.releases[name]["minecraftServer"]["ops"] == "noah"
+    # running and ready: deop over RCON clears it
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=[])
+    assert svc.get_world(name).settings.ops == []
+
+
+def test_admin_change_refused_while_starting(svc: KubeDashboardService) -> None:
+    kube, helm, rcon = parts(svc)
+    name = launch_running(svc)
+    wl = ["noah", "giles"]
+    svc.set_whitelist(name, wl, ME, open_to_all=False, ops=wl)
+    kube.pods[name] = [PodInfo(name="p", phase="Pending", ready=False)]
+    sent, upgrades = len(rcon.log), len(helm.calls)
+    # the booting pod's OPS env + SYNCHRONIZE would re-op anyone dropped now,
+    # so any admin change waits until it is running: one admin or the last
+    for ops in (["noah"], []):
+        with pytest.raises(Conflict, match="is starting; change its admins"):
+            svc.set_whitelist(name, wl, ME, open_to_all=False, ops=ops)
+    # ...or adding one, or dropping one indirectly via the whitelist
+    with pytest.raises(Conflict, match="is starting; change its admins"):
+        svc.set_whitelist(name, [*wl, "alex"], ME, open_to_all=False, ops=[*wl, "alex"])
+    with pytest.raises(Conflict, match="is starting; change its admins"):
+        svc.set_whitelist(name, ["noah"], ME, open_to_all=False)
+    w = svc.get_world(name)
+    assert (w.settings.whitelist, w.settings.ops) == (wl, wl)
+    # a whitelist-only change (same admins, any case) is still saved as before
+    svc.set_whitelist(name, [*wl, "alex"], ME, open_to_all=False, ops=["NOAH", "giles"])
+    assert svc.get_world(name).settings.whitelist == [*wl, "alex"]
+    assert len(rcon.log) == sent  # nothing sent to a pod that is not ready
+    assert len(helm.calls) == upgrades
+
+
+def test_next_ops_dedupes_ignoring_case() -> None:
+    ops = [" Noah", "noah", "", "giles", "GILES"]
+    assert next_ops([], ops, [], open_to_all=True) == ["Noah", "giles"]
+    # on a closed world anyone taken off the whitelist loses admin too
+    assert next_ops(["noah", "giles"], ops, ["giles"], open_to_all=False) == ["giles"]
 
 
 def test_update_settings(svc: KubeDashboardService) -> None:

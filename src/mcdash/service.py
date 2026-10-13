@@ -146,6 +146,66 @@ def _parse_dt(s: Any) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
+def check_players(s: WorldSettings) -> None:
+    """Player names are valid; on a closed world every admin is whitelisted."""
+    for n in [*s.whitelist, *s.ops]:
+        if not n or len(n) > 16 or not all(c.isalnum() or c == "_" for c in n):
+            raise MCDashError(f"bad player name {n!r}")
+    if not s.open_to_all:
+        listed = {n.lower() for n in s.whitelist}
+        missing = [n for n in s.ops if n.lower() not in listed]
+        if missing:
+            raise MCDashError(f"admins must be on the whitelist: {', '.join(missing)}")
+
+
+def dedupe_players(names: list[str]) -> list[str]:
+    """Stripped, non-empty, de-duplicated case-insensitively (first spelling kept)."""
+    out: dict[str, str] = {}
+    for n in (p.strip() for p in names):
+        if n:
+            out.setdefault(n.lower(), n)
+    return list(out.values())
+
+
+def same_players(a: list[str], b: list[str]) -> bool:
+    """The same set of names, ignoring case."""
+    return {p.lower() for p in a} == {p.lower() for p in b}
+
+
+def next_ops(
+    old_whitelist: list[str], ops: list[str], players: list[str], open_to_all: bool
+) -> list[str]:
+    """The ops a whitelist edit leaves: de-duplicated, and on a closed world
+    without anyone just taken off the whitelist (that takes their admin too)."""
+    new_ops = dedupe_players(ops)
+    if not open_to_all:
+        kept = {p.lower() for p in players}
+        gone = {p.lower() for p in old_whitelist} - kept
+        new_ops = [p for p in new_ops if p.lower() not in gone]
+    return new_ops
+
+
+def check_ops_change(
+    name: str, old_ops: list[str], requested: list[str], new_ops: list[str]
+) -> None:
+    """Refuse to clear the last admin of a stopped world.
+
+    With no ops the next start leaves ops.json untouched (EXISTING_OPS_FILE=SKIP),
+    so the old ops would persist; only RCON ``deop`` on a live server removes them.
+    ``requested`` is the admin list asked for, before whitelist removals took
+    their admins with them, so an indirect removal gets its own message.
+    """
+    if not old_ops or new_ops:
+        return
+    dropped = dedupe_players(requested)
+    if dropped:
+        raise Conflict(
+            f"taking {', '.join(dropped)} off the whitelist would remove "
+            f"{name}'s last admin; start it first"
+        )
+    raise Conflict(f"{name} is not running; start it to remove its last admin")
+
+
 @dataclass(frozen=True)
 class _CommandSource:
     tree: CommandTree | None
@@ -578,9 +638,7 @@ class KubeDashboardService:
 
     def _check_settings(self, s: WorldSettings) -> None:
         jvm_memory(s.memory or self.cfg.default_memory)  # raises on bad sizes
-        for n in s.whitelist:
-            if not n or len(n) > 16 or not all(c.isalnum() or c == "_" for c in n):
-                raise MCDashError(f"bad player name {n!r}")
+        check_players(s)
         if s.level_type not in LEVEL_TYPES:
             raise MCDashError(
                 f"unknown world type {s.level_type!r} (one of {', '.join(LEVEL_TYPES)})"
@@ -844,24 +902,45 @@ class KubeDashboardService:
             self.store.audit(actor, "update_settings", name, settings=spec["settings"])
 
     def set_whitelist(
-        self, name: str, players: list[str], actor: str, *, open_to_all: bool
+        self,
+        name: str,
+        players: list[str],
+        actor: str,
+        *,
+        open_to_all: bool,
+        ops: list[str] | None = None,
     ) -> None:
         players = list(dict.fromkeys(p.strip() for p in players if p.strip()))
         with self._lock:
             spec, op, values = self._load(name)
             settings = settings_from_json(spec.get("settings"))
             old, was_open = settings.whitelist, settings.open_to_all
+            old_ops = settings.ops
+            requested = old_ops if ops is None else ops
+            new_ops = next_ops(old, requested, players, open_to_all)
             settings.whitelist = players
             settings.open_to_all = open_to_all
+            settings.ops = new_ops
             self._check_settings(settings)
             pods = self.kube.list_server_pods(name) if values else []
             live = any(p.ready for p in pods)
-            if self._replicas(values) and not live and open_to_all != was_open:
+            starting = bool(self._replicas(values)) and not live
+            if starting and open_to_all != was_open:
                 # The pod would come up with the access mode of the last install
                 # while the record says otherwise.
                 raise Conflict(
                     f"{name} is starting; change who can join once it is running"
                 )
+            if starting and not same_players(old_ops, new_ops):
+                # The booting pod's OPS env and SYNCHRONIZE would re-apply the
+                # old admins, and it cannot take RCON yet.
+                raise Conflict(
+                    f"{name} is starting; change its admins once it is running"
+                )
+            if values is not None and not self._replicas(values):
+                # Stopped: the next start's SYNCHRONIZE applies any admin change
+                # except an empty list.
+                check_ops_change(name, old_ops, requested, new_ops)
             if self._replicas(values) and live:
                 # While a world was open its whitelist.json was never synced, so
                 # closing it must (re)add every name, not just the new ones.
@@ -872,15 +951,24 @@ class KubeDashboardService:
                 cmds += [f"whitelist remove {p}" for p in old if p not in players]
                 if open_to_all != was_open:
                     cmds.append("whitelist off" if open_to_all else "whitelist on")
+                was_op = {p.lower() for p in old_ops}
+                is_op = {p.lower() for p in new_ops}
+                cmds += [f"op {p}" for p in new_ops if p.lower() not in was_op]
+                cmds += [f"deop {p}" for p in old_ops if p.lower() not in is_op]
                 if cmds:
                     self._rcon_cmds(name, cmds, pods=pods)
-            # Persisted in the world record; rendered into WHITELIST at the next
-            # install/upgrade (avoids restarting a running server). Live changes
-            # are already in whitelist.json on the world volume.
+            # Persisted in the world record; rendered into WHITELIST/OPS at the
+            # next install/upgrade (avoids restarting a running server). Live
+            # changes are already in whitelist.json/ops.json on the world volume.
             spec["settings"] = settings_to_json(settings)
             self._save(name, spec, op)
             self.store.audit(
-                actor, "set_whitelist", name, players=players, open_to_all=open_to_all
+                actor,
+                "set_whitelist",
+                name,
+                players=players,
+                open_to_all=open_to_all,
+                ops=new_ops,
             )
 
     # ================================================================ live

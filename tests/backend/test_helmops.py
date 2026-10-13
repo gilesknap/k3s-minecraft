@@ -56,9 +56,13 @@ def test_memory() -> None:
 
 
 def test_settings_json_roundtrip() -> None:
-    s = WorldSettings(server_type=ServerType.FORGE, whitelist=["a"], pvp=True)
+    s = WorldSettings(
+        server_type=ServerType.FORGE, whitelist=["a"], ops=["a"], pvp=True
+    )
     assert settings_from_json(json.loads(json.dumps(settings_to_json(s)))) == s
     assert settings_from_json({"bogus": 1, "server_type": "PAPER"}) == WorldSettings()
+    # records saved before ops existed load with none
+    assert settings_from_json({"whitelist": ["a"]}).ops == []
 
 
 def test_render_values() -> None:
@@ -67,6 +71,7 @@ def test_render_values() -> None:
         version="1.16.5",
         server_type=ServerType.FORGE,
         whitelist=["noah", "giles"],
+        ops=["giles"],
         enable_command_block=True,
     )
     v = render_values("fire-ice2", s, 30566, cfg, replicas=0, forge_version="36.1.0")
@@ -92,6 +97,8 @@ def test_render_values() -> None:
     assert ms["memory"] == "4G"
     assert v["extraEnv"]["ENFORCE_WHITELIST"] == "TRUE"
     assert v["extraEnv"]["EXISTING_WHITELIST_FILE"] == "SYNCHRONIZE"
+    assert ms["ops"] == "giles"
+    assert v["extraEnv"]["EXISTING_OPS_FILE"] == "SYNCHRONIZE"
     assert v["mcdash"]["port"] == 30566
     assert v["mcdash"]["settings"]["whitelist"] == ["noah", "giles"]
 
@@ -99,6 +106,9 @@ def test_render_values() -> None:
     assert "image" not in plain and "nodeSelector" not in plain
     assert "whitelist" not in plain["minecraftServer"]
     assert plain["extraEnv"]["EXISTING_WHITELIST_FILE"] == "SKIP"
+    # no admins chosen: leave ops.json (e.g. the backup's) alone
+    assert "ops" not in plain["minecraftServer"]
+    assert plain["extraEnv"]["EXISTING_OPS_FILE"] == "SKIP"
 
 
 @pytest.mark.parametrize(
@@ -136,7 +146,11 @@ CHART = os.environ.get("MCD_TEST_ITZG_CHART", "")
 )
 def test_render_against_real_chart(tmp_path: Path) -> None:
     s = WorldSettings(
-        whitelist=["noah"], motd="hi & bye", seed="12345", level_type="flat"
+        whitelist=["noah"],
+        ops=["noah"],
+        motd="hi & bye",
+        seed="12345",
+        level_type="flat",
     )
     v = render_values("king", s, 30565, Config(world_node="nuc2"), replicas=0)
     f = tmp_path / "v.json"
@@ -154,6 +168,8 @@ def test_render_against_real_chart(tmp_path: Path) -> None:
     assert "name: king-rcon\n" in out or "name: king-rcon" in out
     assert '"29999984"' in out
     assert "ENFORCE_WHITELIST" in out
+    assert 'name: OPS\n          value: "noah"' in out
+    assert 'name: EXISTING_OPS_FILE\n          value: "SYNCHRONIZE"' in out
     assert "startupProbe:" in out
     assert 'name: SEED\n          value: "12345"' in out
     assert 'name: LEVEL_TYPE\n          value: "minecraft:flat"' in out
@@ -213,6 +229,11 @@ def test_render_values_open_to_all() -> None:
     assert v["extraEnv"]["ENABLE_WHITELIST"] == "FALSE"
     assert v["extraEnv"]["ENFORCE_WHITELIST"] == "FALSE"
     assert v["extraEnv"]["EXISTING_WHITELIST_FILE"] == "SKIP"
+    # ops do not depend on the whitelist
+    v = render_values("w", WorldSettings(open_to_all=True, ops=["steve"]), 1, Config())
+    assert v["minecraftServer"]["ops"] == "steve"
+    assert v["extraEnv"]["EXISTING_OPS_FILE"] == "SYNCHRONIZE"
+    v = render_values("w", s, 30565, Config())
     # the names are kept for when the world is closed again
     assert v["mcdash"]["settings"]["whitelist"] == ["noah", "giles"]
     assert v["mcdash"]["settings"]["open_to_all"] is True

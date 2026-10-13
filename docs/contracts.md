@@ -68,6 +68,9 @@ in their report.
   `externalTrafficPolicy: Local` (ClusterIP only if rendered without a port),
   nodeSelector,
   `ENFORCE_WHITELIST` (false, with no `WHITELIST`, for an `open_to_all` world),
+  `settings.ops` → `minecraftServer.ops` (env `OPS`, comma-separated) with
+  `EXISTING_OPS_FILE=SYNCHRONIZE` when non-empty, else no `OPS` and
+  `EXISTING_OPS_FILE=SKIP` (the world keeps its `ops.json`),
   `online-mode` true, `EULA=TRUE`. Dashboard metadata lives in
   the release values under the top-level key `mcdash:` (`port`, `rconPort`,
   `sourceBackup`, `created`, `settings`) — read back with `helm get values`. Helm releases are

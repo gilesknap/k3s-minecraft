@@ -158,8 +158,9 @@ def settings_from_json(d: dict[str, Any] | None) -> WorldSettings:
             kw["server_type"] = ServerType(kw["server_type"])
         except ValueError:
             kw["server_type"] = ServerType.VANILLA
-    if "whitelist" in kw:
-        kw["whitelist"] = [str(x) for x in kw["whitelist"] or []]
+    for key in ("whitelist", "ops"):
+        if key in kw:
+            kw[key] = [str(x) for x in kw[key] or []]
     if "open_to_all" in kw:
         kw["open_to_all"] = kw["open_to_all"] is True
     return WorldSettings(**kw)
@@ -220,6 +221,8 @@ def render_values(
     # must not pass the names at all.
     if settings.whitelist and not settings.open_to_all:
         ms["whitelist"] = ",".join(settings.whitelist)
+    if settings.ops:
+        ms["ops"] = ",".join(settings.ops)
     if settings.server_type is ServerType.FORGE and forge_version:
         ms["forgeVersion"] = forge_version
     # Only used when the server generates a world (create_world); inert on a
@@ -239,6 +242,8 @@ def render_values(
         "EXISTING_WHITELIST_FILE": (
             "SYNCHRONIZE" if settings.whitelist and whitelisted else "SKIP"
         ),
+        # likewise ops.json: no list keeps the ops restored with the backup
+        "EXISTING_OPS_FILE": "SYNCHRONIZE" if settings.ops else "SKIP",
         "OVERRIDE_SERVER_PROPERTIES": "TRUE",
         # not minecraftServer.maxWorldSize: the schema wants an int, which helm
         # renders as 2.9999984e+07 (float64) — pass the env var as a string

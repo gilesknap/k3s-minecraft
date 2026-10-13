@@ -31,6 +31,7 @@ from mcdash.models import (
     WorldSettings,
     WorldState,
 )
+from mcdash.service import check_ops_change, check_players, next_ops, same_players
 
 PUBLIC_HOST = "mc.gkcluster.org"
 # An extract of the 26.3 data generator's commands.json and registries.json.
@@ -323,12 +324,28 @@ class FakeDashboardService:
         self._world(name).settings = settings
 
     def set_whitelist(
-        self, name: str, players: list[str], actor: str, *, open_to_all: bool
+        self,
+        name: str,
+        players: list[str],
+        actor: str,
+        *,
+        open_to_all: bool,
+        ops: list[str] | None = None,
     ) -> None:
-        self._record("set_whitelist", name, players, actor, open_to_all)
-        settings = self._world(name).settings
-        settings.whitelist = list(players)
-        settings.open_to_all = open_to_all
+        self._record("set_whitelist", name, players, actor, open_to_all, ops)
+        w = self._world(name)
+        old = w.settings
+        requested = old.ops if ops is None else ops
+        new_ops = next_ops(old.whitelist, requested, players, open_to_all)
+        settings = replace(
+            old, whitelist=list(players), open_to_all=open_to_all, ops=new_ops
+        )
+        check_players(settings)
+        if w.state is WorldState.STARTING and not same_players(old.ops, new_ops):
+            raise Conflict(f"{name} is starting; change its admins once it is running")
+        if w.state is not WorldState.RUNNING:
+            check_ops_change(name, old.ops, requested, new_ops)
+        w.settings = settings
 
     # -- live --------------------------------------------------------------
     def rcon(self, name: str, command: str, actor: str) -> str:
@@ -535,6 +552,7 @@ def seeded(**kwargs: object) -> FakeDashboardService:
                 motd="Noah & James survival",
                 difficulty="normal",
                 whitelist=["NoahK", "JamesK", "GilesDad"],
+                ops=["GilesDad"],
             ),
             source_backup_id="archive/2023-02-25_16_53_58-noah-james.zip",
             created=now - timedelta(days=6),

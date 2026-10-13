@@ -259,7 +259,14 @@ that, so it is a property of the node, not of the dashboard.
   even if the world started open. Changing the mode while the server is still
   starting is refused (the pod would come up with the old mode). Worlds are flagged "open to everyone" in
   the UI.
-- Ops come from the backup.
+- **Admins** (`ops`, per world): ticked per player next to the whitelist.
+  On a whitelisted world they must be on the whitelist, and taking someone
+  off the whitelist removes their admin; an open world accepts any valid
+  name. Applied live with RCON `op`/`deop` and persisted into the release
+  values (`OPS` env, `EXISTING_OPS_FILE=SYNCHRONIZE`) so `ops.json` matches
+  the list at each start. An empty list leaves `ops.json` alone
+  (`EXISTING_OPS_FILE=SKIP`), so a world restored from a backup keeps the
+  backup's ops until admins are chosen.
 
 ## Dashboard access
 

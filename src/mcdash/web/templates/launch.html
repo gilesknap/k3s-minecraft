@@ -31,7 +31,7 @@
   </label>
   {% endif %}
   {% include "_settings_fields.html" %}
-  <div class="span2">{{ whitelist_fields(roster, settings.whitelist, settings.open_to_all) }}</div>
+  <div class="span2">{{ whitelist_fields(roster, settings.whitelist, settings.open_to_all, settings.ops) }}</div>
   <div class="span2 formactions">
     {% if backup %}
     <button class="btn primary big">Launch</button>
