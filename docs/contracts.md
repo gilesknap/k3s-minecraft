@@ -54,7 +54,11 @@ in their report.
   operation). Exists from launch, before any Helm release, so it reserves the
   name and both ports while seeding. A record without `rconPort` (world
   launched before RCON NodePorts) gets one, saved at once, on its next
-  install; with the RCON range full that install fails with `Conflict`; rebuilt from the release's `mcdash:` values if lost. `create_world`
+  install with the server running (start, end of a restore, settings save
+  while running; stop and the restore drain never allocate). With the RCON
+  range full that install fails with `Conflict`; after a restore the op stays
+  at `step: seed`, so Start re-runs the seed and fails the same way until a
+  world is deleted (or the range widened) to free a port. Rebuilt from the release's `mcdash:` values if lost. `create_world`
   records op `{kind: create, step: install}` until the release is installed,
   so an interrupted create is finished by the reconciler.
 - Secret `<w>-rcon` — key `rcon-password`, random.

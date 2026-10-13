@@ -384,7 +384,7 @@ def create_app(service: DashboardService) -> FastAPI:
         htmx-only, so a plain navigation never renders it as a page that ends
         up in browser history.
         """
-        if request.headers.get("hx-request") != "true":
+        if not is_htmx(request):
             raise MCDashError("Use the Reveal button on the world page")
         password = service.rcon_password(name, actor)
         resp = render(request, "_rcon_password.html", password=password)

@@ -401,3 +401,18 @@ def test_too_long_command_keeps_the_connection(svc: KubeDashboardService) -> Non
         svc.rcon(name, "say " + "x" * 2000, ME)
     svc.rcon(name, "say again", ME)
     assert rcon.connects == opened  # rejected before sending; no reconnect
+
+
+def test_evicted_when_upgrade_fails(svc: KubeDashboardService) -> None:
+    # helm runs without --atomic, so a failed upgrade may still have
+    # replaced the pod: the pooled connection must not survive it
+    _, helm, rcon = parts(svc)
+    name = launch_running(svc)
+    assert svc.rcon_pool.connected(name)
+    s = svc.get_world(name).settings
+    s.memory = "6Gi"
+    helm.fail_next = "apply failed part-way"
+    with pytest.raises(MCDashError, match="apply failed part-way"):
+        svc.update_settings(name, s, ME)
+    assert not svc.rcon_pool.connected(name)
+    assert not rcon.open_conns

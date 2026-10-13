@@ -191,7 +191,9 @@ and a few tenths of a millisecond from the LAN.
   **30600–30619** by default (`worlds.rconPortMin/rconPortMax`), allocated
   like the game port: lowest free at launch, kept for the world's life,
   stored as `rconPort` in the world record and the release's `mcdash:`
-  values. Worlds that predate it get one at their next install. The itzg
+  values. Worlds that predate it get one at their next install with the server
+  running (start, end of a restore, settings save while running); stop and
+  the restore drain never allocate. The itzg
   chart's own RCON Service is switched to `NodePort` with that `nodePort` and
   `externalTrafficPolicy: Local` (supported by itzg 5.2.0's `rcon-svc.yaml`;
   no extra Service needed).

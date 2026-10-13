@@ -8,7 +8,8 @@ Each world has a ConfigMap ``<w>-mcdash`` (label ``mcdash/kind=world``) with:
   forgeVersion, message}``. It exists from the moment of launch (before any
   Helm release), so it reserves the ports while seeding. ``rconPort`` is
   absent for worlds launched before RCON NodePorts existed; their next
-  install assigns one. The same metadata is mirrored into
+  install with the server running (start, end of a restore, a settings save
+  while running) assigns one. The same metadata is mirrored into
   the Helm release values under ``mcdash:`` on every install/upgrade; if the
   ConfigMap is lost it is rebuilt from the release values.
 * ``op`` — JSON pending multi-step operation (or empty). The reconciler
@@ -354,10 +355,13 @@ class KubeDashboardService:
             forge_version=spec.get("forgeVersion") or None,
             rcon_port=int(spec.get("rconPort") or 0),
         )
-        self.helm.upgrade_install(name, values)
-        self._values_cache.pop(name, None)
-        # an upgrade may replace or stop the server pod
-        self.rcon_pool.evict(name)
+        try:
+            self.helm.upgrade_install(name, values)
+        finally:
+            self._values_cache.pop(name, None)
+            # an upgrade may replace or stop the server pod, even one that
+            # fails part-way (no --atomic)
+            self.rcon_pool.evict(name)
 
     def _rcon_password(self, name: str) -> str:
         pw = self._secret_cache.get(name)
