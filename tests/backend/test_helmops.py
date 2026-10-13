@@ -102,6 +102,8 @@ def test_render_values() -> None:
     assert ms["ops"] == "giles"
     assert v["extraEnv"]["EXISTING_OPS_FILE"] == "SYNCHRONIZE"
     assert v["mcdash"]["port"] == 30566
+    # above itzg's STOP_DURATION (60s), so the server finishes its stop save
+    assert v["extraPodSpec"] == {"terminationGracePeriodSeconds": "90"}
     assert v["mcdash"]["settings"]["whitelist"] == ["noah", "giles"]
 
     plain = render_values("w", WorldSettings(), 30565, Config())
@@ -173,6 +175,7 @@ def test_render_against_real_chart(tmp_path: Path) -> None:
     assert 'name: OPS\n          value: "noah"' in out
     assert 'name: EXISTING_OPS_FILE\n          value: "SYNCHRONIZE"' in out
     assert "startupProbe:" in out
+    assert "terminationGracePeriodSeconds: 90\n" in out
     assert 'name: SEED\n          value: "12345"' in out
     assert 'name: LEVEL_TYPE\n          value: "minecraft:flat"' in out
     assert "RCON_CMDS_STARTUP" not in out

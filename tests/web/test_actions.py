@@ -387,6 +387,14 @@ def test_world_state_after_stop(client: TestClient, svc: FakeDashboardService) -
     assert len(svc.list_snapshots("noah-james")) == snaps  # no snapshot on stop
 
 
+def test_stop_refused_while_busy(client: TestClient, svc: FakeDashboardService) -> None:
+    for busy in (WorldState.SNAPSHOTTING, WorldState.SEEDING):
+        svc.worlds["noah-james"].state = busy
+        r = client.post("/worlds/noah-james/stop")
+        assert r.status_code == 409 and "busy" in r.text
+        assert svc.worlds["noah-james"].state is busy
+
+
 # -- new world ------------------------------------------------------------------
 NEW_FORM = {
     "name": "fresh",

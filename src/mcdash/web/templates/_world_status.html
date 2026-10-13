@@ -23,7 +23,7 @@
   <form method="post" action="/worlds/{{ world.name }}/start" hx-post="/worlds/{{ world.name }}/start" hx-target="#world-status"><button class="btn primary">Start</button></form>
   {% endif %}
   {% if world.state in (WorldState.RUNNING, WorldState.STARTING, WorldState.FAILED) %}
-  <form method="post" action="/worlds/{{ world.name }}/stop" hx-post="/worlds/{{ world.name }}/stop" hx-target="#world-status"><button class="btn" title="Scales to zero. Data and port are kept; no snapshot is taken.">Stop</button></form>
+  <form method="post" action="/worlds/{{ world.name }}/stop" hx-post="/worlds/{{ world.name }}/stop" hx-target="#world-status"><button class="btn" title="Saves the world, then scales to zero. Data and port are kept; no snapshot is taken.">Stop</button></form>
   {% endif %}
   <form method="post" action="/worlds/{{ world.name }}/snapshot" hx-post="/worlds/{{ world.name }}/snapshot" hx-target="#world-status"><button class="btn" {% if busy %}disabled{% endif %}>Snapshot now</button></form>
 </div>

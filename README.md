@@ -19,8 +19,9 @@ The worlds this was built for, and the story behind them, are in
 - **Launch** any archived, promoted or snapshot zip as a new world. The
   dashboard detects vanilla or Forge and the original Minecraft version, and
   pre-fills the launch form from the backup's `server.properties`.
-- **Stop/Start** a world while keeping its data volume and port. Stopping
-  takes no snapshot: the world stays on its volume.
+- **Stop/Start** a world while keeping its data volume and port. Stop
+  flushes the world (`save-all flush`) and then scales to 0; it takes no
+  snapshot, as the world stays on its volume.
 - **Snapshots**: take one at any time; one is also taken before a delete or
   a restore. The last 10 per world are kept. **Promote** a snapshot
   to a named backup that is never pruned.

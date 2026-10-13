@@ -222,6 +222,11 @@ def settings_from_json(d: dict[str, Any] | None) -> WorldSettings:
     return WorldSettings(**kw)
 
 
+# Pod terminationGracePeriodSeconds: comfortably above itzg's STOP_DURATION
+# (60s default), which the server gets to save and shut down after SIGTERM.
+STOP_GRACE_SECONDS = 90
+
+
 def render_values(
     world: str,
     settings: WorldSettings,
@@ -355,6 +360,11 @@ def render_values(
         # can take many minutes; without a startup probe the chart's liveness
         # probe (30s + 20 x 5s) kills it mid-upgrade.
         "startupProbe": {"enabled": True, "failureThreshold": 90, "periodSeconds": 10},
+        # Stop sends SIGTERM; itzg's runner then sends "stop" and waits up to
+        # STOP_DURATION (60s) for the save. The k8s default grace period
+        # (30s) would SIGKILL it first. extraPodSpec values go through tpl,
+        # so the number is a string.
+        "extraPodSpec": {"terminationGracePeriodSeconds": str(STOP_GRACE_SECONDS)},
         "podLabels": {"mcdash/world": world},
         "deploymentLabels": {"mcdash/world": world},
         "mcdash": {

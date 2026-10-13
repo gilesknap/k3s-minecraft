@@ -167,17 +167,57 @@ def test_stop_start(svc: KubeDashboardService) -> None:
     kube, helm, rcon = parts(svc)
     name = launch_running(svc)
     rcon.log.clear()
+    flushed_at: list[int] = []
+    orig = helm.upgrade_install
+
+    def upgrade(release: str, values: dict[str, Any]) -> None:
+        if values.get("replicaCount") == 0:
+            flushed_at.append(len(rcon.log))
+        orig(release, values)
+
+    helm.upgrade_install = upgrade  # type: ignore[method-assign]
     svc.stop(name, ME)
     w = svc.get_world(name)
     assert w.state is WorldState.STOPPED and w.port == 30565
-    # no snapshot on stop: the world stays on its PVC
+    # no snapshot on stop: the world stays on its PVC, flushed before SIGTERM
     assert not kube.active_jobs("snapshot") and not svc.list_snapshots(name)
-    assert not rcon.log
+    assert [c for _, c in rcon.log] == ["save-all flush"]
+    assert flushed_at == [1]  # the flush was sent before the scale to 0
     assert helm.releases[name]["replicaCount"] == 0
     svc.stop(name, ME)  # idempotent
     svc.start(name, ME)
     assert svc.get_world(name).state is WorldState.RUNNING
     assert helm.releases[name]["minecraftServer"]["nodePort"] == 30565
+
+
+def test_stop_when_flush_fails(svc: KubeDashboardService) -> None:
+    _, helm, rcon = parts(svc)
+    name = launch_running(svc)
+    svc.rcon_pool.evict(name)
+    rcon.fail = True  # RCON unreachable: stop still goes ahead
+    svc.stop(name, ME)
+    assert svc.get_world(name).state is WorldState.STOPPED
+    assert helm.releases[name]["replicaCount"] == 0
+
+
+def test_start_refused_while_old_pod_terminates(svc: KubeDashboardService) -> None:
+    kube, helm, _ = parts(svc)
+    name = launch_running(svc)
+    svc.stop(name, ME)
+    # the old pod is still saving after the scale to 0
+    lingering = PodInfo(name="x", phase="Running", ready=False, deleting=True)
+    kube.pods[name] = [lingering]
+    w = svc.get_world(name)
+    assert w.state is WorldState.STOPPED and "shutting down" in w.message
+    upgrades = len(helm.calls)
+    with pytest.raises(Conflict, match="still shutting down"):
+        svc.start(name, ME)
+    assert len(helm.calls) == upgrades  # no second server on the volume
+    assert helm.releases[name]["replicaCount"] == 0
+    kube.pods.pop(name)
+    assert svc.get_world(name).message == ""
+    svc.start(name, ME)
+    assert svc.get_world(name).state is WorldState.RUNNING
 
 
 def test_stop_clears_a_failed_op(svc: KubeDashboardService) -> None:
@@ -193,14 +233,32 @@ def test_stop_clears_a_failed_op(svc: KubeDashboardService) -> None:
 
 
 def legacy_stop(svc: KubeDashboardService, name: str) -> None:
-    """Persist a ``stop`` op the way older dashboards did (snapshot first)."""
-    spec, _, values = svc._load(name)
-    svc._begin_snapshot(name, spec, values, "stop")
+    """Persist a ``stop`` op as older dashboards did: saving paused, snapshot.
+
+    A literal record in the old shape, so a change to ``_begin_snapshot``
+    cannot hide a break in reading it. The reconciler recreates its Job.
+    """
+    spec, _, _ = svc._load(name)
+    stamp = "20260101T000000Z"
+    svc._save(
+        name,
+        spec,
+        {
+            "kind": "stop",
+            "step": "snapshot",
+            "job": f"{name}-snap-{stamp.lower().rstrip('z')}",
+            "dest": f"/store/snapshots/{name}/{stamp}.zip",
+            "local": str(svc.cfg.snapshots_dir / name / f"{stamp}.zip"),
+            "paused": True,
+        },
+    )
+    svc.reconcile_once()  # the old dashboard's Job: recreated if missing
 
 
 def test_legacy_stop_op_still_finishes(svc: KubeDashboardService) -> None:
     _, helm, rcon = parts(svc)
     name = launch_running(svc)
+    rcon.log.clear()
     legacy_stop(svc, name)
     assert svc.get_world(name).state is WorldState.SNAPSHOTTING
     complete(svc, "snapshot")
@@ -213,6 +271,7 @@ def test_legacy_stop_op_still_finishes(svc: KubeDashboardService) -> None:
 def test_legacy_stop_aborts_when_snapshot_fails(svc: KubeDashboardService) -> None:
     _, helm, rcon = parts(svc)
     name = launch_running(svc)
+    rcon.log.clear()
     legacy_stop(svc, name)
     complete(svc, "snapshot", ok=False)
     w = svc.get_world(name)
