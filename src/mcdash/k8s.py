@@ -83,6 +83,9 @@ class JobSpec:
     store_sub_path: str = ""
     store_mount: str = ""
     backoff_limit: int = 1
+    # None = no limit. A Job that cannot start (image pull, no memory on the
+    # node) otherwise never finishes, so callers waiting on it never give up.
+    active_deadline_seconds: int | None = None
 
 
 class KubeApi(Protocol):
@@ -385,6 +388,7 @@ class Kube:
             metadata=c.V1ObjectMeta(name=spec.name, namespace=self.ns, labels=labels),
             spec=c.V1JobSpec(
                 backoff_limit=spec.backoff_limit,
+                active_deadline_seconds=spec.active_deadline_seconds,
                 ttl_seconds_after_finished=3600,
                 template=c.V1PodTemplateSpec(
                     metadata=c.V1ObjectMeta(labels=labels), spec=pod_spec

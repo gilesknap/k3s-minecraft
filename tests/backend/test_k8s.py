@@ -79,8 +79,10 @@ def test_build_commands_job(cfg: Config) -> None:
             store_sub_path="dashboard/commands",
             store_mount="/out",
             backoff_limit=0,
+            active_deadline_seconds=600,
         )
     )
+    assert job.spec.active_deadline_seconds == 600
     spec = job.spec.template.spec
     c = spec.containers[0]
     assert c.image == "itzg/minecraft-server:latest"

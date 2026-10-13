@@ -76,6 +76,7 @@ from mcdash.rcon import RconClient, RconError, parse_list
 from mcdash.store import Store, read_json
 
 log = logging.getLogger(__name__)
+COMMANDS_JOB_DEADLINE = 600  # seconds
 
 CM_SUFFIX = "-mcdash"
 CM_KIND = "world"
@@ -817,7 +818,7 @@ class KubeDashboardService:
             tree: CommandTree | None = CommandTree.load(
                 path, self.commands_dir / f"{version}.registries.json"
             )
-        except (OSError, ValueError) as e:
+        except (OSError, ValueError, TypeError, AttributeError, KeyError) as e:
             log.warning("bad command report %s: %s", path, e)
             tree = None
         self._trees[version] = (mtime, tree)
@@ -899,9 +900,16 @@ class KubeDashboardService:
             store_sub_path=self.commands_dir.relative_to(self.cfg.store_dir).as_posix(),
             store_mount="/out",
             backoff_limit=0,
+            # ~6 s of work; a pod stuck pending fails the Job, and a failed
+            # Job is not repeated for this pod, so the console degrades to
+            # history-only instead of waiting forever.
+            active_deadline_seconds=COMMANDS_JOB_DEADLINE,
         )
         with contextlib.suppress(Conflict):
             self.kube.create_job(spec)
+            log.info(
+                "started commands Job %s for %s on pod %s", spec.name, name, pod.name
+            )
         return True
 
     # ================================================================ roster

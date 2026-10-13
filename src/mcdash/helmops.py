@@ -118,7 +118,7 @@ def startup_rcon_commands(settings: WorldSettings) -> list[str]:
     """
     if normalize_gamemode(settings.gamemode) != "adventure":
         return []
-    t = _version_tuple(settings.version or "")
+    t = version_tuple(settings.version or "")
     if t is not None and t < FORCELOAD_MIN_VERSION:
         return []
     return [FORCELOAD_SPAWN_CMD]

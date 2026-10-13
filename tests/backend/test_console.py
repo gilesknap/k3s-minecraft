@@ -137,4 +137,10 @@ def test_bad_pointer_and_report_are_ignored(svc: KubeDashboardService) -> None:
     )
     (d / "26.3.commands.json").write_text("{not json")
     assert svc.complete(name, "ti").status == "none"
+    # valid JSON with the wrong shape is ignored too, not a 500
+    (d / "26.3.commands.json").write_text(
+        json.dumps({"type": "root", "children": {"time": ["not", "a", "node"]}})
+    )
+    svc._trees.clear()
+    assert svc.complete(name, "ti").status == "none"
     assert not kube.active_jobs("commands")
