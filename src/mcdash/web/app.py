@@ -456,9 +456,7 @@ def create_app(service: DashboardService) -> FastAPI:
     @app.post("/worlds/{name}/stop")
     def world_stop(request: Request, name: str, actor: Actor) -> Response:
         service.stop(name, actor)
-        return partial_or_done(
-            request, name, f"Stopping {name} (a snapshot is taken first)"
-        )
+        return partial_or_done(request, name, f"Stopping {name}")
 
     @app.post("/worlds/{name}/snapshot")
     def world_snapshot(request: Request, name: str, actor: Actor) -> Response:

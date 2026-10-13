@@ -29,7 +29,7 @@ anything in the cluster.
 |------|------------------------|------------|--------|-----------------|
 | **Archive** (precious) | `/bigdisk/minecraft-archive/` | nobody — `a-w` on the NAS **and** `readOnly` mount | never | no |
 | **Backups** (promoted) | `/bigdisk/k8s-cluster/minecraft/backups/` | "Promote" of a snapshot | never | yes, typed-name confirm |
-| **Snapshots** (rolling) | `/bigdisk/k8s-cluster/minecraft/snapshots/<world>/` | manual / on stop / before delete / before restore | keep last 10 per world | yes |
+| **Snapshots** (rolling) | `/bigdisk/k8s-cluster/minecraft/snapshots/<world>/` | manual / before delete / before restore | keep last 10 per world | yes |
 | Dashboard state | `/bigdisk/k8s-cluster/minecraft/dashboard/` | dashboard | — | — |
 | Live world data | dynamic `nfs-rwx` PVC per world (`/k8s-dynamic`) | the server | — | via world delete |
 
@@ -89,8 +89,14 @@ To be recovered from Drive and ingested later.
   world (state: starting → running). Snapshot it to keep it; its snapshots are
   launchable and promotable like any other. Useful for disposable test worlds
   before any precious backup is copied in.
-- **Stop/Start**: `replicas` 0↔1 via helm values. Stop snapshots first. PVC
-  and port are kept.
+- **Stop/Start**: `replicas` 0↔1 via helm values. PVC and port are kept.
+  Stop flushes the world (`save-all flush`) and then scales to 0; it takes
+  no snapshot: the data stays on the PVC, so one would protect nothing,
+  slow stop/restart, and push manual snapshots out of the rolling 10. Use
+  "Snapshot now" first if wanted. The pod gets a 90s termination grace
+  period (above itzg's 60s `STOP_DURATION`) to finish its own stop save.
+  Start is refused until the old pod is gone (shown as "stopping"), so two
+  servers never share the PVC.
 - **Restore from…** (on an existing world): snapshot current state → stop →
   wipe + reseed PVC → start. Keeps port, whitelist, and settings.
 - **Delete**: snapshot → uninstall release → delete PVC and Secret, freeing
@@ -158,9 +164,10 @@ rendered into the release at install time and take effect at the next start.
 - **Synchronous chunk writes**: worlds live on NFS (`nfs-rwx`), where
   synchronous writes make every chunk save wait for the disk. Off is much
   cheaper; the risk is losing the last few seconds of changes if the server
-  crashes hard. A clean stop flushes everything, and snapshots run
-  `save-all flush` first, so they are unaffected. The dashboard therefore
-  defaults it off for every launch and new world, whatever the backup said.
+  crashes hard. Stop flushes the world (`save-all flush`) and then scales to
+  0, and snapshots run `save-all flush` first, so they are unaffected. The
+  dashboard therefore defaults it off for every launch and new world, whatever
+  the backup said.
 - **Hardcore** only matters when the server generates the world, so it is on
   the New world form only, like seed and world type. It is not rendered when
   off, so a backup's `hardcore=true` is never overwritten.
@@ -219,7 +226,9 @@ needs a manual `setworldspawn`.
 
 RCON `save-off` + `save-all flush` → Job zips the PVC (excluding regenerable
 dirs) to `snapshots/<world>/<UTC-timestamp>.zip` in the same layout the seeder
-accepts → RCON `save-on`. Triggers: "Snapshot now", stop, delete, restore.
+accepts → RCON `save-on`. Triggers: "Snapshot now", delete, restore (the
+destructive ones). Stop does not snapshot; a `stop` op persisted by an older
+dashboard (snapshot → scale 0) is still finished by the reconciler.
 Retention: last 10 per world. **Promote** copies a snapshot into Backups with
 a name and description.
 

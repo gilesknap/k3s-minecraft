@@ -30,7 +30,7 @@ def test_stop_htmx_from_worlds_table(
     assert svc.calls[-1] == ("stop", "noah-james", ACTOR)
     assert "<table" in r.text  # the refreshed table partial
     assert 'hx-swap-oob="innerHTML"' in r.text
-    assert "snapshot is taken first" in r.text
+    assert "Stopping noah-james" in r.text and "taken first" not in r.text
 
 
 def test_snapshot_htmx_from_world_page(
@@ -428,8 +428,18 @@ def test_get_on_action_not_allowed(client: TestClient) -> None:
 
 
 def test_world_state_after_stop(client: TestClient, svc: FakeDashboardService) -> None:
+    snaps = len(svc.list_snapshots("noah-james"))
     client.post("/worlds/noah-james/stop")
-    assert svc.worlds["noah-james"].state is WorldState.SNAPSHOTTING
+    assert svc.worlds["noah-james"].state is WorldState.STOPPED
+    assert len(svc.list_snapshots("noah-james")) == snaps  # no snapshot on stop
+
+
+def test_stop_refused_while_busy(client: TestClient, svc: FakeDashboardService) -> None:
+    for busy in (WorldState.SNAPSHOTTING, WorldState.SEEDING):
+        svc.worlds["noah-james"].state = busy
+        r = client.post("/worlds/noah-james/stop")
+        assert r.status_code == 409 and "busy" in r.text
+        assert svc.worlds["noah-james"].state is busy
 
 
 # -- new world ------------------------------------------------------------------

@@ -17,10 +17,15 @@ Each world has a ConfigMap ``<w>-mcdash`` (label ``mcdash/kind=world``) with:
   resumes where it left off.
 
 Operations: ``launch`` (seed -> install), ``create`` (install only: a new
-world has no backup, the server generates it on the empty volume), ``stop``
-(snapshot -> scale 0), ``snapshot``, ``restore`` (snapshot -> scale 0 ->
-drain -> seed -> scale 1), ``delete`` (snapshot -> teardown). An op with
-``error`` set means FAILED.
+world has no backup, the server generates it on the empty volume),
+``snapshot``, ``restore`` (snapshot -> scale 0 -> drain -> seed -> scale 1),
+``delete`` (snapshot -> teardown). An op with ``error`` set means FAILED.
+Stop is not an op: it flushes the world (``save-all flush``) and then scales
+to 0; it takes no snapshot (the data stays on the PVC). Start is not an op
+either, except that it retries a failed ``launch`` seed; it is refused while
+a scaled-to-0 world's old pod is still shutting down. A ``stop`` op persisted
+by an older dashboard (snapshot -> scale 0) is still finished by the
+reconciler.
 """
 
 from __future__ import annotations
@@ -273,6 +278,12 @@ def check_ops_change(
             f"{name}'s last admin; start it first"
         )
     raise Conflict(f"{name} is not running; start it to remove its last admin")
+
+
+def _live(pods: list[PodInfo]) -> list[PodInfo]:
+    """Server pods that may still hold the volume: finished ones (e.g. an
+    Evicted pod left in phase Failed) never run again, so they don't count."""
+    return [p for p in pods if p.phase not in ("Succeeded", "Failed")]
 
 
 @dataclass(frozen=True)
@@ -544,6 +555,16 @@ class KubeDashboardService:
         except (TypeError, ValueError):
             return 1
 
+    def _shutting_down(
+        self, values: dict[str, Any] | None, pods: list[PodInfo]
+    ) -> bool:
+        """A scaled-to-0 (or uninstalled) world whose server pod still exists.
+
+        The pod may still be saving and holds the volume: nothing else (a
+        new server, a seed Job) may use it yet.
+        """
+        return self._replicas(values) == 0 and bool(_live(pods))
+
     def _snapshot_paths(self, name: str, file_stamp: str) -> tuple[Path, str]:
         local = self.cfg.snapshots_dir / name / f"{file_stamp}.zip"
         job = f"{self.cfg.job_store_mount}/snapshots/{name}/{file_stamp}.zip"
@@ -573,6 +594,8 @@ class KubeDashboardService:
         if values is None:
             return WorldState.FAILED, "no helm release"
         if self._replicas(values) == 0:
+            if self._shutting_down(values, pods):
+                return WorldState.STOPPED, "stopping: server still shutting down"
             return WorldState.STOPPED, ""
         live = [p for p in pods if not p.deleting]
         if any(p.ready for p in live):
@@ -867,6 +890,13 @@ class KubeDashboardService:
                 self._save(name, spec, op)
                 self.kube.create_job(jspec)
             else:
+                if values and self._shutting_down(
+                    values, self.kube.list_server_pods(name)
+                ):
+                    # a second server on the same volume would corrupt it
+                    raise Conflict(
+                        f"{name} is still shutting down; try again in a moment"
+                    )
                 spec["message"] = ""
                 self._save(name, spec, None)
                 self._install(name, spec, replicas=1)
@@ -880,6 +910,11 @@ class KubeDashboardService:
         kind: str,
         **extra: Any,
     ) -> None:
+        if values is not None and self._shutting_down(
+            values, self.kube.list_server_pods(name)
+        ):
+            # the old pod may still be saving: a zip now could be torn
+            raise Conflict(f"{name} is still shutting down; try again in a moment")
         k8s_ts, file_ts = self._stamp()
         local, job_path = self._snapshot_paths(name, file_ts)
         op: dict[str, Any] = {
@@ -922,9 +957,17 @@ class KubeDashboardService:
             self._busy(name, op)
             if values is None or (self._replicas(values) == 0 and not op):
                 return
-            if op:  # failed op: clear it
-                op = None
-            self._begin_snapshot(name, spec, values, "stop")
+            # No snapshot: the world stays on its PVC. Flush it first, so the
+            # data is on disk before the pod gets SIGTERM.
+            pods = self.kube.list_server_pods(name)
+            if self._replicas(values) and any(p.ready for p in pods):
+                try:
+                    self._rcon_cmds(name, ["save-all flush"], pods=pods)
+                except (RconError, MCDashError, OSError) as e:
+                    log.warning("%s: could not flush before stop: %s", name, e)
+            spec["message"] = ""
+            self._save(name, spec, None)  # clears a failed op too
+            self._install(name, spec, replicas=0)
             self.store.audit(actor, "stop", name)
 
     def snapshot(self, name: str, actor: str) -> None:
@@ -1275,7 +1318,7 @@ class KubeDashboardService:
                     log.warning("%s: prune failed: %s", name, e)
                 if kind == "snapshot":
                     self._save(name, spec, None)
-                elif kind == "stop":
+                elif kind == "stop":  # persisted by an older dashboard
                     self._install(name, spec, replicas=0)
                     self._save(name, spec, None)
                 elif kind == "restore":
@@ -1286,7 +1329,7 @@ class KubeDashboardService:
                     self._save(name, spec, {**op, "step": "teardown"})
                 return True
             if step == "drain":
-                if [p for p in self.kube.list_server_pods(name)]:
+                if _live(self.kube.list_server_pods(name)):
                     return False
                 job, jspec = self._seed_job(
                     name, op["backup"], settings_from_json(spec.get("settings"))

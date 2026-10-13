@@ -291,11 +291,13 @@ class FakeDashboardService:
         w = self._world(name)
         if w.state is WorldState.STOPPED:
             raise Conflict(f"{name} is already stopped")
-        self._take_snapshot(name)
-        w.state, w.message = WorldState.SNAPSHOTTING, "Snapshot before stop"
+        if w.state in (WorldState.SNAPSHOTTING, WorldState.SEEDING):
+            # like the real service: no stop while an op is in progress
+            raise Conflict(f"{name} is busy ({w.state} in progress)")
+        w.state, w.message = WorldState.STOPPED, ""
         w.players_online = w.uptime_seconds = None
         w.cpu_millicores = w.memory_bytes = None
-        self._later(name, 4, WorldState.STOPPED)
+        self._pending.pop(name, None)
 
     def snapshot(self, name: str, actor: str) -> None:
         self._record("snapshot", name, actor)

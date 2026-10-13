@@ -129,6 +129,17 @@ def post_ok(client: httpx.Client, url: str, data: dict[str, str] | None = None) 
     assert r.status_code < 400, f"POST {url} -> {r.status_code}\n{r.text[:2000]}"
 
 
+def post_ok_when_free(client: httpx.Client, url: str, timeout: int = 180) -> None:
+    """``post_ok``, retrying while the server answers 409 (world busy)."""
+    deadline = time.monotonic() + timeout
+    while True:
+        r = client.post(url, data={}, follow_redirects=False)
+        if r.status_code != 409 or time.monotonic() > deadline:
+            break
+        time.sleep(5)
+    assert r.status_code < 400, f"POST {url} -> {r.status_code}\n{r.text[:2000]}"
+
+
 def snapshot_files(world: str) -> list[str]:
     r = kubectl(
         "exec",
@@ -264,10 +275,15 @@ def test_world_lifecycle(client: httpx.Client) -> None:
     wait_state(client, WORLD, "running")
     assert snap_id in client.get(f"/worlds/{WORLD}/status").text
 
-    # Stop (snapshots first) -> stopped; start -> running again.
+    # Stop (no snapshot: the world stays on its PVC) -> stopped; start ->
+    # running again.
+    snaps_before_stop = set(snapshot_files(WORLD))
     post_ok(client, f"/worlds/{WORLD}/stop")
-    wait_state(client, WORLD, "stopped", timeout=600)
-    post_ok(client, f"/worlds/{WORLD}/start")
+    wait_state(client, WORLD, "stopped", timeout=300)
+    assert set(snapshot_files(WORLD)) == snaps_before_stop, "stop took a snapshot"
+    # "stopped" shows as soon as it scales to 0; start is refused (409) until
+    # the old pod has finished shutting down
+    post_ok_when_free(client, f"/worlds/{WORLD}/start")
     wait_state(client, WORLD, "running")
 
     # Delete needs the typed name; a wrong confirmation is refused.

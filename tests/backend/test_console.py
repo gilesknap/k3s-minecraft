@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from pathlib import Path
 
 from mcdash.completion import REPORT_SCRIPT
 from mcdash.service import KubeDashboardService
@@ -88,15 +87,6 @@ def test_stopped_world_uses_the_last_known_tree(svc: KubeDashboardService) -> No
     name = launch_running(svc)
     write_report(svc, name, f"{name}-abc")
     svc.stop(name, ME)
-    kube.finish_jobs("snapshot")
-    for j in kube.jobs.values():
-        if j.spec.kind == "snapshot":
-            local = svc.cfg.store_dir / Path(
-                j.spec.args[j.spec.args.index("--dest") + 1]
-            ).relative_to("/store")
-            local.parent.mkdir(parents=True, exist_ok=True)
-            local.write_bytes(b"zip")
-    svc.reconcile_once()
     assert not kube.pods.get(name)
     rcon.log.clear()
     c = svc.complete(name, "tp ")

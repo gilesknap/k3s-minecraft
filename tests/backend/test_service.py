@@ -164,13 +164,25 @@ def test_snapshot_pauses_saving_and_prunes(svc: KubeDashboardService) -> None:
 
 
 def test_stop_start(svc: KubeDashboardService) -> None:
-    _, helm, _ = parts(svc)
+    kube, helm, rcon = parts(svc)
     name = launch_running(svc)
+    rcon.log.clear()
+    flushed_at: list[int] = []
+    orig = helm.upgrade_install
+
+    def upgrade(release: str, values: dict[str, Any]) -> None:
+        if values.get("replicaCount") == 0:
+            flushed_at.append(len(rcon.log))
+        orig(release, values)
+
+    helm.upgrade_install = upgrade  # type: ignore[method-assign]
     svc.stop(name, ME)
-    assert svc.get_world(name).state is WorldState.SNAPSHOTTING
-    complete(svc, "snapshot")
     w = svc.get_world(name)
     assert w.state is WorldState.STOPPED and w.port == 30565
+    # no snapshot on stop: the world stays on its PVC, flushed before SIGTERM
+    assert not kube.active_jobs("snapshot") and not svc.list_snapshots(name)
+    assert [c for _, c in rcon.log] == ["save-all flush"]
+    assert flushed_at == [1]  # the flush was sent before the scale to 0
     assert helm.releases[name]["replicaCount"] == 0
     svc.stop(name, ME)  # idempotent
     svc.start(name, ME)
@@ -178,10 +190,121 @@ def test_stop_start(svc: KubeDashboardService) -> None:
     assert helm.releases[name]["minecraftServer"]["nodePort"] == 30565
 
 
-def test_stop_aborts_when_snapshot_fails(svc: KubeDashboardService) -> None:
+def test_stop_when_flush_fails(svc: KubeDashboardService) -> None:
     _, helm, rcon = parts(svc)
     name = launch_running(svc)
+    svc.rcon_pool.evict(name)
+    rcon.fail = True  # RCON unreachable: stop still goes ahead
     svc.stop(name, ME)
+    assert svc.get_world(name).state is WorldState.STOPPED
+    assert helm.releases[name]["replicaCount"] == 0
+
+
+def test_start_refused_while_old_pod_terminates(svc: KubeDashboardService) -> None:
+    kube, helm, _ = parts(svc)
+    name = launch_running(svc)
+    svc.stop(name, ME)
+    # the old pod is still saving after the scale to 0
+    lingering = PodInfo(name="x", phase="Running", ready=False, deleting=True)
+    kube.pods[name] = [lingering]
+    w = svc.get_world(name)
+    assert w.state is WorldState.STOPPED and "shutting down" in w.message
+    upgrades = len(helm.calls)
+    with pytest.raises(Conflict, match="still shutting down"):
+        svc.start(name, ME)
+    assert len(helm.calls) == upgrades  # no second server on the volume
+    assert helm.releases[name]["replicaCount"] == 0
+    kube.pods.pop(name)
+    assert svc.get_world(name).message == ""
+    svc.start(name, ME)
+    assert svc.get_world(name).state is WorldState.RUNNING
+
+
+@pytest.mark.parametrize("action", ["snapshot", "restore", "delete"])
+def test_snapshot_refused_while_old_pod_terminates(
+    svc: KubeDashboardService, action: str
+) -> None:
+    kube, _, _ = parts(svc)
+    name = launch_running(svc)
+    svc.stop(name, ME)
+    kube.pods[name] = [PodInfo(name="x", phase="Running", ready=False, deleting=True)]
+    calls = {
+        "snapshot": lambda: svc.snapshot(name, ME),
+        "restore": lambda: svc.restore(name, FIRE, ME),
+        "delete": lambda: svc.delete(name, ME),
+    }
+    with pytest.raises(Conflict, match="still shutting down"):
+        calls[action]()
+    assert svc._load(name)[1] is None  # no op started
+    kube.pods.pop(name)
+    calls["snapshot"]()
+    assert svc._load(name)[1]["kind"] == "snapshot"
+
+
+def test_finished_pod_does_not_block_start(svc: KubeDashboardService) -> None:
+    kube, _, _ = parts(svc)
+    name = launch_running(svc)
+    svc.stop(name, ME)
+    # an Evicted pod stays in phase Failed until garbage-collected
+    kube.pods[name] = [PodInfo(name="x", phase="Failed", ready=False)]
+    assert svc.get_world(name).message == ""
+    svc.start(name, ME)
+    assert svc.get_world(name).state is WorldState.RUNNING
+
+
+def test_stop_clears_a_failed_op(svc: KubeDashboardService) -> None:
+    _, helm, _ = parts(svc)
+    name = launch_running(svc)
+    spec, _, _ = svc._load(name)
+    svc._save(name, spec, {"kind": "snapshot", "step": "snapshot", "error": "x"})
+    assert svc.get_world(name).state is WorldState.FAILED
+    svc.stop(name, ME)
+    assert svc._load(name)[1] is None
+    assert svc.get_world(name).state is WorldState.STOPPED
+    assert helm.releases[name]["replicaCount"] == 0
+
+
+def legacy_stop(svc: KubeDashboardService, name: str) -> None:
+    """Persist a ``stop`` op as older dashboards did: saving paused, snapshot.
+
+    A literal record in the old shape, so a change to ``_begin_snapshot``
+    cannot hide a break in reading it. The reconciler recreates its Job.
+    """
+    spec, _, _ = svc._load(name)
+    stamp = "20260101T000000Z"
+    svc._save(
+        name,
+        spec,
+        {
+            "kind": "stop",
+            "step": "snapshot",
+            "job": f"{name}-snap-{stamp.lower().rstrip('z')}",
+            "dest": f"/store/snapshots/{name}/{stamp}.zip",
+            "local": str(svc.cfg.snapshots_dir / name / f"{stamp}.zip"),
+            "paused": True,
+        },
+    )
+    svc.reconcile_once()  # the old dashboard's Job: recreated if missing
+
+
+def test_legacy_stop_op_still_finishes(svc: KubeDashboardService) -> None:
+    _, helm, rcon = parts(svc)
+    name = launch_running(svc)
+    rcon.log.clear()
+    legacy_stop(svc, name)
+    assert svc.get_world(name).state is WorldState.SNAPSHOTTING
+    complete(svc, "snapshot")
+    w = svc.get_world(name)
+    assert w.state is WorldState.STOPPED and len(svc.list_snapshots(name)) == 1
+    assert helm.releases[name]["replicaCount"] == 0
+    assert "save-on" in [c for _, c in rcon.log]
+
+
+def test_legacy_stop_aborts_when_snapshot_fails(svc: KubeDashboardService) -> None:
+    _, helm, rcon = parts(svc)
+    name = launch_running(svc)
+    rcon.log.clear()
+    legacy_stop(svc, name)
     complete(svc, "snapshot", ok=False)
     w = svc.get_world(name)
     assert w.state is WorldState.RUNNING
@@ -209,7 +332,6 @@ def test_whitelist_live_without_restart(svc: KubeDashboardService) -> None:
         svc.set_whitelist(name, ["bad name!"], ME, open_to_all=False)
     # persisted into release values at the next start
     svc.stop(name, ME)
-    complete(svc, "snapshot")
     svc.start(name, ME)
     assert helm.releases[name]["minecraftServer"]["whitelist"] == "giles,millie"
 
@@ -229,7 +351,6 @@ def test_ops_live_and_persisted(svc: KubeDashboardService) -> None:
     assert ops == ["op giles", "op noah", "deop giles"]
     assert len(helm.calls) == upgrades  # no pod restart
     svc.stop(name, ME)
-    complete(svc, "snapshot")
     svc.start(name, ME)
     values = helm.releases[name]
     assert values["minecraftServer"]["ops"] == "noah"
@@ -270,7 +391,6 @@ def test_last_admin_removal_needs_running_world(svc: KubeDashboardService) -> No
     wl = ["noah", "giles"]
     svc.set_whitelist(name, wl, ME, open_to_all=False, ops=["noah", "giles"])
     svc.stop(name, ME)
-    complete(svc, "snapshot")
     # dropping one of two admins while stopped: SYNCHRONIZE at the next start
     svc.set_whitelist(name, wl, ME, open_to_all=False, ops=["noah"])
     assert svc.get_world(name).settings.ops == ["noah"]
@@ -354,7 +474,6 @@ def test_open_to_all_live_and_persisted(svc: KubeDashboardService) -> None:
     w = svc.get_world(name)
     assert w.settings.open_to_all is True and w.settings.whitelist == ["noah"]
     svc.stop(name, ME)
-    complete(svc, "snapshot")
     svc.start(name, ME)
     values = helm.releases[name]
     assert "whitelist" not in values["minecraftServer"]
@@ -490,10 +609,13 @@ def test_crashloop_is_failed(svc: KubeDashboardService) -> None:
 
 
 def test_restart_resumes_operation(svc: KubeDashboardService) -> None:
-    """A fresh service (dashboard restart) picks up an in-flight op."""
+    """A fresh service (dashboard restart or upgrade) picks up an in-flight op.
+
+    Here an old dashboard's ``stop`` op, which an upgrade must still finish.
+    """
     kube, helm, rcon = parts(svc)
     name = launch_running(svc)
-    svc.stop(name, ME)
+    legacy_stop(svc, name)
     finish(svc, "snapshot")
 
     fresh = KubeDashboardService(svc.cfg, kube, helm, rcon_factory=rcon.factory)
@@ -802,7 +924,6 @@ def test_old_record_keeps_server_properties(svc: KubeDashboardService) -> None:
     spec["settings"] = {k: v for k, v in spec["settings"].items() if k not in new}
     svc._save(name, spec, op)
     svc.stop(name, ME)
-    complete(svc, "snapshot")
     svc.start(name, ME)
     v = helm.releases[name]
     ms, env = v["minecraftServer"], v["extraEnv"]

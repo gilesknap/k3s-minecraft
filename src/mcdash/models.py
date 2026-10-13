@@ -215,7 +215,7 @@ class Forbidden(MCDashError):
 class DashboardService(Protocol):
     """All methods are synchronous and return quickly.
 
-    Long operations (seed, snapshot, restore, stop-with-snapshot) start
+    Long operations (seed, snapshot, restore, delete) start
     Kubernetes Jobs and return; progress is visible via ``World.state``.
     ``actor`` is the X-Auth-Request-Email of the caller, for the audit log.
     """
@@ -245,7 +245,7 @@ class DashboardService(Protocol):
     def list_worlds(self) -> list[World]: ...
     def get_world(self, name: str) -> World: ...
     def start(self, name: str, actor: str) -> None: ...
-    def stop(self, name: str, actor: str) -> None: ...  # snapshots first
+    def stop(self, name: str, actor: str) -> None: ...  # scale to 0, no snapshot
     def snapshot(self, name: str, actor: str) -> None: ...
     def restore(self, name: str, backup_id: str, actor: str) -> None: ...
     def delete(self, name: str, actor: str) -> None: ...  # snapshots first
