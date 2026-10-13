@@ -208,6 +208,8 @@ def settings_from_json(d: dict[str, Any] | None) -> WorldSettings:
     for key in ("open_to_all", "hardcore"):
         if key in kw:
             kw[key] = kw[key] is True
+    if not isinstance(kw.get("forge_version", ""), str):
+        kw["forge_version"] = ""
     if "use_aikar_flags" in kw:
         kw["use_aikar_flags"] = kw["use_aikar_flags"] is not False
     # managed server.properties: anything malformed -> None (not managed)
@@ -242,6 +244,8 @@ def render_values(
     """itzg chart values for one world (contract: docs/contracts.md).
 
     ``rcon_port``: the world's RCON NodePort; 0 keeps RCON cluster-internal.
+    ``forge_version``: the build detected from the world's backup;
+    ``settings.forge_version`` overrides it.
     """
     mem = settings.memory or cfg.default_memory
     mib = memory_mib(mem)
@@ -284,8 +288,11 @@ def render_values(
         ms["whitelist"] = ",".join(settings.whitelist)
     if settings.ops:
         ms["ops"] = ",".join(settings.ops)
-    if settings.server_type is ServerType.FORGE and forge_version:
-        ms["forgeVersion"] = forge_version
+    # The admin's override, else the build detected from the backup (kept in
+    # mcdash.forgeVersion); neither = itzg's recommended build.
+    forge = settings.forge_version or forge_version
+    if settings.server_type is ServerType.FORGE and forge:
+        ms["forgeVersion"] = forge
     # Only used when the server generates a world (create_world); inert on a
     # volume that already holds one.
     if settings.seed:

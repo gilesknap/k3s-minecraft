@@ -127,6 +127,49 @@ def test_forge_launch_full_mode(svc: KubeDashboardService) -> None:
     assert v["image"]["tag"] == "java8"
 
 
+def test_forge_version_defaults_and_override(svc: KubeDashboardService) -> None:
+    _, helm, _ = parts(svc)
+    assert svc.launch_defaults(KING)[1].forge_version == ""
+    name, s = svc.launch_defaults(FIRE)
+    assert s.forge_version == "36.1.0"  # detected from the backup
+    s.forge_version = "36.2.34"
+    svc.launch(FIRE, name, s, ME)
+    complete(svc, "seed")
+    v = helm.releases[name]
+    assert v["minecraftServer"]["forgeVersion"] == "36.2.34"
+    assert v["mcdash"]["forgeVersion"] == "36.1.0"  # still the detected build
+    assert svc.get_world(name).settings.forge_version == "36.2.34"
+
+
+def test_forge_version_not_overridden_is_not_stored(
+    svc: KubeDashboardService,
+) -> None:
+    _, helm, _ = parts(svc)
+    name, s = svc.launch_defaults(FIRE)
+    svc.launch(FIRE, name, s, ME)
+    complete(svc, "seed")
+    # the detected build is shown but not saved as an override
+    assert helm.releases[name]["mcdash"]["settings"]["forge_version"] == ""
+    assert svc.get_world(name).settings.forge_version == "36.1.0"
+
+
+def test_forge_version_validation(svc: KubeDashboardService) -> None:
+    name, s = svc.launch_defaults(FIRE)
+    for bad in ("36", "x", "1.16.5-36.2.34", "36.2.34; rm", "1.2.3.4.5"):
+        s.forge_version = bad
+        with pytest.raises(MCDashError, match="Forge version"):
+            svc.launch(FIRE, name, s, ME)
+    s.forge_version = "14.23.5.2768"
+    svc.launch(FIRE, name, s, ME)
+    # ignored (and not stored) for a vanilla world
+    name, s = svc.launch_defaults(KING)
+    s.forge_version = "nonsense"
+    svc.launch(KING, name, s, ME)
+    complete(svc, "seed")
+    assert svc.get_world(name).settings.forge_version == ""
+    assert "forgeVersion" not in parts(svc)[1].releases[name]["minecraftServer"]
+
+
 def test_bad_names_and_ports(svc: KubeDashboardService) -> None:
     _, s = svc.launch_defaults(KING)
     with pytest.raises(MCDashError):
@@ -459,6 +502,41 @@ def test_update_settings(svc: KubeDashboardService) -> None:
     s.memory = "huge"
     with pytest.raises(MCDashError):
         svc.update_settings(name, s, ME)
+
+
+def test_update_settings_forge_version(svc: KubeDashboardService) -> None:
+    _, helm, _ = parts(svc)
+    name = launch_running(svc, FIRE)
+    svc.stop(name, ME)
+    s = svc.get_world(name).settings
+    s.forge_version = "36.2.34"
+    svc.update_settings(name, s, ME)
+    assert helm.releases[name]["replicaCount"] == 0
+    svc.start(name, ME)
+    assert helm.releases[name]["minecraftServer"]["forgeVersion"] == "36.2.34"
+    # blank goes back to the detected build
+    s.forge_version = ""
+    svc.update_settings(name, s, ME)
+    assert helm.releases[name]["minecraftServer"]["forgeVersion"] == "36.1.0"
+    assert svc.get_world(name).settings.forge_version == "36.1.0"
+    s.forge_version = "latest"
+    with pytest.raises(MCDashError, match="Forge version"):
+        svc.update_settings(name, s, ME)
+
+
+def test_restore_keeps_forge_override(svc: KubeDashboardService) -> None:
+    _, helm, _ = parts(svc)
+    name = launch_running(svc, FIRE)
+    s = svc.get_world(name).settings
+    s.forge_version = "36.2.34"
+    svc.update_settings(name, s, ME)
+    sid = f"snapshot/{name}/20250101T000000Z.zip"
+    make_world_zip(svc.cfg.snapshots_dir / name / "20250101T000000Z.zip", forge=True)
+    svc.restore(name, sid, ME)
+    complete(svc, "snapshot")
+    complete(svc, "seed")
+    # like the Minecraft version, an override survives a restore
+    assert helm.releases[name]["minecraftServer"]["forgeVersion"] == "36.2.34"
 
 
 def test_open_to_all_live_and_persisted(svc: KubeDashboardService) -> None:

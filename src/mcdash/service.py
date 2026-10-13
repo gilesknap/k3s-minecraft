@@ -5,9 +5,11 @@ World records
 Each world has a ConfigMap ``<w>-mcdash`` (label ``mcdash/kind=world``) with:
 
 * ``spec`` — JSON ``{port, rconPort, sourceBackup, created, settings,
-  forgeVersion, message}``. It exists from the moment of launch (before any
-  Helm release), so it reserves the ports while seeding. ``rconPort`` is
-  absent for worlds launched before RCON NodePorts existed; their next
+  forgeVersion, message}``; ``forgeVersion`` is the Forge build detected from
+  the backup, ``settings.forge_version`` an admin override of it. It exists
+  from the moment of launch (before any Helm release), so it reserves the
+  ports while seeding. ``rconPort`` is absent for worlds launched before RCON
+  NodePorts existed; their next
   install with the server running (start, end of a restore, a settings save
   while running) assigns one. The same metadata is mirrored into
   the Helm release values under ``mcdash:`` on every install/upgrade; if the
@@ -38,7 +40,7 @@ import secrets
 import threading
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -62,6 +64,7 @@ from mcdash.helmops import (
 )
 from mcdash.k8s import JobInfo, JobSpec, KubeApi, PodInfo
 from mcdash.models import (
+    FORGE_VERSION_RE,
     LEVEL_TYPES,
     SETTING_RANGES,
     Backup,
@@ -208,6 +211,28 @@ def check_properties(s: WorldSettings) -> None:
     for field in OPTIONAL_BOOLS:
         if getattr(s, field) not in (None, True, False):
             raise MCDashError(f"{field.replace('_', ' ')} must be on or off")
+
+
+def check_forge_version(s: WorldSettings) -> None:
+    """A Forge world's build override is blank or looks like ``36.2.34``."""
+    v = s.forge_version
+    if (
+        s.server_type is ServerType.FORGE
+        and v
+        and not re.fullmatch(FORGE_VERSION_RE, v)
+    ):
+        raise MCDashError(
+            f"{v!r} is not a Forge version (e.g. 36.2.34; blank = detected)"
+        )
+
+
+def forge_override(s: WorldSettings, detected: str) -> str:
+    """The ``forge_version`` to store: only a build that differs from the one
+    detected from the backup, so a restore's re-detection still applies to a
+    world nobody overrode. Non-Forge worlds store none."""
+    if s.server_type is not ServerType.FORGE or s.forge_version == detected:
+        return ""
+    return s.forge_version
 
 
 def _parse_dt(s: Any) -> datetime | None:
@@ -644,12 +669,15 @@ class KubeDashboardService:
         pods = self.kube.list_server_pods(name) if values else []
         self.rcon_pool.note_target(name, _pod_target(pods))
         state, msg = self._derive(op, values, pods)
+        settings = settings_from_json(spec.get("settings"))
+        if settings.server_type is ServerType.FORGE and not settings.forge_version:
+            settings.forge_version = str(spec.get("forgeVersion") or "")  # in use
         pod = next((p for p in pods if not p.deleting and p.host_ip), None)
         w = World(
             name=name,
             port=int(spec.get("port") or 0),
             state=state,
-            settings=settings_from_json(spec.get("settings")),
+            settings=settings,
             source_backup_id=str(spec.get("sourceBackup", "")),
             created=_parse_dt(spec.get("created")) or datetime.fromtimestamp(0, UTC),
             connect_address=f"{self.cfg.public_host}:{spec.get('port')}",
@@ -699,7 +727,10 @@ class KubeDashboardService:
     def launch_defaults(self, backup_id: str) -> tuple[str, WorldSettings]:
         b = self.backups.get(backup_id)
         name = unique_name(sanitize_world_name(b.world_name), self._taken_names())
-        return name, self.defaults_for(b)
+        s = self.defaults_for(b)
+        if s.server_type is ServerType.FORGE:
+            s.forge_version = self.backups.detection(backup_id).forge_version or ""
+        return name, s
 
     def defaults_for(self, b: Backup) -> WorldSettings:
         p = b.properties
@@ -733,6 +764,7 @@ class KubeDashboardService:
         jvm_memory(s.memory or self.cfg.default_memory)  # raises on bad sizes
         check_players(s)
         check_properties(s)
+        check_forge_version(s)
         if s.level_type not in LEVEL_TYPES:
             raise MCDashError(
                 f"unknown world type {s.level_type!r} (one of {', '.join(LEVEL_TYPES)})"
@@ -807,8 +839,10 @@ class KubeDashboardService:
         self._check_settings(settings)
         b = self.backups.get(backup_id)
         det = self.backups.detection(backup_id)
+        detected = det.forge_version or ""
+        stored = replace(settings, forge_version=forge_override(settings, detected))
         with self._lock:
-            spec = self._reserve(name, settings, b.id, det.forge_version or "")
+            spec = self._reserve(name, stored, b.id, detected)
             job, jspec = self._seed_job(name, b.id, settings)
             op = {"kind": "launch", "step": "seed", "job": job, "backup": b.id}
             self._save(name, spec, op)  # reserves name + port first
@@ -835,7 +869,8 @@ class KubeDashboardService:
         self._check_name(name)
         self._check_settings(settings)
         with self._lock:
-            spec = self._reserve(name, settings, "", "")
+            stored = replace(settings, forge_version=forge_override(settings, ""))
+            spec = self._reserve(name, stored, "", "")
             op: dict[str, Any] | None = {"kind": "create", "step": "install"}
             self._save(name, spec, op)  # reserves name + port first
             self._create_volume_and_secret(name)
@@ -983,6 +1018,7 @@ class KubeDashboardService:
         with self._lock:
             spec, op, values = self._load(name)
             self._busy(name, op)
+            # re-detected; an admin's settings.forge_version still wins
             extra = {"backup": backup_id, "forgeVersion": det.forge_version or ""}
             if op and op.get("step") in ("seed", "install"):
                 # data broken, or never generated: nothing worth snapshotting
@@ -1011,7 +1047,9 @@ class KubeDashboardService:
         with self._lock:
             spec, op, values = self._load(name)
             self._busy(name, op)
-            spec["settings"] = settings_to_json(settings)
+            detected = str(spec.get("forgeVersion") or "")
+            stored = replace(settings, forge_version=forge_override(settings, detected))
+            spec["settings"] = settings_to_json(stored)
             self._save(name, spec, op)
             if values is not None:
                 self._install(name, spec, replicas=self._replicas(values))

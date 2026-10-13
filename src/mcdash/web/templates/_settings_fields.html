@@ -6,6 +6,10 @@
   <label>Version
     <input name="version" value="{{ settings.version }}" required placeholder="LATEST or 1.16.5">
   </label>
+  <label>Forge version
+    <input name="forge_version" value="{{ settings.forge_version }}" pattern="\d+(\.\d+){1,3}" placeholder="blank = detected, e.g. 36.2.34" autocomplete="off">
+    <small class="muted">Forge worlds only: the Forge build, without the Minecraft version. Blank = the one detected from the backup.</small>
+  </label>
   <label>Memory
     <input name="memory" value="{{ settings.memory }}" required pattern="\d+(\.\d+)?(Mi|Gi)" placeholder="4Gi">
   </label>

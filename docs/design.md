@@ -122,6 +122,7 @@ Detection, from the zip without full extraction:
 | | Vanilla | Forge / modded |
 |---|---|---|
 | Server version | `LATEST` (players run latest client) — overridable | original detected version, `TYPE=FORGE` — overridable |
+| Forge version | — | build detected from the backup's jars — overridable on the launch and Settings forms (e.g. old 1.16.5 builds before ~36.2.26 crash on current Java 8) |
 | Copied | `world/` + `ops.json`, `whitelist.json`, `banned-*.json` | full `/data` minus `libraries/`, `versions/`, `logs/`, `.cache`, `?/` |
 | Java image | default | itzg image tag matching the old version's Java |
 

@@ -33,6 +33,7 @@ from mcdash.models import (
 )
 from mcdash.service import (
     apply_property_defaults,
+    check_forge_version,
     check_ops_change,
     check_players,
     check_properties,
@@ -54,6 +55,8 @@ def sample_tree() -> CommandTree:
 PORT_MIN, PORT_MAX = 30565, 30584
 RCON_PORT_MIN, RCON_PORT_MAX = 30600, 30619
 RCON_HOST = "192.168.1.92"
+# Stands in for the Forge build the real service detects from a backup.
+FAKE_FORGE_BUILDS = {"1.16.5": "36.2.0", "1.12.2": "14.23.5.2768"}
 
 
 class FakeDashboardService:
@@ -191,6 +194,9 @@ class FakeDashboardService:
             motd=p.get("motd", ""),
             max_world_size=int(p.get("max-world-size", 29999984)),
             whitelist=[],
+            forge_version=FAKE_FORGE_BUILDS.get(b.mc_version or "", "")
+            if forge
+            else "",
         )
         apply_property_defaults(s, p)
         return name, s
@@ -200,6 +206,7 @@ class FakeDashboardService:
     ) -> World:
         self._record("launch", backup_id, name, settings, actor)
         self.get_backup(backup_id)
+        check_forge_version(settings)
         if name in self.worlds:
             raise Conflict(f"A world called {name!r} already exists")
         port = self._free_port()
@@ -335,6 +342,7 @@ class FakeDashboardService:
     def update_settings(self, name: str, settings: WorldSettings, actor: str) -> None:
         self._record("update_settings", name, settings, actor)
         check_properties(settings)
+        check_forge_version(settings)
         self._world(name).settings = settings
 
     def set_whitelist(
@@ -595,6 +603,7 @@ def seeded(**kwargs: object) -> FakeDashboardService:
             settings=WorldSettings(
                 version="1.16.5",
                 server_type=F,
+                forge_version="36.2.0",
                 memory="6Gi",
                 difficulty="hard",
                 motd="Fire and Ice (modded)",

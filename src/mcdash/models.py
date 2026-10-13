@@ -57,6 +57,9 @@ class Backup:
 
 LEVEL_TYPES = ("normal", "flat", "amplified", "large_biomes")
 
+# A Forge build number, e.g. "36.2.34" or "14.23.5.2768".
+FORGE_VERSION_RE = r"\d+(\.\d+){1,3}"
+
 # Inclusive (min, max) for the integer server.properties settings. Upper bounds
 # keep typed chart values below 1e6, which helm would render as floats.
 SETTING_RANGES: dict[str, tuple[int, int]] = {
@@ -136,6 +139,10 @@ class WorldSettings:
     # JVM: itzg USE_AIKAR_FLAGS (G1 GC tuning). On by default, also for records
     # saved before the field existed.
     use_aikar_flags: bool = True
+    # FORGE only: the Forge build to run, e.g. "36.2.34". "" = the one detected
+    # from the world's backup (else itzg's recommended build). The service
+    # keeps only an override here; ``World.settings`` shows the build in use.
+    forge_version: str = ""
 
 
 @dataclass
