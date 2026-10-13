@@ -49,3 +49,8 @@ def test_reveal_password(client: TestClient, svc: FakeDashboardService) -> None:
 def test_reveal_password_unknown_world(client: TestClient) -> None:
     r = client.get("/worlds/nope/rcon-password", headers=HX)
     assert r.status_code == 404
+
+
+def test_reveal_needs_htmx(client: TestClient) -> None:
+    r = client.get("/worlds/noah-james/rcon-password")
+    assert r.status_code == 400

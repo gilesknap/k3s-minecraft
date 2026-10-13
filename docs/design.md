@@ -236,6 +236,9 @@ workstation that is also a node, at the cost of that node's pods). Another polic
 engine (Calico, Cilium) may not exempt node-local traffic: add the node's
 pod-CIDR gateway (e.g. `10.42.5.1/32`) to `rconAllowedCidrs` there. LAN hosts
 on another subnet (e.g. a second NIC on the node) need their CIDR added too.
+Trusting the node also means **host-network pods on the world's node** (e.g.
+node-exporter, csi-nfs-node) can always reach RCON; the policy cannot narrow
+that, so it is a property of the node, not of the dashboard.
 
 ## Player access and security
 

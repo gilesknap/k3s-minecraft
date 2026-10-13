@@ -118,8 +118,11 @@ def test_network_policy_cidrs_and_toggle() -> None:
             "except": ["192.168.1.81/32", "192.168.1.84/32"],
         }
     }
-    res = template("--set", "networkPolicy.rconAllowedCidrs={not-a-cidr}", check=False)
-    assert res.returncode != 0
+    for bad in ("not-a-cidr", "192.168.1.0/999", "192.168.1.0/33"):
+        res = template(
+            "--set", f"networkPolicy.rconAllowedCidrs={{{bad}}}", check=False
+        )
+        assert res.returncode != 0, bad
     (np,) = policies("--set", "networkPolicy.rconAllowedCidrs=null")
     assert len(np["spec"]["ingress"][1]["from"]) == 1  # dashboard only
     assert policies("--set", "networkPolicy.enabled=false") == []

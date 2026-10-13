@@ -322,7 +322,11 @@ class KubeDashboardService:
         log.info("%s: assigned RCON port %s", name, spec["rconPort"])
 
     def _install(self, name: str, spec: dict[str, Any], replicas: int) -> None:
-        self._ensure_rcon_port(name, spec)
+        # Only a running server needs an RCON NodePort. Allocating on the
+        # replicas=0 installs of stop/restore could fail (range full) and turn
+        # a stop into a failure while the server keeps running.
+        if replicas:
+            self._ensure_rcon_port(name, spec)
         values = render_values(
             name,
             settings_from_json(spec.get("settings")),
@@ -332,7 +336,7 @@ class KubeDashboardService:
             source_backup=spec.get("sourceBackup", ""),
             created=_parse_dt(spec.get("created")),
             forge_version=spec.get("forgeVersion") or None,
-            rcon_port=int(spec["rconPort"]),
+            rcon_port=int(spec.get("rconPort") or 0),
         )
         self.helm.upgrade_install(name, values)
         self._values_cache.pop(name, None)

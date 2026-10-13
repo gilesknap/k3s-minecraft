@@ -190,3 +190,18 @@ def test_config_rcon_range() -> None:
         Config(port_min=30565, port_max=30584, rcon_port_min=30580)
     with pytest.raises(ValueError, match="empty"):
         Config(rcon_port_min=30610, rcon_port_max=30600)
+
+
+def test_stopping_a_legacy_world_never_allocates(svc: KubeDashboardService) -> None:
+    """A replicas=0 install (stop) must not fail because the RCON range is full."""
+    _, helm, _ = parts(svc)
+    old = launch_running(svc)
+    make_legacy(svc, old)
+    svc.cfg = replace(svc.cfg, rcon_port_min=30600, rcon_port_max=30600)
+    _, s = svc.launch_defaults(KING)
+    svc.create_world("newer", s, ME)  # takes the only RCON port
+    svc.stop(old, ME)
+    complete(svc, "snapshot")
+    w = svc.get_world(old)
+    assert w.state is WorldState.STOPPED and w.rcon_port == 0
+    assert "nodePort" not in helm.releases[old]["minecraftServer"]["rcon"]
