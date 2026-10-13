@@ -30,11 +30,13 @@ import secrets
 import threading
 import time
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 from mcdash.backups import BackupIndex
+from mcdash.completion import REPORT_SCRIPT, VERSION_RE, CommandTree
 from mcdash.config import Config
 from mcdash.helmops import (
     RCON_PORT,
@@ -46,11 +48,13 @@ from mcdash.helmops import (
     render_values,
     settings_from_json,
     settings_to_json,
+    version_tuple,
 )
 from mcdash.k8s import JobInfo, JobSpec, KubeApi, PodInfo
 from mcdash.models import (
     LEVEL_TYPES,
     Backup,
+    Completion,
     Conflict,
     MCDashError,
     NotFound,
@@ -69,9 +73,10 @@ from mcdash.naming import (
     unique_name,
 )
 from mcdash.rcon import RconClient, RconError, parse_list
-from mcdash.store import Store
+from mcdash.store import Store, read_json
 
 log = logging.getLogger(__name__)
+COMMANDS_JOB_DEADLINE = 600  # seconds
 
 CM_SUFFIX = "-mcdash"
 CM_KIND = "world"
@@ -85,6 +90,8 @@ BAD_WAIT_REASONS = {
 DIFFICULTIES = {"0": "peaceful", "1": "easy", "2": "normal", "3": "hard"}
 NEW_WORLD_NAME = "new-world"
 MAX_SEED_LEN = 64
+# The itzg image, for a commands Job when the pod does not say which it runs.
+ITZG_IMAGE = "itzg/minecraft-server"
 
 
 class HelmApi(Protocol):
@@ -122,6 +129,14 @@ def _parse_dt(s: Any) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
+@dataclass(frozen=True)
+class _CommandSource:
+    tree: CommandTree | None
+    status: str
+    message: str
+    running: bool
+
+
 class KubeDashboardService:
     """Implements ``mcdash.models.DashboardService`` against Kubernetes."""
 
@@ -148,6 +163,8 @@ class KubeDashboardService:
         self._values_cache: dict[str, tuple[str, dict[str, Any]]] = {}
         self._secret_cache: dict[str, str] = {}
         self._players_cache: dict[str, tuple[float, list[str] | None]] = {}
+        self._cmd_cache: dict[str, tuple[float, _CommandSource]] = {}
+        self._trees: dict[str, tuple[float, CommandTree | None]] = {}
         self._stop_evt = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_reconcile_error = ""
@@ -771,6 +788,129 @@ class KubeDashboardService:
             yield f"[{name} is not running]"
             return
         yield from self.kube.stream_pod_log(pods[0].name)
+
+    # ================================================================ console
+    @property
+    def commands_dir(self) -> Path:
+        return self.cfg.dashboard_dir / "commands"
+
+    def complete(self, name: str, line: str) -> Completion:
+        src = self._command_source(name)
+        if src.tree is None:
+            return Completion(len(line), [], src.status, src.message)
+        players = (self._players(name) or []) if src.running else []
+        start, items = src.tree.suggest(line, players)
+        return Completion(start, items, src.status, src.message)
+
+    def _tree(self, version: str) -> CommandTree | None:
+        """The command tree generated for ``version``, if any (cached)."""
+        if not VERSION_RE.fullmatch(version):
+            return None
+        path = self.commands_dir / f"{version}.commands.json"
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            return None
+        hit = self._trees.get(version)
+        if hit and hit[0] == mtime:
+            return hit[1]
+        try:
+            tree: CommandTree | None = CommandTree.load(
+                path, self.commands_dir / f"{version}.registries.json"
+            )
+        except (OSError, ValueError, TypeError, AttributeError, KeyError) as e:
+            log.warning("bad command report %s: %s", path, e)
+            tree = None
+        self._trees[version] = (mtime, tree)
+        return tree
+
+    def _command_source(self, name: str) -> _CommandSource:
+        hit = self._cmd_cache.get(name)
+        if hit and time.monotonic() - hit[0] < self.cache_ttl:
+            return hit[1]
+        with self._lock:
+            spec, op, values = self._load(name)
+            settings = settings_from_json(spec.get("settings"))
+            pods = self.kube.list_server_pods(name) if values and not op else []
+            pod = next((p for p in pods if p.ready and not p.deleting), None)
+            ptr = read_json(self.commands_dir / "worlds" / f"{name}.json", {})
+            if not isinstance(ptr, dict):
+                ptr = {}
+            version = str(ptr.get("version") or "")
+            status, msg = "ready", ""
+            if pod is None:
+                pass  # not running: use whatever was last recorded
+            elif ptr.get("pod") != pod.name:
+                why = self._why_no_commands(settings)
+                if why:
+                    msg = why
+                elif self._commands_job(name, pod):
+                    status = "pending"
+                    msg = "reading the command list from the server"
+            elif ptr.get("error"):
+                msg = f"no command list: {ptr['error']}"
+            if not version and VERSION_RE.fullmatch(settings.version):
+                version = settings.version  # e.g. Forge: vanilla commands if known
+            tree = self._tree(version) if version else None
+            if tree is None and status == "ready":
+                status = "none"
+                msg = msg or "no command list for this world"
+            src = _CommandSource(tree, status, msg, pod is not None)
+        self._cmd_cache[name] = (time.monotonic(), src)
+        return src
+
+    def _why_no_commands(self, settings: WorldSettings) -> str:
+        if settings.server_type is not ServerType.VANILLA:
+            return "modded server: vanilla commands only, if known"
+        t = version_tuple(settings.version)
+        if t is not None and t < (1, 13, 0):
+            return "Minecraft before 1.13 has no command tree"
+        if not self.cfg.store_pvc:
+            return "no store volume for the commands Job"
+        return ""
+
+    def _commands_job(self, name: str, pod: PodInfo) -> bool:
+        """Start a commands Job for ``pod`` unless one ran or is running.
+
+        Returns True while the Job is still to finish. A Job that already ran
+        for this pod and left no record (e.g. it failed) is not repeated.
+        """
+        for j in self.kube.list_jobs(name):
+            if j.kind != "commands":
+                continue
+            if not j.done:
+                return True
+            if pod.started and j.created and j.created >= pod.started:
+                return False
+        out = self.commands_dir / "worlds"
+        self.store.guard.check(out)
+        out.mkdir(parents=True, exist_ok=True)  # the Job mounts it as uid 1000
+        k8s_ts, _ = self._stamp()
+        spec = JobSpec(
+            name=f"{name}-cmds-{k8s_ts}",
+            world=name,
+            kind="commands",
+            args=[],
+            image=pod.image or ITZG_IMAGE,
+            command=["sh", "-c", REPORT_SCRIPT],
+            env={"MCD_WORLD": name, "MCD_POD": pod.name},
+            data_read_only=True,
+            mount_archive=False,
+            store_read_only=False,
+            store_sub_path=self.commands_dir.relative_to(self.cfg.store_dir).as_posix(),
+            store_mount="/out",
+            backoff_limit=0,
+            # ~6 s of work; a pod stuck pending fails the Job, and a failed
+            # Job is not repeated for this pod, so the console degrades to
+            # history-only instead of waiting forever.
+            active_deadline_seconds=COMMANDS_JOB_DEADLINE,
+        )
+        with contextlib.suppress(Conflict):
+            self.kube.create_job(spec)
+            log.info(
+                "started commands Job %s for %s on pod %s", spec.name, name, pod.name
+            )
+        return True
 
     # ================================================================ roster
     def roster(self) -> list[Player]:

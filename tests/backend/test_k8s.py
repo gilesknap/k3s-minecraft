@@ -61,6 +61,46 @@ def test_build_job_mounts(cfg: Config) -> None:
     assert smounts["archive"].read_only is True
 
 
+def test_build_commands_job(cfg: Config) -> None:
+    """The console's commands Job: another image, read-only world, one store dir."""
+    k = make_kube(cfg)
+    job = k.build_job(
+        JobSpec(
+            "w-cmds-1",
+            "w",
+            "commands",
+            [],
+            image="itzg/minecraft-server:latest",
+            command=["sh", "-c", "true"],
+            env={"MCD_WORLD": "w"},
+            data_read_only=True,
+            mount_archive=False,
+            store_read_only=False,
+            store_sub_path="dashboard/commands",
+            store_mount="/out",
+            backoff_limit=0,
+            active_deadline_seconds=600,
+        )
+    )
+    assert job.spec.active_deadline_seconds == 600
+    spec = job.spec.template.spec
+    c = spec.containers[0]
+    assert c.image == "itzg/minecraft-server:latest"
+    assert c.command == ["sh", "-c", "true"]
+    assert {e.name: e.value for e in c.env}["MCD_WORLD"] == "w"
+    mounts = {m.name: m for m in c.volume_mounts}
+    assert set(mounts) == {"data", "store"}
+    assert mounts["data"].read_only is True
+    assert (mounts["store"].mount_path, mounts["store"].sub_path) == (
+        "/out",
+        "dashboard/commands",
+    )
+    assert mounts["store"].read_only is False
+    assert {v.name for v in spec.volumes} == {"data", "store"}
+    assert spec.security_context.run_as_non_root is True
+    assert job.spec.backoff_limit == 0
+
+
 def test_job_info_failed_condition() -> None:
     j = NS(
         metadata=NS(
@@ -86,6 +126,12 @@ def test_list_server_pods(cfg: Config) -> None:
     started = datetime(2026, 1, 1, tzinfo=UTC)
     pod = NS(
         metadata=NS(name="w-abc", deletion_timestamp=None),
+        spec=NS(
+            containers=[
+                NS(name="sidecar", image="busybox"),
+                NS(name="w", image="itzg/minecraft-server:java21"),
+            ]
+        ),
         status=NS(
             phase="Running",
             start_time=started,
@@ -101,6 +147,7 @@ def test_list_server_pods(cfg: Config) -> None:
     k.core.list_namespaced_pod.return_value = NS(items=[pod])
     (p,) = k.list_server_pods("w")
     assert p.ready and p.restarts == 2 and p.started == started
+    assert p.image == "itzg/minecraft-server:java21"
     sel = k.core.list_namespaced_pod.call_args.kwargs["label_selector"]
     assert sel == "app=w,app.kubernetes.io/name=minecraft"
 

@@ -6,15 +6,20 @@ which service method was invoked with which actor.
 
 from __future__ import annotations
 
+import functools
 import itertools
+import json
 import random
 import time
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
+from mcdash.completion import CommandTree
 from mcdash.models import (
     Backup,
+    Completion,
     Conflict,
     Forbidden,
     MCDashError,
@@ -28,6 +33,16 @@ from mcdash.models import (
 )
 
 PUBLIC_HOST = "mc.gkcluster.org"
+# An extract of the 26.3 data generator's commands.json and registries.json.
+SAMPLE_COMMANDS = Path(__file__).with_name("sample_commands.json")
+
+
+@functools.cache
+def sample_tree() -> CommandTree:
+    raw = json.loads(SAMPLE_COMMANDS.read_text())
+    return CommandTree(raw["commands"], raw["registries"])
+
+
 PORT_MIN, PORT_MAX = 30565, 30584
 
 
@@ -309,6 +324,13 @@ class FakeDashboardService:
         if cmd == "time query daytime":
             return "The time is 6000"
         return f"Unknown or incomplete command, see below for error\n{cmd}<--[HERE]"
+
+    def complete(self, name: str, line: str) -> Completion:
+        w = self._world(name)
+        if w.settings.server_type is not ServerType.VANILLA:
+            return Completion(len(line), [], "none", "modded server")
+        start, items = sample_tree().suggest(line, w.players_online or [])
+        return Completion(start, items)
 
     def stream_logs(self, name: str) -> Iterator[str]:
         self._world(name)

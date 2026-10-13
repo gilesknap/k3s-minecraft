@@ -124,6 +124,35 @@ class World:
     message: str = ""  # human-readable detail for FAILED / in-progress states
 
 
+@dataclass(frozen=True)
+class Suggestion:
+    """One RCON console completion candidate.
+
+    ``kind``: ``literal`` (a command or sub-command name), ``value`` (an
+    argument value such as a player or item) or ``hint`` (describes an argument,
+    e.g. ``<targets>``; shown but not inserted).
+    """
+
+    text: str
+    kind: str = "literal"
+    detail: str = ""
+
+
+@dataclass
+class Completion:
+    """Suggestions for the token being typed, which starts at ``start``.
+
+    ``status``: ``ready`` (a command list is known), ``pending`` (it is being
+    read from the server; ask again shortly) or ``none`` (no command list for
+    this world: history only). ``message`` explains ``pending``/``none``.
+    """
+
+    start: int
+    items: list[Suggestion] = field(default_factory=list)
+    status: str = "ready"
+    message: str = ""
+
+
 @dataclass
 class Player:
     name: str
@@ -194,6 +223,7 @@ class DashboardService(Protocol):
     # live
     def rcon(self, name: str, command: str, actor: str) -> str: ...
     def stream_logs(self, name: str) -> Iterator[str]: ...  # follows; blocks
+    def complete(self, name: str, line: str) -> Completion: ...  # RCON console
 
     # roster
     def roster(self) -> list[Player]: ...

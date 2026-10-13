@@ -209,6 +209,37 @@ logs `X-Auth-Request-Email` against each action. No public status page.
   uptime, CPU/memory (metrics-server), last snapshot time.
 - World page: streamed log tail (SSE), RCON console, whitelist editor,
   settings, snapshots (launch / promote / delete).
+
+### RCON console
+
+- **History** is client-side: the last 100 successfully sent commands per
+  world in `localStorage` (`mcdash.rcon.<world>`, no consecutive duplicates).
+  Up/Down walk it and keep the half-typed draft; Escape closes the suggestions
+  or clears the input.
+- **Completion**: RCON has no completion request, so suggestions come from the
+  vanilla data generator's reports (`--reports`): `commands.json` (the whole
+  Brigadier tree) and `registries.json` (item, block, entity, effect ... ids).
+  When the console is first used on a running vanilla world whose current pod
+  has no record yet, the dashboard starts a **commands Job** in the world's own
+  image (it has Java; the dashboard image does not) with the world volume
+  mounted read-only and only `dashboard/commands/` of the store writable. The
+  Job reads the resolved version from itzg's `/data/.install-vanilla.env`,
+  runs the generator against the jar already on the volume (once per version;
+  ~6 s and under 512 MiB heap for 26.3) and records
+  `worlds/<world>.json = {pod, version, error}`. A new pod (restart, upgrade
+  of `LATEST`) is checked again; a version already generated costs no Java.
+  No exec into world pods, so no extra RBAC.
+- The dashboard walks the tree server-side (`GET /worlds/<w>/complete?line=`):
+  literals first, as Brigadier does; redirects (`tp` → `teleport`,
+  `execute … run`) followed; arguments matched by parser (numbers, coordinates
+  of 2–3 tokens, selectors and player names). Values come from online players
+  (the cached `list`), fixed enums (gamemode, bool, dimension, colours ...) and
+  static registries; other arguments show a `<name>` hint. Greedy or bracketed
+  arguments (messages, NBT, JSON text) end completion.
+- Forge worlds and versions before 1.13 get no Job: history only, or the
+  vanilla tree of the same version if another world already produced it.
+- Completion never sends anything over RCON except the existing cached `list`,
+  and nothing is audited; sending a command is unchanged.
 - Deferred: Grafana via the chart's `mc-monitor` exporter.
 
 ## Rollout

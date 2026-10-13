@@ -45,7 +45,7 @@ def pvc_name(world: str) -> str:
     return f"{world}-data"
 
 
-def _version_tuple(v: str) -> tuple[int, ...] | None:
+def version_tuple(v: str) -> tuple[int, ...] | None:
     m = re.fullmatch(r"(\d+)\.(\d+)(?:\.(\d+))?", v.strip())
     if not m:
         return None
@@ -59,7 +59,7 @@ def java_tag_for(version: str | None) -> str | None:
     """
     if not version:
         return None
-    t = _version_tuple(version)
+    t = version_tuple(version)
     if t is None:
         return None
     if t < (1, 17, 0):
@@ -89,7 +89,7 @@ _LEVEL_TYPE_LEGACY = {
 
 def level_type_for(level_type: str, version: str | None) -> str | None:
     """itzg ``LEVEL_TYPE`` for ``level_type``; ``None`` = server default."""
-    t = _version_tuple(version or "")
+    t = version_tuple(version or "")
     table = (
         _LEVEL_TYPE_LEGACY if t is not None and t < (1, 19, 0) else _LEVEL_TYPE_MODERN
     )
@@ -118,7 +118,7 @@ def startup_rcon_commands(settings: WorldSettings) -> list[str]:
     """
     if normalize_gamemode(settings.gamemode) != "adventure":
         return []
-    t = _version_tuple(settings.version or "")
+    t = version_tuple(settings.version or "")
     if t is not None and t < FORCELOAD_MIN_VERSION:
         return []
     return [FORCELOAD_SPAWN_CMD]

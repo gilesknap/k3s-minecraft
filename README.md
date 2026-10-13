@@ -27,7 +27,12 @@ The worlds this was built for, and the story behind them, are in
 - **Restore from** any backup into an existing world, keeping its port and
   settings.
 - **Monitoring**: state, players online, uptime, CPU and memory, a streamed
-  log tail and an RCON console.
+  log tail and an RCON console. The console keeps a per-world command history
+  in the browser (Up/Down to recall, Escape to clear) and suggests command
+  names, sub-commands, online players and item/block/entity ids as you type
+  (Tab or Enter accepts). Suggestions come from the vanilla server's own
+  command tree, read once per Minecraft version by a short Job; Forge worlds
+  and versions before 1.13 get history only.
 - **Whitelist** editing from a player roster, enforced by default. A world can
   instead be marked **open to everyone** (no whitelist), which applies live.
   `online-mode` is always on.

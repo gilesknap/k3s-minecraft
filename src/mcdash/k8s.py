@@ -56,16 +56,36 @@ class PodInfo:
     waiting_reason: str = ""
     started: datetime | None = None
     deleting: bool = False
+    image: str = ""  # the server container's image
 
 
 @dataclass
 class JobSpec:
+    """A Job against world ``world``'s volume (mounted at ``/data``).
+
+    By default it runs ``python -m mcdash.jobs <args>`` in the dashboard image
+    with the archive (read-only) and the whole store mounted. ``image`` and
+    ``command`` run something else; ``store_sub_path`` mounts only that
+    directory of the store, at ``store_mount``.
+    """
+
     name: str
     world: str
     kind: str
     args: list[str]
     store_read_only: bool = True
     labels: dict[str, str] = field(default_factory=dict)
+    image: str = ""
+    command: list[str] | None = None
+    env: dict[str, str] = field(default_factory=dict)
+    data_read_only: bool = False
+    mount_archive: bool = True
+    store_sub_path: str = ""
+    store_mount: str = ""
+    backoff_limit: int = 1
+    # None = no limit. A Job that cannot start (image pull, no memory on the
+    # node) otherwise never finishes, so callers waiting on it never give up.
+    active_deadline_seconds: int | None = None
 
 
 class KubeApi(Protocol):
@@ -279,7 +299,11 @@ class Kube:
     def build_job(self, spec: JobSpec) -> Any:
         c = self.client
         cfg = self.cfg
-        mounts = [c.V1VolumeMount(name="data", mount_path="/data")]
+        mounts = [
+            c.V1VolumeMount(
+                name="data", mount_path="/data", read_only=spec.data_read_only or None
+            )
+        ]
         volumes = [
             c.V1Volume(
                 name="data",
@@ -288,7 +312,7 @@ class Kube:
                 ),
             )
         ]
-        if cfg.archive_pvc:
+        if cfg.archive_pvc and spec.mount_archive:
             mounts.append(
                 c.V1VolumeMount(
                     name="archive", mount_path=cfg.job_archive_mount, read_only=True
@@ -306,8 +330,9 @@ class Kube:
             mounts.append(
                 c.V1VolumeMount(
                     name="store",
-                    mount_path=cfg.job_store_mount,
+                    mount_path=spec.store_mount or cfg.job_store_mount,
                     read_only=spec.store_read_only,
+                    sub_path=spec.store_sub_path or None,
                 )
             )
             volumes.append(
@@ -326,13 +351,14 @@ class Kube:
         }
         container = c.V1Container(
             name=spec.kind,
-            image=cfg.job_image,
-            command=["python", "-m", "mcdash.jobs", *spec.args],
+            image=spec.image or cfg.job_image,
+            command=spec.command or ["python", "-m", "mcdash.jobs", *spec.args],
             env=[
                 c.V1EnvVar(name="MCD_UID", value=str(cfg.uid)),
                 c.V1EnvVar(name="MCD_GID", value=str(cfg.gid)),
                 c.V1EnvVar(name="MCD_ARCHIVE_DIR", value=cfg.job_archive_mount),
                 c.V1EnvVar(name="PYTHONUNBUFFERED", value="1"),
+                *(c.V1EnvVar(name=k, value=v) for k, v in spec.env.items()),
             ],
             volume_mounts=mounts,
             security_context=c.V1SecurityContext(
@@ -361,7 +387,8 @@ class Kube:
         return c.V1Job(
             metadata=c.V1ObjectMeta(name=spec.name, namespace=self.ns, labels=labels),
             spec=c.V1JobSpec(
-                backoff_limit=1,
+                backoff_limit=spec.backoff_limit,
+                active_deadline_seconds=spec.active_deadline_seconds,
                 ttl_seconds_after_finished=3600,
                 template=c.V1PodTemplateSpec(
                     metadata=c.V1ObjectMeta(labels=labels), spec=pod_spec
@@ -428,6 +455,11 @@ class Kube:
             restarts = 0
             reason = ""
             started = st.start_time
+            containers = list(p.spec.containers or []) if p.spec else []
+            image = next(
+                (c.image for c in containers if c.name == world),
+                containers[0].image if containers else "",
+            )
             for cs in st.container_statuses or []:
                 restarts += cs.restart_count or 0
                 if cs.state and cs.state.waiting and cs.state.waiting.reason:
@@ -443,6 +475,7 @@ class Kube:
                     waiting_reason=reason,
                     started=started,
                     deleting=p.metadata.deletion_timestamp is not None,
+                    image=image or "",
                 )
             )
         return out
