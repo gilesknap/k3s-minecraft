@@ -58,6 +58,28 @@ class Backup:
 LEVEL_TYPES = ("normal", "flat", "amplified", "large_biomes")
 
 
+# server.properties / itzg MODE spellings -> the dashboard's names
+GAMEMODE_ALIASES = {
+    "0": "survival",
+    "s": "survival",
+    "1": "creative",
+    "c": "creative",
+    "2": "adventure",
+    "a": "adventure",
+    "3": "spectator",
+    "sp": "spectator",
+}
+
+
+def normalize_gamemode(gamemode: str) -> str:
+    """``"2"``, ``"a"`` or ``" Adventure "`` -> ``"adventure"``.
+
+    Unknown values pass through unchanged.
+    """
+    gm = gamemode.strip().lower()
+    return GAMEMODE_ALIASES.get(gm, gm)
+
+
 @dataclass
 class WorldSettings:
     """Everything the launch form edits. Passed to itzg as chart values/env.

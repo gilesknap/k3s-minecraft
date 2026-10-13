@@ -63,6 +63,7 @@ from mcdash.models import (
     World,
     WorldSettings,
     WorldState,
+    normalize_gamemode,
 )
 from mcdash.naming import (
     format_compact_timestamp,
@@ -85,7 +86,6 @@ BAD_WAIT_REASONS = {
     "CreateContainerConfigError",
     "InvalidImageName",
 }
-GAMEMODES = {"0": "survival", "1": "creative", "2": "adventure", "3": "spectator"}
 DIFFICULTIES = {"0": "peaceful", "1": "easy", "2": "normal", "3": "hard"}
 NEW_WORLD_NAME = "new-world"
 MAX_SEED_LEN = 64
@@ -458,9 +458,9 @@ class KubeDashboardService:
         if b.server_type is ServerType.FORGE:
             s.server_type = ServerType.FORGE
             s.version = b.mc_version or "LATEST"
-        gm = p.get("gamemode", "").strip().lower()
+        gm = normalize_gamemode(p.get("gamemode", ""))
         if gm:
-            s.gamemode = GAMEMODES.get(gm, gm)
+            s.gamemode = gm
         df = p.get("difficulty", "").strip().lower()
         if df:
             s.difficulty = DIFFICULTIES.get(df, df)
