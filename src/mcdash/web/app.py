@@ -677,8 +677,9 @@ def create_app(service: DashboardService) -> FastAPI:
             check_confirm(confirm, b.world_name)
         service.delete_backup(backup_id, actor)
         msg = f"Deleted {backup_id}"
-        if is_htmx(request) and b.tier is Tier.SNAPSHOT:
-            # the snapshot form swaps out its own row: an empty body removes it
+        if is_htmx(request) and b.tier is Tier.SNAPSHOT and back.startswith("/backups"):
+            # the Backups page swaps out the row: an empty body removes it and
+            # keeps the sort, filter and scroll (the world page reloads instead)
             return render(request, "_oob_flash.html", oob_msg=msg)
         return done(request, _local(back), msg)
 
@@ -772,4 +773,4 @@ def create_app(service: DashboardService) -> FastAPI:
 
 def _local(url: str) -> str:
     """Only allow same-site relative redirects."""
-    return url if url.startswith("/") and not url.startswith("//") else "/"
+    return url if url.startswith("/") and not url.startswith(("//", "/\\")) else "/"
