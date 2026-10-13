@@ -330,7 +330,7 @@ def create_app(service: DashboardService) -> FastAPI:
         SETTING_RANGES=SETTING_RANGES,
         ServerType=ServerType,
         default_dir=default_dir,
-        version=app_version(),
+        app_version=app_version(),
     )
 
     def render(

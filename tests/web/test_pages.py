@@ -351,13 +351,17 @@ def test_launch_form_server_properties(client: TestClient) -> None:
     assert 'name="hardcore"' not in html
 
 
-@pytest.mark.parametrize("env, shown", [("0.4.1", "0.4.1"), ("", "dev")])
+@pytest.mark.parametrize("env, shown", [("0.4.1", "0.4.1"), ("", "dev"), (None, "dev")])
 def test_version_shown_in_header(
-    svc: FakeDashboardService, monkeypatch: pytest.MonkeyPatch, env: str, shown: str
+    svc: FakeDashboardService,
+    monkeypatch: pytest.MonkeyPatch,
+    env: str | None,
+    shown: str,
 ) -> None:
-    monkeypatch.setenv("MCD_VERSION", env)
+    if env is None:
+        monkeypatch.delenv("MCD_VERSION", raising=False)
+    else:
+        monkeypatch.setenv("MCD_VERSION", env)
     c = TestClient(create_app(svc))
     for url in ("/", "/backups", "/worlds/noah-james"):
-        assert f'<span class="version" title="Dashboard release">{shown}</span>' in (
-            c.get(url).text
-        )
+        assert re.search(rf'class="version"[^>]*>{shown}<', c.get(url).text)
