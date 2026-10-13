@@ -406,6 +406,23 @@ def test_settings_json_old_record() -> None:
     assert env["USE_AIKAR_FLAGS"] == "true"
 
 
+def test_forge_version_render_and_json() -> None:
+    forge = WorldSettings(version="1.16.5", server_type=ServerType.FORGE)
+    v = render_values("f", forge, 30565, Config(), forge_version="36.2.0")
+    assert v["minecraftServer"]["forgeVersion"] == "36.2.0"
+    forge.forge_version = "36.2.34"  # the override beats the detected build
+    v = render_values("f", forge, 30565, Config(), forge_version="36.2.0")
+    assert v["minecraftServer"]["forgeVersion"] == "36.2.34"
+    assert v["mcdash"]["forgeVersion"] == "36.2.0"
+    assert v["mcdash"]["settings"]["forge_version"] == "36.2.34"
+    assert settings_from_json(settings_to_json(forge)) == forge
+    v = render_values("f", WorldSettings(forge_version="36.2.34"), 30565, Config())
+    assert "forgeVersion" not in v["minecraftServer"]  # vanilla: ignored
+    # old records have no key; junk loads as no override
+    assert settings_from_json({"server_type": "FORGE"}).forge_version == ""
+    assert settings_from_json({"forge_version": 36}).forge_version == ""
+
+
 def test_settings_json_new_fields() -> None:
     assert settings_from_json(json.loads(json.dumps(settings_to_json(TUNED)))) == TUNED
     off = WorldSettings(use_aikar_flags=False)

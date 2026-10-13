@@ -13,6 +13,7 @@ from .fakes import FakeDashboardService
 ARCHIVE = "archive/2023-02-25_16_53_58-noah-james.zip"
 SNAP = "snapshot/noah-james/20261011T090000Z.zip"
 BACKUP = "backup/noah-james-end-portal.zip"
+FORGE_BACKUP = "archive/2021-11-20_19_30_02-fire-ice2.zip"
 
 
 def test_start(client: TestClient, svc: FakeDashboardService) -> None:
@@ -254,6 +255,36 @@ def test_launch(client: TestClient, svc: FakeDashboardService) -> None:
     assert not settings.pvp
     assert settings.difficulty == "normal"
     assert client.get("/worlds/noah-james-2").status_code == 200
+
+
+def test_forge_version_from_forms(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    form = {
+        "server_type": "FORGE",
+        "version": "1.16.5",
+        "memory": "6Gi",
+        "forge_version": " 36.2.34 ",
+    }
+    r = client.post("/worlds/fire-ice2/settings", data=form)
+    assert r.status_code == 303, r.text
+    assert svc.calls[-1][2].forge_version == "36.2.34"
+    assert svc.worlds["fire-ice2"].settings.forge_version == "36.2.34"
+    r = client.post(
+        "/launch", data={**form, "backup_id": FORGE_BACKUP, "name": "fire-ice2-2"}
+    )
+    assert r.status_code == 303, r.text
+    assert svc.calls[-1][3].forge_version == "36.2.34"
+    # ignored for vanilla
+    vanilla = {**form, "server_type": "VANILLA", "forge_version": "junk"}
+    r = client.post("/worlds/noah-james/settings", data=vanilla)
+    assert r.status_code == 303, r.text
+    assert svc.calls[-1][2].forge_version == ""
+    r = client.post(
+        "/worlds/fire-ice2/settings", data={**form, "forge_version": "1.16.5-36.2.34"}
+    )
+    assert r.status_code == 400 and "not a Forge version" in r.text
+    assert svc.worlds["fire-ice2"].settings.forge_version == "36.2.34"
 
 
 def test_launch_name_taken_conflict(client: TestClient) -> None:

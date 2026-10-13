@@ -211,6 +211,8 @@ def settings_from_form(
     return WorldSettings(
         version=text("version") or "LATEST",
         server_type=server_type,
+        # blank = the build detected from the backup; only Forge worlds have it
+        forge_version=text("forge_version") if server_type is ServerType.FORGE else "",
         memory=memory,
         gamemode=gamemode,
         force_gamemode="force_gamemode" in form,

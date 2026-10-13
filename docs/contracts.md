@@ -102,7 +102,16 @@ in their report.
   `None`. `simulation_distance` < 1.18, `pause_when_empty_seconds` < 1.21.2
   and `sync_chunk_writes` < 1.16 are not rendered. `settings.use_aikar_flags`
   (default true, also for old records) → `extraEnv.USE_AIKAR_FLAGS=true`;
-  nothing when false. Ranges (`models.SETTING_RANGES`, checked by the service
+  nothing when false. `settings.forge_version` (FORGE only; e.g. `36.2.34`,
+  matching `models.FORGE_VERSION_RE`, else the service raises `MCDashError`)
+  overrides the build detected from the backup (the record's `forgeVersion`,
+  mirrored as `mcdash.forgeVersion`) in `minecraftServer.forgeVersion`; blank
+  = the detected build, neither = itzg's recommended build. The service
+  stores only an override (a value equal to the detected build is saved as
+  `""`, non-Forge worlds save `""`), `World.settings.forge_version` shows the
+  build in use and `launch_defaults` prefills the detected one. Old records
+  load as `""`. A restore re-detects `forgeVersion` from the restored backup
+  but keeps an override, as it keeps the Minecraft version. Ranges (`models.SETTING_RANGES`, checked by the service
   and the form): view 2–32, simulation 5–32, spawn protection 0–100000, pause
   0–86400 (0 = never), max players 1–10000.
 - Jobs `<w>-seed-<ts>` / `<w>-snap-<ts>` (no seed Job for `create_world`) — image `$MCD_JOB_IMAGE`, run as

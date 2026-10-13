@@ -136,6 +136,18 @@ def test_launch_form_prefilled(client: TestClient) -> None:
     assert 'name="ops" value="NoahK"' in html  # an admin box per player
 
 
+def test_forge_version_field_only_for_forge(client: TestClient) -> None:
+    html = client.get(f"/launch?backup={quote(FORGE)}").text
+    assert 'name="forge_version" value="36.2.0"' in html
+    assert (
+        'name="forge_version"'
+        not in client.get(f"/launch?backup={quote(ARCHIVE)}").text
+    )
+    assert 'name="forge_version" value="36.2.0"' in client.get("/worlds/fire-ice2").text
+    assert 'name="forge_version"' not in client.get("/worlds/noah-james").text
+    assert 'name="forge_version"' not in client.get("/new").text
+
+
 def test_launch_form_command_blocks(client: TestClient) -> None:
     bid = "archive/2021-08-09_14_22_10-adventure-of-doom.zip"
     html = client.get(f"/launch?backup={quote(bid)}").text
