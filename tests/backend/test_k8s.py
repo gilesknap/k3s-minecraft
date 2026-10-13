@@ -127,13 +127,15 @@ def test_list_server_pods(cfg: Config) -> None:
     pod = NS(
         metadata=NS(name="w-abc", deletion_timestamp=None),
         spec=NS(
+            node_name="nuc2",
             containers=[
                 NS(name="sidecar", image="busybox"),
                 NS(name="w", image="itzg/minecraft-server:java21"),
-            ]
+            ],
         ),
         status=NS(
             phase="Running",
+            host_ip="192.168.1.92",
             start_time=started,
             conditions=[NS(type="Ready", status="True")],
             container_statuses=[
@@ -148,6 +150,7 @@ def test_list_server_pods(cfg: Config) -> None:
     (p,) = k.list_server_pods("w")
     assert p.ready and p.restarts == 2 and p.started == started
     assert p.image == "itzg/minecraft-server:java21"
+    assert (p.host_ip, p.node) == ("192.168.1.92", "nuc2")
     sel = k.core.list_namespaced_pod.call_args.kwargs["label_selector"]
     assert sel == "app=w,app.kubernetes.io/name=minecraft"
 

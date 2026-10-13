@@ -1,3 +1,7 @@
+{{- $w := .Values.worlds }}
+{{- if and (le (int $w.rconPortMin) (int $w.portMax)) (le (int $w.portMin) (int $w.rconPortMax)) }}
+{{- fail (printf "worlds.rconPortMin-rconPortMax (%v-%v) must not overlap worlds.portMin-portMax (%v-%v)" $w.rconPortMin $w.rconPortMax $w.portMin $w.portMax) }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,6 +63,12 @@ spec:
               value: {{ .Values.worlds.portMin | quote }}
             - name: MCD_PORT_MAX
               value: {{ .Values.worlds.portMax | quote }}
+            - name: MCD_RCON_PORT_MIN
+              value: {{ .Values.worlds.rconPortMin | quote }}
+            - name: MCD_RCON_PORT_MAX
+              value: {{ .Values.worlds.rconPortMax | quote }}
+            - name: MCD_RCON_HOST
+              value: {{ .Values.worlds.rconHost | quote }}
             - name: MCD_PUBLIC_HOST
               value: {{ .Values.worlds.publicHost | default "localhost" | quote }}
             - name: MCD_WORLD_NODE

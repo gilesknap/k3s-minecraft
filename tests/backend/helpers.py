@@ -201,6 +201,8 @@ class FakeHelm:
                     phase="Running",
                     ready=True,
                     started=datetime.now(UTC),
+                    host_ip="192.168.1.92",
+                    node="nuc2",
                 )
             ]
         else:

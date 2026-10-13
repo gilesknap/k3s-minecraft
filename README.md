@@ -36,6 +36,10 @@ The worlds this was built for, and the story behind them, are in
 - **Whitelist** editing from a player roster, enforced by default. A world can
   instead be marked **open to everyone** (no whitelist), which applies live.
   `online-mode` is always on.
+- **Direct RCON** from the LAN for tools such as
+  [mciwb](https://github.com/gilesknap/mciwb): each world has its own RCON
+  NodePort, shown on its page with a reveal-password button (see
+  [Direct RCON](#direct-rcon-mciwb)).
 - **Adventure worlds** keep their spawn chunk force-loaded, working around a
   Minecraft 26.3 bug that respawns players at the bottom of the world when the
   spawn chunk is not loaded.
@@ -59,7 +63,10 @@ between components in [docs/contracts.md](docs/contracts.md). In brief:
 - **Seeding and snapshots** run as Kubernetes Jobs that use the dashboard's
   own image (`python -m mcdash.jobs seed|snapshot ...`).
 - **Networking**: each world gets a NodePort from a fixed range (default
-  30565-30584) that it keeps for its whole life. The dashboard has a
+  30565-30584) that it keeps for its whole life, and an RCON NodePort from a
+  second range (default 30600-30619) for LAN clients. A NetworkPolicy lets
+  anyone reach the game port but RCON only from the dashboard and the LAN.
+  The dashboard has a
   ClusterIP Service only and does no authentication itself. Put it behind an
   authenticating proxy; it logs `X-Auth-Request-Email` against each action.
 
@@ -91,12 +98,20 @@ worlds:
   storageClass: nfs-rwx        # RWX class for per-world PVCs
   portMin: 30565
   portMax: 30584
+  rconPortMin: 30600           # RCON NodePorts: LAN only, never forward these
+  rconPortMax: 30619
   defaultMemory: 4Gi
   snapshotKeep: 10
+networkPolicy:
+  enabled: true                # needs a CNI that enforces policies (k3s does)
+  rconAllowedCidrs:            # your LAN, minus the other cluster nodes
+    - cidr: 192.168.1.0/24     # (their pods reach NodePorts as the node IP)
+      except: [192.168.1.81/32, 192.168.1.82/32]
 ```
 
 The chart creates a Deployment, a Service (port 80), a ServiceAccount with a
-Role limited to its namespace, and two static NFS PV/PVC pairs. The PVs have
+Role limited to its namespace, two static NFS PV/PVC pairs and a
+NetworkPolicy for the world pods. The PVs have
 `Retain` reclaim and their names are prefixed with the namespace. It does
 **not** create an Ingress. For each storage tier, `storage.<tier>.existingClaim`
 uses a PVC you created yourself. `storage.<tier>.hostPath` exists only for
@@ -105,6 +120,32 @@ testing (kind). See
 for every value.
 
 Your router must forward TCP `portMin`-`portMax` to the pinned node.
+**Never** forward `rconPortMin`-`rconPortMax` (on the router, or in a relay
+such as tpi-k3s-ansible's `vps_relay.forwards`): RCON is full server control
+behind one password.
+
+### Direct RCON (mciwb)
+
+Each world's page shows its RCON addresses, with copy buttons, and a
+**Reveal** button for the password (fetched only on request and recorded in
+the audit log):
+
+- `<node-ip>:<rcon-port>` from any LAN host in `networkPolicy.rconAllowedCidrs`;
+- `127.0.0.1:<rcon-port>` on the world's node itself (needs kube-proxy's
+  localhost NodePorts, the k3s default). This is the fastest route: about as
+  fast as running inside the pod.
+
+The port is the world's for life, like the game port. Worlds created before
+this feature get one the next time they start. With
+[mciwb](https://github.com/gilesknap/mciwb), on the world's node:
+
+```python
+from mciwb import Iwb
+
+w = Iwb(server="127.0.0.1", port=30600, passwd="<revealed password>")
+```
+
+or `server="192.168.1.92"` (the node's LAN address) from a workstation.
 
 ## NAS setup and ingesting the archive
 

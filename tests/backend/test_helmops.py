@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 from mcdash.config import Config
 from mcdash.helmops import (
@@ -157,6 +158,8 @@ def test_render_against_real_chart(tmp_path: Path) -> None:
     assert 'name: SEED\n          value: "12345"' in out
     assert 'name: LEVEL_TYPE\n          value: "minecraft:flat"' in out
     assert "RCON_CMDS_STARTUP" not in out
+    # without an RCON port, RCON stays cluster-internal
+    assert "type: ClusterIP" in out
     s = WorldSettings(gamemode="adventure")
     f.write_text(json.dumps(render_values("doom", s, 30566, Config())))
     out = subprocess.run(
@@ -274,3 +277,65 @@ def test_render_values_forceload_spawn() -> None:
     )
     v = render_values("fire-ice2", forge, 30565, Config(), forge_version="36.1.0")
     assert v["extraEnv"]["RCON_CMDS_STARTUP"] == "forceload add ~ ~"
+
+
+def test_render_values_rcon_nodeport() -> None:
+    v = render_values("w", WorldSettings(), 30565, Config(), rcon_port=30600)
+    rc = v["minecraftServer"]["rcon"]
+    assert (rc["serviceType"], rc["nodePort"], rc["externalTrafficPolicy"]) == (
+        "NodePort",
+        30600,
+        "Local",
+    )
+    assert rc["existingSecret"] == "w-rcon" and rc["port"] == 25575
+    assert v["mcdash"]["rconPort"] == 30600
+    # the game service is unchanged
+    assert v["minecraftServer"]["nodePort"] == 30565
+
+    plain = render_values("w", WorldSettings(), 30565, Config())
+    assert plain["minecraftServer"]["rcon"]["serviceType"] == "ClusterIP"
+    assert "nodePort" not in plain["minecraftServer"]["rcon"]
+    assert plain["mcdash"]["rconPort"] == 0
+
+
+@pytest.mark.skipif(
+    not (CHART and Path(CHART).is_dir() and shutil.which("helm")),
+    reason="set MCD_TEST_ITZG_CHART to an unpacked itzg chart to run",
+)
+def test_render_rcon_nodeport_against_real_chart(tmp_path: Path) -> None:
+    v = render_values("king", WorldSettings(), 30565, Config(), rcon_port=30600)
+    f = tmp_path / "v.json"
+    f.write_text(json.dumps(v))
+    out = subprocess.run(
+        ["helm", "template", "king", CHART, "-n", "minecraft", "-f", str(f)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    docs = [d for d in yaml.safe_load_all(out) if d]
+    svcs = {d["metadata"]["name"]: d for d in docs if d["kind"] == "Service"}
+    rcon = svcs["king-rcon"]["spec"]
+    assert rcon["type"] == "NodePort"
+    assert rcon["externalTrafficPolicy"] == "Local"
+    assert rcon["ports"] == [
+        {
+            "name": "rcon",
+            "port": 25575,
+            "nodePort": 30600,
+            "targetPort": "rcon",
+            "protocol": "TCP",
+        }
+    ]
+    game = svcs["king"]["spec"]
+    assert game["type"] == "NodePort" and game["ports"][0]["nodePort"] == 30565
+    # the labels the dashboard chart's NetworkPolicy selects on
+    (dep,) = [d for d in docs if d["kind"] == "Deployment"]
+    labels = dep["spec"]["template"]["metadata"]["labels"]
+    assert labels["app.kubernetes.io/name"] == "minecraft"
+    assert labels["mcdash/world"] == "king"
+    ports = {p["name"]: p["containerPort"] for p in _container(dep)["ports"]}
+    assert ports == {"minecraft": 25565, "rcon": 25575}
+
+
+def _container(dep: dict) -> dict:
+    return dep["spec"]["template"]["spec"]["containers"][0]

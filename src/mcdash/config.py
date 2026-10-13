@@ -26,6 +26,12 @@ class Config:
     job_image: str = ""
     port_min: int = 30565
     port_max: int = 30584
+    # RCON NodePorts, one per world. Must not overlap the game range: the VPS
+    # relay forwards the game range to the internet; RCON must never be relayed.
+    rcon_port_min: int = 30600
+    rcon_port_max: int = 30619
+    # LAN address shown for RCON; "" = the world pod's node (status.hostIP).
+    rcon_host: str = ""
     public_host: str = "localhost"
     world_node: str = ""
     storage_class: str = "nfs-rwx"
@@ -58,6 +64,9 @@ class Config:
             job_image=s("MCD_JOB_IMAGE", ""),
             port_min=int(s("MCD_PORT_MIN", "30565")),
             port_max=int(s("MCD_PORT_MAX", "30584")),
+            rcon_port_min=int(s("MCD_RCON_PORT_MIN", "30600")),
+            rcon_port_max=int(s("MCD_RCON_PORT_MAX", "30619")),
+            rcon_host=s("MCD_RCON_HOST", ""),
             public_host=s("MCD_PUBLIC_HOST", "localhost"),
             world_node=s("MCD_WORLD_NODE", ""),
             storage_class=s("MCD_STORAGE_CLASS", "nfs-rwx"),
@@ -68,6 +77,15 @@ class Config:
             uid=int(s("MCD_UID", "1000")),
             gid=int(s("MCD_GID", "1000")),
         )
+
+    def __post_init__(self) -> None:
+        if self.rcon_port_min > self.rcon_port_max:
+            raise ValueError("RCON port range is empty (min > max)")
+        if self.rcon_port_min <= self.port_max and self.port_min <= self.rcon_port_max:
+            raise ValueError(
+                f"RCON ports {self.rcon_port_min}-{self.rcon_port_max} overlap the "
+                f"game ports {self.port_min}-{self.port_max}"
+            )
 
     @property
     def backups_dir(self) -> Path:

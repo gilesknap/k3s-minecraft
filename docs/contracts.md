@@ -32,7 +32,9 @@ in their report.
 | `MCD_ARCHIVE_PVC` | — | PVC name of the archive, mounted read-only by seed Jobs at `/archive` |
 | `MCD_STORE_PVC` | — | PVC name of the store, mounted by Jobs at `/store` |
 | `MCD_JOB_IMAGE` | — | image for seed/snapshot Jobs (the dashboard image itself) |
-| `MCD_PORT_MIN` / `MCD_PORT_MAX` | `30565` / `30584` | NodePort range, inclusive |
+| `MCD_PORT_MIN` / `MCD_PORT_MAX` | `30565` / `30584` | game NodePort range, inclusive |
+| `MCD_RCON_PORT_MIN` / `MCD_RCON_PORT_MAX` | `30600` / `30619` | RCON NodePort range, inclusive; must not overlap the game range (startup fails if it does) |
+| `MCD_RCON_HOST` | "" | LAN address shown for RCON; "" = the world pod's `status.hostIP` (unknown while stopped) |
 | `MCD_PUBLIC_HOST` | `localhost` | host shown in connect addresses |
 | `MCD_WORLD_NODE` | "" | if set, `nodeSelector kubernetes.io/hostname` for worlds and Jobs |
 | `MCD_STORAGE_CLASS` | `nfs-rwx` | storage class for world PVCs |
@@ -48,18 +50,23 @@ in their report.
   `$MCD_STORAGE_CLASS`, RWX. Labels `app.kubernetes.io/managed-by: mcdash`,
   `mcdash/world: <w>`.
 - ConfigMap `<w>-mcdash` (label `mcdash/kind: world`) — the world record
-  (`spec`: port, source, settings; `op`: pending multi-step operation). Exists
-  from launch, before any Helm release, so it reserves the name and port while
-  seeding; rebuilt from the release's `mcdash:` values if lost. `create_world`
+  (`spec`: port, rconPort, source, settings; `op`: pending multi-step
+  operation). Exists from launch, before any Helm release, so it reserves the
+  name and both ports while seeding. A record without `rconPort` (world
+  launched before RCON NodePorts) gets one, saved at once, on its next
+  install; with the RCON range full that install fails with `Conflict`; rebuilt from the release's `mcdash:` values if lost. `create_world`
   records op `{kind: create, step: install}` until the release is installed,
   so an interrupted create is finished by the reconciler.
 - Secret `<w>-rcon` — key `rcon-password`, random.
 - Helm release `<w>` of the vendored itzg chart: `persistence.dataDir.existingClaim=<w>-data`,
-  NodePort game service on the allocated port, RCON ClusterIP, nodeSelector,
+  NodePort game service on the allocated port, RCON service
+  (`minecraftServer.rcon`) `serviceType: NodePort`, `nodePort: <rconPort>`,
+  `externalTrafficPolicy: Local` (ClusterIP only if rendered without a port),
+  nodeSelector,
   `ENFORCE_WHITELIST` (false, with no `WHITELIST`, for an `open_to_all` world),
   `online-mode` true, `EULA=TRUE`. Dashboard metadata lives in
-  the release values under the top-level key `mcdash:` (`port`, `sourceBackup`,
-  `created`, `settings`) — read back with `helm get values`. Helm releases are
+  the release values under the top-level key `mcdash:` (`port`, `rconPort`,
+  `sourceBackup`, `created`, `settings`) — read back with `helm get values`. Helm releases are
   the source of truth for which worlds exist. `settings.seed` →
   `minecraftServer.levelSeed` (env `SEED`) when non-empty; `settings.level_type`
   → `minecraftServer.levelType` (env `LEVEL_TYPE`, written verbatim to
@@ -123,6 +130,9 @@ storage:
 worlds:
   portMin: 30565
   portMax: 30584
+  rconPortMin: 30600  # RCON NodePorts: LAN only; never relay/forward them
+  rconPortMax: 30619
+  rconHost: ""        # "" = the world pod's node IP
   publicHost: ""
   node: ""            # hostname to pin worlds to
   storageClass: nfs-rwx
@@ -130,11 +140,21 @@ worlds:
   defaultMemory: 4Gi
   snapshotKeep: 10
 securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
+networkPolicy:
+  enabled: true
+  rconAllowedCidrs: [192.168.1.0/24]
 ```
 
 The chart creates: Deployment (1 replica, port 8080, `/healthz`), Service
 (ClusterIP 80→8080), ServiceAccount + Role + RoleBinding, the two PV/PVC
-pairs. It does **not** create an Ingress (tpi-k3s-ansible owns ingress/auth).
+pairs and, with `networkPolicy.enabled`, NetworkPolicy `<fullname>-worlds`.
+It selects pods with `app.kubernetes.io/name: minecraft` **and** an
+`mcdash/world` label (world servers only: not the dashboard, whose name label
+is `minecraft-dashboard`, nor the Jobs, which have no name label), Ingress
+only: TCP 25565 from anywhere; TCP 25575 from this release's dashboard pod
+(selector labels) and `rconAllowedCidrs` (each a CIDR string or an ipBlock
+`{cidr, except}`); everything else denied. Rendering
+fails if the RCON and game port ranges overlap. It does **not** create an Ingress (tpi-k3s-ansible owns ingress/auth).
 
 ## New worlds (`create_world`)
 
@@ -158,6 +178,17 @@ inserted). `status` is `ready`, `pending` (commands Job running; ask again) or
 `none` (no command list: the console still has history). Served as JSON by
 `GET /worlds/<w>/complete?line=…`. It sends nothing over RCON beyond the cached
 `list` used for player names, and writes no audit entry.
+
+## Direct RCON (`World.rcon_port`, `rcon_password`)
+
+`World.rcon_port` is the RCON NodePort (0 = assigned at the next start),
+`World.rcon_host` the LAN address to show (`$MCD_RCON_HOST`, else the server
+pod's `status.hostIP`, else `""`), `World.node` the pod's node (else
+`$MCD_WORLD_NODE`). The world page shows `<rcon_host>:<rcon_port>` and
+`127.0.0.1:<rcon_port>` (on `node`). `rcon_password(name, actor)` returns the
+world's RCON password and writes audit action `rcon_password` (never the
+password). Served by `GET /worlds/<w>/rcon-password` as an HTML fragment with
+`Cache-Control: no-store`; the password is never part of any page until then.
 
 ## Runtime notes
 

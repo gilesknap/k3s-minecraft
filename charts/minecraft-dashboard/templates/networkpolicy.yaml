@@ -1,0 +1,52 @@
+{{- if .Values.networkPolicy.enabled }}
+# World server pods only: the itzg chart labels its pods
+# app.kubernetes.io/name=minecraft and the dashboard adds mcdash/world. The
+# dashboard (app.kubernetes.io/name=minecraft-dashboard) and its Jobs (no
+# app.kubernetes.io/name) are not selected. Ingress only: egress is untouched.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mcdash.fullname" . }}-worlds
+  labels:
+    {{- include "mcdash.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minecraft
+    matchExpressions:
+      - key: mcdash/world
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    # Game: anyone (LAN, NodePort, the VPS relay).
+    - ports:
+        - protocol: TCP
+          port: 25565
+    # RCON: this dashboard and the LAN. NodePort clients keep their source IP
+    # (externalTrafficPolicy Local); connections from the world's own node
+    # (e.g. 127.0.0.1:<rcon NodePort>) are accepted by k3s's policy controller
+    # before any policy is consulted.
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "mcdash.selectorLabels" . | nindent 14 }}
+        {{- range .Values.networkPolicy.rconAllowedCidrs }}
+        {{- if kindIs "string" . }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- else }}
+        - ipBlock:
+            cidr: {{ .cidr | quote }}
+            {{- with .except }}
+            except:
+              {{- range . }}
+              - {{ . | quote }}
+              {{- end }}
+            {{- end }}
+        {{- end }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 25575
+{{- end }}

@@ -49,8 +49,17 @@ storage:
       - nfsvers=4
 
 worlds:
+  # Game NodePorts, one per world (players; the VPS relay may forward these).
   portMin: 30565
   portMax: 30584
+  # RCON NodePorts, one per world, for direct LAN clients (e.g. mciwb).
+  # Must not overlap the game range, and must NEVER be forwarded to the
+  # internet (e.g. never add it to a relay's forwards).
+  rconPortMin: 30600
+  rconPortMax: 30619
+  # LAN address shown for RCON on the world page; "" = the world pod's node
+  # InternalIP (shown while the world runs).
+  rconHost: ""
   publicHost: ""
   # Hostname to pin worlds and Jobs to (nodeSelector kubernetes.io/hostname).
   node: ""
@@ -77,6 +86,22 @@ containerSecurityContext:
   readOnlyRootFilesystem: true
   capabilities:
     drop: ["ALL"]
+
+# NetworkPolicy for the world server pods (itzg pods with an mcdash/world
+# label; not this dashboard, not the seed/snapshot/commands Jobs). Game port
+# 25565 is open to all; RCON 25575 only from this dashboard's pod and
+# rconAllowedCidrs. Needs a policy-enforcing CNI (k3s: built in).
+networkPolicy:
+  enabled: true
+  # Sources allowed to reach RCON (NodePort clients keep their IP:
+  # externalTrafficPolicy Local). Traffic from the world's own node is
+  # allowed by k3s's policy controller regardless (see docs/design.md).
+  # Each entry is a CIDR string or {cidr, except: [CIDRs]} (an ipBlock).
+  # Pods on OTHER nodes that connect to <world-node-ip>:<rcon-port> are
+  # masqueraded to their node's IP, so list other cluster nodes' IPs under
+  # "except" unless you run RCON clients on them.
+  rconAllowedCidrs:
+    - 192.168.1.0/24
 
 service:
   type: ClusterIP
