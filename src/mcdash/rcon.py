@@ -31,6 +31,19 @@ MAX_PACKET = 4096 + 14  # body limit Minecraft uses for responses, plus header
 MAX_COMMAND = 1446
 
 
+def _enable_keepalive(sock: socket.socket) -> None:
+    """Probe an idle pooled connection so a dead peer is noticed in ~90 s."""
+    with contextlib.suppress(OSError):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        for opt, val in (
+            ("TCP_KEEPIDLE", 60),
+            ("TCP_KEEPINTVL", 10),
+            ("TCP_KEEPCNT", 3),
+        ):
+            if hasattr(socket, opt):  # Linux; absent on some platforms
+                sock.setsockopt(socket.IPPROTO_TCP, getattr(socket, opt), val)
+
+
 class RconError(Exception):
     pass
 
@@ -84,6 +97,7 @@ class RconClient:
                 f"cannot connect to RCON {self.host}:{self.port}: {e}"
             ) from e
         self._sock.settimeout(self.timeout)
+        _enable_keepalive(self._sock)
         req = next(self._ids)
         self._send(req, SERVERDATA_AUTH, self.password)
         while True:
@@ -106,10 +120,11 @@ class RconClient:
         if self._sock is None:
             return False
         try:
-            readable, _, _ = select.select([self._sock], [], [], 0)
+            p = select.poll()
+            p.register(self._sock, select.POLLIN | select.POLLHUP | select.POLLERR)
+            return not p.poll(0)
         except (OSError, ValueError):
             return False
-        return not readable
 
     def close(self) -> None:
         if self._sock is not None:
@@ -282,6 +297,9 @@ class RconPool:
         Commands of a batch that already ran are never re-sent; a retry
         resumes at the failed command. At most one retry per call.
         """
+        for c in cmds:
+            if len(c.encode()) > MAX_COMMAND:
+                raise RconError("command too long")  # nothing sent, keep the connection
         slot = self._slot(world)
         with slot.lock:
             if slot.evict_pending or (slot.client is not None and slot.key != key):

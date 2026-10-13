@@ -218,7 +218,7 @@ def test_hung_world_does_not_block_others(svc: KubeDashboardService) -> None:
     t = threading.Thread(target=lambda: result.append(svc.rcon(a, "say a", ME)))
     t.start()
     try:
-        time.sleep(0.05)  # let it take world a's lock and hang
+        assert rcon.blocked.wait(2)  # world a's command holds its lock and hangs
         t0 = time.monotonic()
         assert svc.rcon(b, "say b", ME) == "ok say b"
         assert svc.get_world(b).players_online == ["noah", "giles"]
@@ -390,3 +390,14 @@ def test_pool_retries_idempotent_after_hangup_over_tcp() -> None:
     finally:
         pool.close_all()
         srv.close()
+
+
+def test_too_long_command_keeps_the_connection(svc: KubeDashboardService) -> None:
+    _, _, rcon = parts(svc)
+    name = launch_running(svc)
+    svc.rcon(name, "say hi", ME)
+    opened = rcon.connects
+    with pytest.raises(MCDashError, match="too long"):
+        svc.rcon(name, "say " + "x" * 2000, ME)
+    svc.rcon(name, "say again", ME)
+    assert rcon.connects == opened  # rejected before sending; no reconnect

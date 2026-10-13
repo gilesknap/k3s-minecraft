@@ -249,6 +249,7 @@ class FakeRcon:
         self.fail_unsent = 0
         self.fail_sent = 0
         self.block: dict[str, threading.Event] = {}
+        self.blocked = threading.Event()  # set when a command starts waiting on block
         self.in_flight: dict[int, int] = {}  # id(conn) -> concurrent commands
         self.overlaps = 0
         self._mu = threading.Lock()
@@ -302,6 +303,7 @@ class FakeRcon:
                     raise RconError("RCON connection closed")
                 for key, evt in o.block.items():
                     if key in self.host:
+                        o.blocked.set()
                         evt.wait(5)
                 time.sleep(0.001)  # widen any interleaving window
                 if cmd == "list":
