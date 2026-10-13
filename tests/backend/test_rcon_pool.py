@@ -135,10 +135,9 @@ def test_password_change_reconnects(svc: KubeDashboardService) -> None:
 def test_evicted_on_stop(svc: KubeDashboardService) -> None:
     _, _, rcon = parts(svc)
     name = launch_running(svc)
-    svc.stop(name, ME)
-    assert len(rcon.open_conns) == 1  # save-off used it
-    complete(svc, "snapshot")  # save-on, then scale to 0
-    assert "save-on" in [c for _, c in rcon.log]
+    assert svc.rcon(name, "say hi", ME) == "ok say hi"
+    assert len(rcon.open_conns) == 1
+    svc.stop(name, ME)  # scales to 0 directly
     assert not rcon.open_conns
     assert not svc.rcon_pool.connected(name)
 

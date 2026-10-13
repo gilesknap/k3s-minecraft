@@ -17,10 +17,12 @@ Each world has a ConfigMap ``<w>-mcdash`` (label ``mcdash/kind=world``) with:
   resumes where it left off.
 
 Operations: ``launch`` (seed -> install), ``create`` (install only: a new
-world has no backup, the server generates it on the empty volume), ``stop``
-(snapshot -> scale 0), ``snapshot``, ``restore`` (snapshot -> scale 0 ->
-drain -> seed -> scale 1), ``delete`` (snapshot -> teardown). An op with
-``error`` set means FAILED.
+world has no backup, the server generates it on the empty volume),
+``snapshot``, ``restore`` (snapshot -> scale 0 -> drain -> seed -> scale 1),
+``delete`` (snapshot -> teardown). An op with ``error`` set means FAILED.
+Start and stop are not ops: they scale the release directly. Stop takes no
+snapshot (the data stays on the PVC), but a ``stop`` op persisted by an
+older dashboard (snapshot -> scale 0) is still finished by the reconciler.
 """
 
 from __future__ import annotations
@@ -922,9 +924,10 @@ class KubeDashboardService:
             self._busy(name, op)
             if values is None or (self._replicas(values) == 0 and not op):
                 return
-            if op:  # failed op: clear it
-                op = None
-            self._begin_snapshot(name, spec, values, "stop")
+            # no snapshot: the world stays on its PVC and a clean stop flushes
+            spec["message"] = ""
+            self._save(name, spec, None)  # clears a failed op too
+            self._install(name, spec, replicas=0)
             self.store.audit(actor, "stop", name)
 
     def snapshot(self, name: str, actor: str) -> None:
@@ -1275,7 +1278,7 @@ class KubeDashboardService:
                     log.warning("%s: prune failed: %s", name, e)
                 if kind == "snapshot":
                     self._save(name, spec, None)
-                elif kind == "stop":
+                elif kind == "stop":  # persisted by an older dashboard
                     self._install(name, spec, replicas=0)
                     self._save(name, spec, None)
                 elif kind == "restore":

@@ -264,9 +264,12 @@ def test_world_lifecycle(client: httpx.Client) -> None:
     wait_state(client, WORLD, "running")
     assert snap_id in client.get(f"/worlds/{WORLD}/status").text
 
-    # Stop (snapshots first) -> stopped; start -> running again.
+    # Stop (no snapshot: the world stays on its PVC) -> stopped; start ->
+    # running again.
+    snaps_before_stop = set(snapshot_files(WORLD))
     post_ok(client, f"/worlds/{WORLD}/stop")
-    wait_state(client, WORLD, "stopped", timeout=600)
+    wait_state(client, WORLD, "stopped", timeout=300)
+    assert set(snapshot_files(WORLD)) == snaps_before_stop, "stop took a snapshot"
     post_ok(client, f"/worlds/{WORLD}/start")
     wait_state(client, WORLD, "running")
 

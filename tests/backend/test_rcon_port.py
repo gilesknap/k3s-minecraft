@@ -61,7 +61,6 @@ def test_rcon_port_stable_across_lifecycle(svc: KubeDashboardService) -> None:
     kube, helm, _ = parts(svc)
     name = launch_running(svc)
     svc.stop(name, ME)
-    complete(svc, "snapshot")
     w = svc.get_world(name)
     assert w.state is WorldState.STOPPED and w.rcon_port == 30600
     # no pod: the node address is unknown, the node name falls back to config
@@ -105,7 +104,6 @@ def test_existing_world_gets_port_at_next_install(svc: KubeDashboardService) -> 
     _, helm, _ = parts(svc)
     old = launch_running(svc)
     svc.stop(old, ME)
-    complete(svc, "snapshot")
     make_legacy(svc, old)
     assert svc.get_world(old).rcon_port == 0
     # a world launched meanwhile takes the first RCON port
@@ -128,7 +126,6 @@ def test_existing_world_start_with_rcon_ports_exhausted(
     _, helm, _ = parts(svc)
     old = launch_running(svc)
     svc.stop(old, ME)
-    complete(svc, "snapshot")
     make_legacy(svc, old)
     svc.cfg = replace(svc.cfg, rcon_port_min=30600, rcon_port_max=30600)
     _, s = svc.launch_defaults(KING)
@@ -201,7 +198,6 @@ def test_stopping_a_legacy_world_never_allocates(svc: KubeDashboardService) -> N
     _, s = svc.launch_defaults(KING)
     svc.create_world("newer", s, ME)  # takes the only RCON port
     svc.stop(old, ME)
-    complete(svc, "snapshot")
     w = svc.get_world(old)
     assert w.state is WorldState.STOPPED and w.rcon_port == 0
     assert "nodePort" not in helm.releases[old]["minecraftServer"]["rcon"]

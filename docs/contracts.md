@@ -52,7 +52,11 @@ in their report.
   `mcdash/world: <w>`.
 - ConfigMap `<w>-mcdash` (label `mcdash/kind: world`) — the world record
   (`spec`: port, rconPort, source, settings; `op`: pending multi-step
-  operation). Exists from launch, before any Helm release, so it reserves the
+  operation — `snapshot`, `restore`, `delete`, `launch`, `create`). Start and
+  stop are not ops: they upgrade the release to `replicaCount` 1 / 0 at
+  once, and stop takes no snapshot. An in-flight `{kind: stop, step:
+  snapshot}` op written by an older dashboard is still finished (snapshot,
+  then scale to 0). Exists from launch, before any Helm release, so it reserves the
   name and both ports while seeding. A record without `rconPort` (world
   launched before RCON NodePorts) gets one, saved at once, on its next
   install with the server running (start, end of a restore, settings save
