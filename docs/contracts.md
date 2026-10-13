@@ -14,6 +14,7 @@ streams share. `src/mcdash/models.py` is the Python contract and is
 | `store.py` | backend | JSON state in `$MCD_STORE_DIR/dashboard/` (roster, labels, index cache, audit log) |
 | `k8s.py`, `helmops.py`, `rcon.py` | backend | Kubernetes client, `helm` CLI wrapper, RCON protocol client |
 | `service.py` | backend | `KubeDashboardService` implementing `DashboardService` + reconciler thread |
+| `completion.py` | backend | console completion: Brigadier tree walker over the generator reports, and the commands Job script |
 | `jobs/seed.py`, `jobs/snapshot.py`, `jobs/__main__.py` | backend | code run inside Job pods (`python -m mcdash.jobs ...`) |
 | `cli.py` | backend | `mcdash serve` (uvicorn on `:8080`, `create_app`), `mcdash index <dir>` (print detected backups — local debugging) |
 | `web/` (`app.py` with `create_app(service)`, templates, static) | web | FastAPI + HTMX + Jinja2 UI |
@@ -71,6 +72,15 @@ in their report.
   `$MCD_UID`, mount `<w>-data` at `/data`, archive PVC read-only at `/archive`,
   store PVC at `/store`, labels `mcdash/world`, `mcdash/job: seed|snapshot`,
   `ttlSecondsAfterFinished: 3600`.
+
+- Job `<w>-cmds-<ts>` (label `mcdash/job: commands`, `backoffLimit: 0`) — the
+  console's command list. Image: the world pod's server image (fallback
+  `itzg/minecraft-server`), `sh -c mcdash.completion.REPORT_SCRIPT`, env
+  `MCD_WORLD`, `MCD_POD`. Mounts `<w>-data` **read-only** at `/data` and the
+  store PVC with `subPath: dashboard/commands` at `/out`; no archive. Writes
+  `/out/<version>.commands.json`, `/out/<version>.registries.json` (only if
+  missing) and `/out/worlds/<w>.json` = `{"pod", "version", "error"}`. Started
+  by `complete()` at most once per server pod.
 
 Job CLI (run in the Job container):
 
@@ -134,6 +144,16 @@ on the empty volume. `World.source_backup_id` is `""` (UI shows "new world");
 a later restore sets it to the restored backup. A failed install leaves the
 world `failed` and "Start" retries it. Snapshot, stop/start, restore and
 delete are unchanged.
+
+## Console completion (`complete`)
+
+`complete(name, line) -> Completion(start, items, status, message)`: suggestions
+for the token of `line` that starts at `start`; each `Suggestion(text, kind,
+detail)` has kind `literal`, `value` or `hint` (`<targets>`: shown, not
+inserted). `status` is `ready`, `pending` (commands Job running; ask again) or
+`none` (no command list: the console still has history). Served as JSON by
+`GET /worlds/<w>/complete?line=…`. It sends nothing over RCON beyond the cached
+`list` used for player names, and writes no audit entry.
 
 ## Runtime notes
 

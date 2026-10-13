@@ -182,6 +182,21 @@ p.alert { display: block; }
 }
 .log { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .rcon-entry { margin-bottom: .5rem; }
+.rcon-input { position: relative; flex: 1; display: flex; }
+.rcon-input input { flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.rcon-help { margin: .35rem 0 0; }
+.suggest {
+  position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 5; margin: 0; padding: .2rem 0;
+  list-style: none; max-height: 15rem; overflow: auto; background: var(--card); border: 1px solid var(--line);
+  border-radius: 6px; box-shadow: 0 6px 24px rgb(0 0 0 / .18);
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85em;
+}
+.suggest li { display: flex; justify-content: space-between; gap: 1rem; padding: .15rem .6rem; cursor: pointer; }
+.suggest li.active, .suggest li:hover { background: var(--code); }
+.suggest li.active { box-shadow: inset 3px 0 var(--accent); }
+.suggest li.hint, .suggest li.note { color: var(--muted); cursor: default; font-style: italic; }
+.suggest li.hint:hover, .suggest li.note:hover { background: none; }
+.suggest .detail { color: var(--muted); }
 .rcon-cmd { color: var(--accent); font-weight: 600; }
 .rcon-entry pre { margin: .1rem 0 0; white-space: pre-wrap; font-size: 1em; }
 .bgroup { margin-bottom: 1.4rem; }

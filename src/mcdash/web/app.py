@@ -13,6 +13,7 @@ import logging
 import re
 import threading
 from collections.abc import AsyncIterator, Callable
+from dataclasses import asdict
 from datetime import UTC, datetime
 from itertools import groupby
 from pathlib import Path
@@ -22,6 +23,7 @@ from urllib.parse import quote
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import (
     HTMLResponse,
+    JSONResponse,
     PlainTextResponse,
     RedirectResponse,
     Response,
@@ -59,6 +61,7 @@ LEVEL_TYPE_LABELS = {
 }
 PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{1,16}$")
 SSE_KEEPALIVE_S = 15.0
+MAX_COMPLETE_LINE = 1000
 
 
 # -- template helpers --------------------------------------------------------
@@ -454,6 +457,12 @@ def create_app(service: DashboardService) -> FastAPI:
             raise MCDashError("Enter a command")
         output = service.rcon(name, command.removeprefix("/"), actor)
         return render(request, "_rcon_entry.html", command=command, output=output)
+
+    @app.get("/worlds/{name}/complete")
+    def world_complete(name: str, line: str = "") -> JSONResponse:
+        """Console suggestions for ``line`` (read-only; nothing is sent)."""
+        comp = service.complete(name, line[:MAX_COMPLETE_LINE])
+        return JSONResponse(asdict(comp), headers={"Cache-Control": "no-store"})
 
     @app.get("/worlds/{name}/logs")
     async def world_logs(request: Request, name: str) -> StreamingResponse:

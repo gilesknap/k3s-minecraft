@@ -18,9 +18,15 @@
   <form class="inline" method="post" action="/worlds/{{ world.name }}/rcon"
         hx-post="/worlds/{{ world.name }}/rcon" hx-target="#rcon-scrollback" hx-swap="beforeend"
         hx-on::after-request="if(event.detail.successful){this.reset(); var s=document.getElementById('rcon-scrollback'); s.scrollTop=s.scrollHeight}">
-    <input name="command" placeholder="e.g. say hello, time set day" autocomplete="off" required aria-label="RCON command">
+    <div class="rcon-input">
+      <input id="rcon-input" name="command" placeholder="e.g. say hello, time set day" autocomplete="off" spellcheck="false" required aria-label="RCON command"
+             data-history-key="mcdash.rcon.{{ world.name }}" data-complete="/worlds/{{ world.name }}/complete"
+             role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="rcon-suggest" aria-describedby="rcon-help">
+      <ul id="rcon-suggest" class="suggest" role="listbox" aria-label="Suggestions" hidden></ul>
+    </div>
     <button class="btn primary">Send</button>
   </form>
+  <p id="rcon-help" class="small muted rcon-help">↑/↓ history · Tab completes · Esc clears</p>
 </section>
 
 <section class="card">

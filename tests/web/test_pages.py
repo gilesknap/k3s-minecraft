@@ -174,6 +174,41 @@ def test_world_page_sections(client: TestClient) -> None:
     assert 'value="MillieM" >' in html
 
 
+def test_world_page_console_hooks(client: TestClient) -> None:
+    """The attributes app.js binds the console history and completion to."""
+    html = client.get("/worlds/noah-james").text
+    assert 'id="rcon-input"' in html
+    assert 'data-history-key="mcdash.rcon.noah-james"' in html
+    assert 'data-complete="/worlds/noah-james/complete"' in html
+    assert 'aria-controls="rcon-suggest"' in html and 'id="rcon-suggest"' in html
+
+
+def test_world_complete(client: TestClient, svc: FakeDashboardService) -> None:
+    r = client.get("/worlds/noah-james/complete", params={"line": "ti"})
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "no-store"
+    body = r.json()
+    assert body["status"] == "ready" and body["start"] == 0
+    assert [i["text"] for i in body["items"]] == ["tick", "time", "title"]
+    body = client.get("/worlds/noah-james/complete", params={"line": "tp "}).json()
+    assert {"NoahK", "GilesDad"} <= {i["text"] for i in body["items"]}
+    hint = next(i for i in body["items"] if i["kind"] == "hint")
+    assert hint["text"].startswith("<")
+    # no command is sent and nothing is audited
+    assert not [c for c in svc.calls if c[0] == "rcon"]
+
+
+def test_world_complete_modded_and_missing(client: TestClient) -> None:
+    body = client.get("/worlds/fire-ice2/complete", params={"line": "ti"}).json()
+    assert body == {
+        "start": 2,
+        "items": [],
+        "status": "none",
+        "message": "modded server",
+    }
+    assert client.get("/worlds/nope/complete", params={"line": "x"}).status_code == 404
+
+
 def test_world_page_lists_only_its_snapshots(client: TestClient) -> None:
     html = client.get("/worlds/fire-ice2").text
     snaps = html[html.index("<h2>Snapshots") : html.index("Restore from")]
