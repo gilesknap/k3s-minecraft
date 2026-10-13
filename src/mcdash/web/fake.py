@@ -31,7 +31,14 @@ from mcdash.models import (
     WorldSettings,
     WorldState,
 )
-from mcdash.service import check_ops_change, check_players, next_ops, same_players
+from mcdash.service import (
+    apply_property_defaults,
+    check_ops_change,
+    check_players,
+    check_properties,
+    next_ops,
+    same_players,
+)
 
 PUBLIC_HOST = "mc.gkcluster.org"
 # An extract of the 26.3 data generator's commands.json and registries.json.
@@ -172,7 +179,7 @@ class FakeDashboardService:
             name = f"{b.world_name}-{n}"
             n += 1
         forge = b.server_type is ServerType.FORGE
-        return name, WorldSettings(
+        s = WorldSettings(
             version=(b.mc_version or "LATEST") if forge else "LATEST",
             server_type=b.server_type,
             memory="6Gi" if forge else "4Gi",
@@ -185,6 +192,8 @@ class FakeDashboardService:
             max_world_size=int(p.get("max-world-size", 29999984)),
             whitelist=[],
         )
+        apply_property_defaults(s, p)
+        return name, s
 
     def launch(
         self, backup_id: str, name: str, settings: WorldSettings, actor: str
@@ -231,7 +240,9 @@ class FakeDashboardService:
         while name in self.worlds:
             name = f"new-world-{n}"
             n += 1
-        return name, WorldSettings()
+        s = WorldSettings()
+        apply_property_defaults(s, {})
+        return name, s
 
     def create_world(self, name: str, settings: WorldSettings, actor: str) -> World:
         self._record("create_world", name, settings, actor)
@@ -321,6 +332,7 @@ class FakeDashboardService:
 
     def update_settings(self, name: str, settings: WorldSettings, actor: str) -> None:
         self._record("update_settings", name, settings, actor)
+        check_properties(settings)
         self._world(name).settings = settings
 
     def set_whitelist(
@@ -553,6 +565,15 @@ def seeded(**kwargs: object) -> FakeDashboardService:
                 difficulty="normal",
                 whitelist=["NoahK", "JamesK", "GilesDad"],
                 ops=["GilesDad"],
+                view_distance=12,
+                simulation_distance=10,
+                spawn_protection=0,
+                pause_when_empty_seconds=0,
+                sync_chunk_writes=False,
+                allow_flight=True,
+                max_players=20,
+                broadcast_rcon_to_ops=False,
+                broadcast_console_to_ops=True,
             ),
             source_backup_id="archive/2023-02-25_16_53_58-noah-james.zip",
             created=now - timedelta(days=6),

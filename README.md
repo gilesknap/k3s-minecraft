@@ -40,6 +40,12 @@ The worlds this was built for, and the story behind them, are in
   [mciwb](https://github.com/gilesknap/mciwb): each world has its own RCON
   NodePort, shown on its page with a reveal-password button (see
   [Direct RCON](#direct-rcon-mciwb)).
+- **Server tunables** per world: view and simulation distance, spawn
+  protection, pause-when-empty (set 0 for RCON builds with nobody online),
+  synchronous chunk writes (off by default, as worlds live on NFS), allow
+  flight, max players, RCON/console output to admins, hardcore (new worlds)
+  and Aikar's JVM flags (on by default). See
+  [docs/design.md](docs/design.md#server-tunables).
 - **Adventure worlds** keep their spawn chunk force-loaded, working around a
   Minecraft 26.3 bug that respawns players at the bottom of the world when the
   spawn chunk is not loaded.

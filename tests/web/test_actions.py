@@ -447,3 +447,71 @@ def test_settings_update_keeps_generation_settings(
     call, name, settings, _ = svc.calls[-1]
     assert (call, name, settings.memory) == ("update_settings", "fresh", "3Gi")
     assert (settings.seed, settings.level_type) == ("12345", "flat")
+
+
+SETTINGS_FORM = {
+    "server_type": "VANILLA",
+    "version": "LATEST",
+    "memory": "4Gi",
+    "gamemode": "survival",
+    "difficulty": "easy",
+    "max_world_size": "29999984",
+}
+
+
+def test_update_settings_server_properties(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    form = {
+        **SETTINGS_FORM,
+        "view_distance": "24",
+        "simulation_distance": "",  # blank = leave the property alone
+        "spawn_protection": "0",
+        "pause_when_empty_seconds": "0",
+        "max_players": "8",
+        "allow_flight": "on",  # checkbox
+        "sync_chunk_writes": "off",  # "unchanged/on/off" select
+        "broadcast_rcon_to_ops": "",  # select left at "unchanged"
+        "hardcore": "on",  # not on this form: ignored
+    }  # broadcast_console_to_ops, use_aikar_flags: unticked checkboxes
+    r = client.post("/worlds/noah-james/settings", data=form)
+    assert r.status_code == 303, r.text
+    settings = svc.calls[-1][2]
+    assert settings.view_distance == 24
+    assert settings.simulation_distance is None
+    assert settings.spawn_protection == 0
+    assert settings.pause_when_empty_seconds == 0
+    assert settings.max_players == 8
+    assert settings.allow_flight is True
+    assert settings.sync_chunk_writes is False
+    assert settings.broadcast_rcon_to_ops is None
+    assert settings.broadcast_console_to_ops is False
+    assert settings.use_aikar_flags is False
+    assert settings.hardcore is False  # kept from the world
+
+
+def test_server_properties_validation(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    n = len(svc.calls)
+    for field, value, msg in (
+        ("view_distance", "33", "View distance must be between 2 and 32"),
+        ("view_distance", "1", "View distance must be between 2 and 32"),
+        ("simulation_distance", "4", "Simulation distance must be between 5 and 32"),
+        ("spawn_protection", "-1", "Spawn protection must be between 0"),
+        ("pause_when_empty_seconds", "-1", "Pause when empty must be between 0"),
+        ("max_players", "0", "Max players must be between 1"),
+        ("max_players", "lots", "Max players must be a whole number"),
+    ):
+        r = client.post(
+            "/worlds/noah-james/settings", data={**SETTINGS_FORM, field: value}
+        )
+        assert r.status_code == 400, (field, value)
+        assert msg in r.text
+    assert len(svc.calls) == n
+
+
+def test_new_world_hardcore(client: TestClient, svc: FakeDashboardService) -> None:
+    r = client.post("/new", data={**NEW_FORM, "hardcore": "on"})
+    assert r.status_code == 303, r.text
+    assert svc.calls[-1][2].hardcore is True

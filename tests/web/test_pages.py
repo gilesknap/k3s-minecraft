@@ -304,3 +304,48 @@ def test_header_link_toggles_direction(client: TestClient) -> None:
         "/backups?sort=size&amp;dir=desc" in html
     )  # first click on size: largest first
     assert "/backups?sort=label&amp;dir=asc" in html
+
+
+def test_settings_form_server_properties(client: TestClient) -> None:
+    html = client.get("/worlds/noah-james").text
+    assert 'name="view_distance" type="number" min="2" max="32" value="12"' in html
+    assert 'name="spawn_protection" type="number" min="0" max="100000" value="0"' in (
+        html
+    )
+    assert 'name="pause_when_empty_seconds"' in html and 'value="0"' in html
+    assert 'name="allow_flight" checked' in html
+    assert 'name="sync_chunk_writes" >' in html  # unchecked
+    assert 'name="broadcast_console_to_ops" checked' in html
+    assert 'name="use_aikar_flags" checked' in html
+    assert "<legend>Performance</legend>" in html
+    assert 'name="hardcore"' not in html  # new worlds only
+
+
+def test_settings_form_old_record(client: TestClient) -> None:
+    """A world from before these settings: blank numbers, "unchanged" selects."""
+    html = client.get("/worlds/fire-ice2").text
+    assert re.search(r'name="view_distance"[^>]*value=""', html)
+    assert 'placeholder="unchanged (default 10)"' in html
+    assert re.search(
+        r'<select name="allow_flight">\s*<option value="" selected>unchanged', html
+    )
+    assert 'name="use_aikar_flags" checked' in html
+
+
+def test_new_world_form_server_properties(client: TestClient) -> None:
+    html = client.get("/new").text
+    assert 'name="hardcore"' in html and 'name="hardcore" checked' not in html
+    assert re.search(r'name="view_distance"[^>]*value="10"', html)
+    assert re.search(r'name="pause_when_empty_seconds"[^>]*value="60"', html)
+    assert 'name="sync_chunk_writes" >' in html  # off by default
+    assert 'name="broadcast_rcon_to_ops" checked' in html
+    assert 'name="use_aikar_flags" checked' in html
+    assert '<option value="" selected>unchanged' not in html
+
+
+def test_launch_form_server_properties(client: TestClient) -> None:
+    html = client.get(f"/launch?backup={quote(FORGE)}").text
+    assert re.search(r'name="view_distance"[^>]*value="10"', html)
+    # Forge 1.16.5 has no simulation-distance / pause-when-empty-seconds
+    assert re.search(r'name="simulation_distance"[^>]*value=""', html)
+    assert 'name="hardcore"' not in html

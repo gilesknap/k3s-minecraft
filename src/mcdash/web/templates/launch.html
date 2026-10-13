@@ -29,6 +29,7 @@
       {% for value, label in LEVEL_TYPE_LABELS.items() %}<option value="{{ value }}" {% if settings.level_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
     </select>
   </label>
+  <label class="check span2"><input type="checkbox" name="hardcore" {% if settings.hardcore %}checked{% endif %}> Hardcore <small class="muted">one life: dying puts a player in spectator mode; difficulty is locked to hard</small></label>
   {% endif %}
   {% include "_settings_fields.html" %}
   <div class="span2">{{ whitelist_fields(roster, settings.whitelist, settings.open_to_all, settings.ops) }}</div>

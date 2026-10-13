@@ -18,6 +18,7 @@ from typing import Any
 
 from mcdash.config import Config
 from mcdash.models import (
+    SETTING_RANGES,
     MCDashError,
     NotFound,
     ServerType,
@@ -124,6 +125,31 @@ def startup_rcon_commands(settings: WorldSettings) -> list[str]:
     return [FORCELOAD_SPAWN_CMD]
 
 
+# The first version with each server.properties key the dashboard sets that is
+# not ancient. Older servers ignore unknown keys, but they are not rendered
+# where pointless (e.g. 1.12 Forge worlds).
+PROPERTY_MIN_VERSION: dict[str, tuple[int, ...]] = {
+    "sync_chunk_writes": (1, 16, 0),  # 20w14a
+    "simulation_distance": (1, 18, 0),  # 21w38a
+    "pause_when_empty_seconds": (1, 21, 2),  # 24w33a
+}
+
+
+def property_supported(field: str, version: str | None) -> bool:
+    """Whether the ``WorldSettings`` ``field`` exists on ``version``.
+
+    ``LATEST`` and versions that do not parse (snapshots, 26.x-style ids are
+    parsed) are treated as new.
+    """
+    need = PROPERTY_MIN_VERSION.get(field)
+    t = version_tuple(version or "")
+    return need is None or t is None or t >= need
+
+
+def _env_bool(v: bool) -> str:
+    return "true" if v else "false"
+
+
 def jvm_memory(k8s_qty: str) -> str:
     """``4Gi`` -> ``4G`` (itzg MEMORY / -Xmx), ``1536Mi`` -> ``1536M``."""
     m = re.fullmatch(r"\s*(\d+)\s*([KMGT]?)i?\s*", k8s_qty, re.IGNORECASE)
@@ -140,6 +166,24 @@ def memory_mib(k8s_qty: str) -> int:
     return {"K": n // 1024, "": n // (1024 * 1024), "M": n, "G": n * 1024}.get(
         unit, n * 1024 * 1024
     )
+
+
+# ``bool | None`` settings: None = leave server.properties alone.
+OPTIONAL_BOOLS = (
+    "sync_chunk_writes",
+    "allow_flight",
+    "broadcast_rcon_to_ops",
+    "broadcast_console_to_ops",
+)
+# WorldSettings field -> itzg env var, for settings passed as extraEnv.
+PROPERTY_ENV = {
+    "simulation_distance": "SIMULATION_DISTANCE",
+    "pause_when_empty_seconds": "PAUSE_WHEN_EMPTY_SECONDS",
+    "sync_chunk_writes": "SYNC_CHUNK_WRITES",
+    "allow_flight": "ALLOW_FLIGHT",
+    "broadcast_rcon_to_ops": "BROADCAST_RCON_TO_OPS",
+    "broadcast_console_to_ops": "BROADCAST_CONSOLE_TO_OPS",
+}
 
 
 def settings_to_json(s: WorldSettings) -> dict[str, Any]:
@@ -161,8 +205,20 @@ def settings_from_json(d: dict[str, Any] | None) -> WorldSettings:
     for key in ("whitelist", "ops"):
         if key in kw:
             kw[key] = [str(x) for x in kw[key] or []]
-    if "open_to_all" in kw:
-        kw["open_to_all"] = kw["open_to_all"] is True
+    for key in ("open_to_all", "hardcore"):
+        if key in kw:
+            kw[key] = kw[key] is True
+    if "use_aikar_flags" in kw:
+        kw["use_aikar_flags"] = kw["use_aikar_flags"] is not False
+    # managed server.properties: anything malformed -> None (not managed)
+    for key in SETTING_RANGES:
+        if key in kw:
+            v = kw[key]
+            ok = isinstance(v, int) and not isinstance(v, bool)
+            kw[key] = v if ok else None
+    for key in OPTIONAL_BOOLS:
+        if key in kw and not isinstance(kw[key], bool):
+            kw[key] = None
     return WorldSettings(**kw)
 
 
@@ -232,6 +288,21 @@ def render_values(
     level_type = level_type_for(settings.level_type, settings.version)
     if level_type:
         ms["levelType"] = level_type
+    # Only rendered when on: it matters when the server generates the world,
+    # and "false" would overwrite a backup's hardcore=true.
+    if settings.hardcore:
+        ms["hardcore"] = True
+    # Typed chart values where the chart has them. Small ints render fine
+    # (helm's float64 only switches to e-notation from 1e6; SETTING_RANGES
+    # stays below that). None = not managed: itzg leaves the property as is.
+    for field, key in (
+        ("view_distance", "viewDistance"),
+        ("spawn_protection", "spawnProtection"),
+        ("max_players", "maxPlayers"),
+    ):
+        v = getattr(settings, field)
+        if v is not None:
+            ms[key] = int(v)
 
     whitelisted = not settings.open_to_all
     extra_env: dict[str, Any] = {
@@ -249,6 +320,14 @@ def render_values(
         # renders as 2.9999984e+07 (float64) — pass the env var as a string
         "MAX_WORLD_SIZE": str(int(settings.max_world_size)),
     }
+    # server.properties the chart has no typed value for
+    for field, env in PROPERTY_ENV.items():
+        v = getattr(settings, field)
+        if v is None or not property_supported(field, settings.version):
+            continue
+        extra_env[env] = _env_bool(v) if isinstance(v, bool) else str(int(v))
+    if settings.use_aikar_flags:
+        extra_env["USE_AIKAR_FLAGS"] = "true"
     startup_cmds = startup_rcon_commands(settings)
     if startup_cmds:
         # itzg runs each line via rcon-cli once the server is listening, on

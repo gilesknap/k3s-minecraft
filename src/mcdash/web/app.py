@@ -35,6 +35,7 @@ from starlette.datastructures import FormData
 
 from mcdash.models import (
     LEVEL_TYPES,
+    SETTING_RANGES,
     Backup,
     Conflict,
     DashboardService,
@@ -53,6 +54,13 @@ HERE = Path(__file__).parent
 log = logging.getLogger(__name__)
 GAMEMODES = ["survival", "creative", "adventure", "spectator"]
 DIFFICULTIES = ["peaceful", "easy", "normal", "hard"]
+SETTING_LABELS = {
+    "view_distance": "View distance",
+    "simulation_distance": "Simulation distance",
+    "spawn_protection": "Spawn protection",
+    "pause_when_empty_seconds": "Pause when empty",
+    "max_players": "Max players",
+}
 LEVEL_TYPE_LABELS = {
     "normal": "Normal",
     "flat": "Superflat",
@@ -173,6 +181,32 @@ def settings_from_form(
     level_type = text("level_type", "normal")
     if level_type not in LEVEL_TYPES:
         raise MCDashError(f"Unknown world type {level_type!r}")
+
+    def number(key: str) -> int | None:
+        """Blank = None (leave the world's server.properties value alone)."""
+        raw = text(key)
+        lo, hi = SETTING_RANGES[key]
+        label = SETTING_LABELS[key]
+        if not raw:
+            return None
+        try:
+            v = int(raw)
+        except ValueError:
+            raise MCDashError(f"{label} must be a whole number") from None
+        if not lo <= v <= hi:
+            raise MCDashError(f"{label} must be between {lo} and {hi}")
+        return v
+
+    def tristate(key: str) -> bool | None:
+        """A checkbox (absent = off), or the "unchanged/on/off" select an
+        unmanaged setting gets (``""`` = None)."""
+        v = form.get(key)
+        if v is None:
+            return False
+        if v == "":
+            return None
+        return v != "off"
+
     return WorldSettings(
         version=text("version") or "LATEST",
         server_type=server_type,
@@ -189,6 +223,17 @@ def settings_from_form(
         ops=ops,
         seed=text("seed"),
         level_type=level_type,
+        hardcore="hardcore" in form,
+        view_distance=number("view_distance"),
+        simulation_distance=number("simulation_distance"),
+        spawn_protection=number("spawn_protection"),
+        pause_when_empty_seconds=number("pause_when_empty_seconds"),
+        max_players=number("max_players"),
+        sync_chunk_writes=tristate("sync_chunk_writes"),
+        allow_flight=tristate("allow_flight"),
+        broadcast_rcon_to_ops=tristate("broadcast_rcon_to_ops"),
+        broadcast_console_to_ops=tristate("broadcast_console_to_ops"),
+        use_aikar_flags="use_aikar_flags" in form,
     )
 
 
@@ -281,6 +326,7 @@ def create_app(service: DashboardService) -> FastAPI:
         GAMEMODES=GAMEMODES,
         DIFFICULTIES=DIFFICULTIES,
         LEVEL_TYPE_LABELS=LEVEL_TYPE_LABELS,
+        SETTING_RANGES=SETTING_RANGES,
         ServerType=ServerType,
         default_dir=default_dir,
     )
@@ -453,6 +499,7 @@ def create_app(service: DashboardService) -> FastAPI:
         # generation-only: not on this form, keep what the world was made with
         settings.seed = world.settings.seed
         settings.level_type = world.settings.level_type
+        settings.hardcore = world.settings.hardcore
         service.update_settings(name, settings, actor)
         return done(request, f"/worlds/{name}", "Settings saved")
 

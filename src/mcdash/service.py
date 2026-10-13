@@ -42,10 +42,12 @@ from mcdash.backups import BackupIndex
 from mcdash.completion import REPORT_SCRIPT, VERSION_RE, CommandTree
 from mcdash.config import Config
 from mcdash.helmops import (
+    OPTIONAL_BOOLS,
     RCON_PORT,
     RCON_SECRET_KEY,
     HelmError,
     jvm_memory,
+    property_supported,
     pvc_name,
     rcon_secret_name,
     render_values,
@@ -56,6 +58,7 @@ from mcdash.helmops import (
 from mcdash.k8s import JobInfo, JobSpec, KubeApi, PodInfo
 from mcdash.models import (
     LEVEL_TYPES,
+    SETTING_RANGES,
     Backup,
     Completion,
     Conflict,
@@ -134,6 +137,72 @@ def _pod_target(pods: list[PodInfo]) -> tuple[str, str, int] | None:
 
 def _bool(v: str | None) -> bool:
     return str(v).strip().lower() == "true"
+
+
+# Launch / new-world values of the managed server.properties settings: the
+# vanilla defaults, except sync-chunk-writes (worlds live on NFS, where
+# synchronous chunk writes make every save wait for the disk).
+PROPERTY_DEFAULTS: dict[str, int | bool] = {
+    "view_distance": 10,
+    "simulation_distance": 10,
+    "spawn_protection": 16,
+    "pause_when_empty_seconds": 60,
+    "sync_chunk_writes": False,
+    "allow_flight": False,
+    "max_players": 20,
+    "broadcast_rcon_to_ops": True,
+    "broadcast_console_to_ops": True,
+}
+# Taken from the backup's server.properties when present. Not
+# sync-chunk-writes: the backup's value reflects the disk it was played on.
+_PROPERTY_KEYS = {
+    "view_distance": "view-distance",
+    "simulation_distance": "simulation-distance",
+    "spawn_protection": "spawn-protection",
+    "pause_when_empty_seconds": "pause-when-empty-seconds",
+    "allow_flight": "allow-flight",
+    "max_players": "max-players",
+    "broadcast_rcon_to_ops": "broadcast-rcon-to-ops",
+    "broadcast_console_to_ops": "broadcast-console-to-ops",
+}
+
+
+def apply_property_defaults(s: WorldSettings, props: dict[str, str]) -> None:
+    """Fill the managed server.properties settings for a launch or new world.
+
+    From ``props`` (a backup's server.properties) where present and valid,
+    integers clamped to ``SETTING_RANGES``; else ``PROPERTY_DEFAULTS``.
+    Settings ``s.version`` does not have stay ``None`` (not rendered).
+    """
+    for field, default in PROPERTY_DEFAULTS.items():
+        if not property_supported(field, s.version):
+            setattr(s, field, None)
+            continue
+        value: int | bool = default
+        raw = props.get(_PROPERTY_KEYS.get(field, ""), "").strip()
+        if raw and isinstance(default, bool):
+            value = _bool(raw)
+        elif raw:
+            try:
+                lo, hi = SETTING_RANGES[field]
+                value = min(max(int(raw), lo), hi)
+            except ValueError:
+                pass
+        setattr(s, field, value)
+
+
+def check_properties(s: WorldSettings) -> None:
+    """Managed server.properties settings are in range (None = not managed)."""
+    for field, (lo, hi) in SETTING_RANGES.items():
+        v = getattr(s, field)
+        if v is None:
+            continue
+        if isinstance(v, bool) or not isinstance(v, int) or not lo <= v <= hi:
+            name = field.replace("_", " ")
+            raise MCDashError(f"{name} must be a whole number from {lo} to {hi}")
+    for field in OPTIONAL_BOOLS:
+        if getattr(s, field) not in (None, True, False):
+            raise MCDashError(f"{field.replace('_', ' ')} must be on or off")
 
 
 def _parse_dt(s: Any) -> datetime | None:
@@ -634,11 +703,13 @@ class KubeDashboardService:
                 s.max_world_size = int(p["max-world-size"])
         except ValueError:
             pass
+        apply_property_defaults(s, p)
         return s
 
     def _check_settings(self, s: WorldSettings) -> None:
         jvm_memory(s.memory or self.cfg.default_memory)  # raises on bad sizes
         check_players(s)
+        check_properties(s)
         if s.level_type not in LEVEL_TYPES:
             raise MCDashError(
                 f"unknown world type {s.level_type!r} (one of {', '.join(LEVEL_TYPES)})"
@@ -732,7 +803,9 @@ class KubeDashboardService:
 
     def new_world_defaults(self) -> tuple[str, WorldSettings]:
         name = unique_name(NEW_WORLD_NAME, self._taken_names())
-        return name, WorldSettings(memory=self.cfg.default_memory)
+        s = WorldSettings(memory=self.cfg.default_memory)
+        apply_property_defaults(s, {})
+        return name, s
 
     def create_world(self, name: str, settings: WorldSettings, actor: str) -> World:
         """A fresh world: no seed Job, itzg generates it on the empty volume."""
