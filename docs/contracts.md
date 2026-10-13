@@ -12,7 +12,7 @@ streams share. `src/mcdash/models.py` is the Python contract and is
 | `config.py` | backend | `Config.from_env()` — env vars below |
 | `backups.py`, `detect.py`, `naming.py` | backend | backup indexing, filename parsing, vanilla/Forge + version detection, server.properties parse |
 | `store.py` | backend | JSON state in `$MCD_STORE_DIR/dashboard/` (roster, labels, index cache, audit log) |
-| `k8s.py`, `helmops.py`, `rcon.py` | backend | Kubernetes client, `helm` CLI wrapper, RCON protocol client |
+| `k8s.py`, `helmops.py`, `rcon.py` | backend | Kubernetes client, `helm` CLI wrapper, RCON protocol client and per-world connection pool (`RconPool`, see design.md "RCON connections") |
 | `service.py` | backend | `KubeDashboardService` implementing `DashboardService` + reconciler thread |
 | `completion.py` | backend | console completion: Brigadier tree walker over the generator reports, and the commands Job script |
 | `jobs/seed.py`, `jobs/snapshot.py`, `jobs/__main__.py` | backend | code run inside Job pods (`python -m mcdash.jobs ...`) |
