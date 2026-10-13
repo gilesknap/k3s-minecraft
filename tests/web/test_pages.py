@@ -136,16 +136,16 @@ def test_launch_form_prefilled(client: TestClient) -> None:
     assert 'name="ops" value="NoahK"' in html  # an admin box per player
 
 
-def test_forge_version_field_only_for_forge(client: TestClient) -> None:
+def test_forge_version_field(client: TestClient) -> None:
+    # Prefilled for Forge worlds; shown blank elsewhere so switching the
+    # server type to Forge can set a build in the same save.
     html = client.get(f"/launch?backup={quote(FORGE)}").text
     assert 'name="forge_version" value="36.2.0"' in html
-    assert (
-        'name="forge_version"'
-        not in client.get(f"/launch?backup={quote(ARCHIVE)}").text
-    )
+    vanilla = client.get(f"/launch?backup={quote(ARCHIVE)}").text
+    assert 'name="forge_version" value=""' in vanilla
     assert 'name="forge_version" value="36.2.0"' in client.get("/worlds/fire-ice2").text
-    assert 'name="forge_version"' not in client.get("/worlds/noah-james").text
-    assert 'name="forge_version"' not in client.get("/new").text
+    assert 'name="forge_version" value=""' in client.get("/worlds/noah-james").text
+    assert 'name="forge_version" value=""' in client.get("/new").text
 
 
 def test_launch_form_command_blocks(client: TestClient) -> None:

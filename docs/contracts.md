@@ -111,8 +111,8 @@ in their report.
   `""`, non-Forge worlds save `""`), `World.settings.forge_version` shows the
   build in use and `launch_defaults` prefills the detected one. Old records
   load as `""`. A restore re-detects `forgeVersion` from the restored backup
-  but keeps an override, as it keeps the Minecraft version. Ranges (`models.SETTING_RANGES`, checked by the service
-  and the form): view 2–32, simulation 5–32, spawn protection 0–100000, pause
+  but keeps an override, as it keeps the Minecraft version. Ranges
+  (`models.SETTING_RANGES`, checked by the service and the form): view 2–32, simulation 5–32, spawn protection 0–100000, pause
   0–86400 (0 = never), max players 1–10000.
 - Jobs `<w>-seed-<ts>` / `<w>-snap-<ts>` (no seed Job for `create_world`) — image `$MCD_JOB_IMAGE`, run as
   `$MCD_UID`, mount `<w>-data` at `/data`, archive PVC read-only at `/archive`,
