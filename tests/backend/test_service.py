@@ -220,6 +220,27 @@ def test_start_refused_while_old_pod_terminates(svc: KubeDashboardService) -> No
     assert svc.get_world(name).state is WorldState.RUNNING
 
 
+@pytest.mark.parametrize("action", ["snapshot", "restore", "delete"])
+def test_snapshot_refused_while_old_pod_terminates(
+    svc: KubeDashboardService, action: str
+) -> None:
+    kube, _, _ = parts(svc)
+    name = launch_running(svc)
+    svc.stop(name, ME)
+    kube.pods[name] = [PodInfo(name="x", phase="Running", ready=False, deleting=True)]
+    calls = {
+        "snapshot": lambda: svc.snapshot(name, ME),
+        "restore": lambda: svc.restore(name, FIRE, ME),
+        "delete": lambda: svc.delete(name, ME),
+    }
+    with pytest.raises(Conflict, match="still shutting down"):
+        calls[action]()
+    assert svc._load(name)[1] is None  # no op started
+    kube.pods.pop(name)
+    calls["snapshot"]()
+    assert svc._load(name)[1]["kind"] == "snapshot"
+
+
 def test_finished_pod_does_not_block_start(svc: KubeDashboardService) -> None:
     kube, _, _ = parts(svc)
     name = launch_running(svc)

@@ -910,6 +910,11 @@ class KubeDashboardService:
         kind: str,
         **extra: Any,
     ) -> None:
+        if values is not None and self._shutting_down(
+            values, self.kube.list_server_pods(name)
+        ):
+            # the old pod may still be saving: a zip now could be torn
+            raise Conflict(f"{name} is still shutting down; try again in a moment")
         k8s_ts, file_ts = self._stamp()
         local, job_path = self._snapshot_paths(name, file_ts)
         op: dict[str, Any] = {
