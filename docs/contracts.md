@@ -86,6 +86,22 @@ in their report.
   `forceload add ~ ~` (keeps the spawn chunk loaded; 26.3 adventure respawn
   bug, see design.md), except for versions that parse as older than 1.14.
   Other game modes do not set `RCON_CMDS_STARTUP`.
+  Server tunables (design.md, "Server tunables"): `settings.view_distance`,
+  `spawn_protection`, `max_players` → `minecraftServer.viewDistance`,
+  `spawnProtection`, `maxPlayers` (ints); `settings.hardcore` →
+  `minecraftServer.hardcore: true` only when true; `simulation_distance`,
+  `pause_when_empty_seconds`, `sync_chunk_writes`, `allow_flight`,
+  `broadcast_rcon_to_ops`, `broadcast_console_to_ops` → `extraEnv`
+  `SIMULATION_DISTANCE`, `PAUSE_WHEN_EMPTY_SECONDS`, `SYNC_CHUNK_WRITES`,
+  `ALLOW_FLIGHT`, `BROADCAST_RCON_TO_OPS`, `BROADCAST_CONSOLE_TO_OPS`
+  (strings, booleans as `true`/`false`). A `None` setting is not rendered
+  (itzg leaves the property alone); records without these fields load as
+  `None`. `simulation_distance` < 1.18, `pause_when_empty_seconds` < 1.21.2
+  and `sync_chunk_writes` < 1.16 are not rendered. `settings.use_aikar_flags`
+  (default true, also for old records) → `extraEnv.USE_AIKAR_FLAGS=true`;
+  nothing when false. Ranges (`models.SETTING_RANGES`, checked by the service
+  and the form): view 2–32, simulation 5–32, spawn protection 0–100000, pause
+  0–86400 (0 = never), max players 1–10000.
 - Jobs `<w>-seed-<ts>` / `<w>-snap-<ts>` (no seed Job for `create_world`) — image `$MCD_JOB_IMAGE`, run as
   `$MCD_UID`, mount `<w>-data` at `/data`, archive PVC read-only at `/archive`,
   store PVC at `/store`, labels `mcdash/world`, `mcdash/job: seed|snapshot`,
@@ -167,7 +183,11 @@ fails if the RCON and game port ranges overlap. It does **not** create an Ingres
 
 `new_world_defaults()` suggests a free name (`new-world`, `new-world-2`, …)
 and `WorldSettings(memory=$MCD_DEFAULT_MEMORY)` (LATEST, VANILLA, survival,
-normal world type, random seed). `create_world(name, settings, actor)` is
+normal world type, random seed) with the server tunables set to
+`service.PROPERTY_DEFAULTS` (vanilla defaults, but `sync_chunk_writes`
+false). `launch_defaults` takes them from the backup's `server.properties`
+where present (integers clamped into range), except `sync_chunk_writes`,
+which is always false; version-gated ones the version lacks stay `None`. `create_world(name, settings, actor)` is
 `launch` without a backup: same name/port checks, ConfigMap, Secret and PVC,
 then the release is installed at once with `replicaCount: 1` — no seed Job,
 so the world goes straight to `starting` → `running` while itzg generates it

@@ -16,9 +16,10 @@ from mcdash.models import (
     NotFound,
     Player,
     ServerType,
+    WorldSettings,
     WorldState,
 )
-from mcdash.service import KubeDashboardService, next_ops
+from mcdash.service import PROPERTY_DEFAULTS, KubeDashboardService, next_ops
 
 from .helpers import FakeHelm, FakeKube, FakeRcon, make_world_zip
 
@@ -723,3 +724,96 @@ def test_create_world_interrupted_install_resumes(svc: KubeDashboardService) -> 
     fresh.reconcile_once()
     assert fresh.get_world("halfway").state is WorldState.RUNNING
     assert "halfway-data" in kube.pvcs and "halfway-rcon" in kube.secrets
+
+
+TUNED_PROPS = (
+    "gamemode=survival\nview-distance=6\nsimulation-distance=64\n"
+    "spawn-protection=0\nmax-players=abc\nallow-flight=true\n"
+    "sync-chunk-writes=true\nbroadcast-rcon-to-ops=false\n"
+)
+
+
+def test_launch_defaults_server_properties(svc: KubeDashboardService) -> None:
+    make_world_zip(svc.cfg.archive_dir / "tuned.zip", properties=TUNED_PROPS)
+    svc.backups.scan()
+    _, s = svc.launch_defaults("archive/tuned.zip")
+    assert s.version == "LATEST"
+    assert s.view_distance == 6
+    assert s.simulation_distance == 32  # clamped into range
+    assert s.spawn_protection == 0
+    assert s.max_players == 20  # unparseable: vanilla default
+    assert s.allow_flight is True
+    assert s.broadcast_rcon_to_ops is False
+    assert s.broadcast_console_to_ops is True  # absent: vanilla default
+    assert s.pause_when_empty_seconds == 60
+    # not taken from the backup: worlds here live on NFS
+    assert s.sync_chunk_writes is False
+    assert s.use_aikar_flags is True and s.hardcore is False
+
+
+def test_launch_defaults_version_gated(svc: KubeDashboardService) -> None:
+    _, s = svc.launch_defaults(FIRE)  # Forge 1.16.5
+    assert s.view_distance == 10 and s.sync_chunk_writes is False
+    assert s.simulation_distance is None  # 1.18+
+    assert s.pause_when_empty_seconds is None  # 1.21.2+
+
+
+def test_new_world_defaults_server_properties(svc: KubeDashboardService) -> None:
+    _, s = svc.new_world_defaults()
+    assert {k: getattr(s, k) for k in PROPERTY_DEFAULTS} == PROPERTY_DEFAULTS
+    assert s.sync_chunk_writes is False and s.use_aikar_flags is True
+
+
+def test_update_settings_server_properties(svc: KubeDashboardService) -> None:
+    _, helm, _ = parts(svc)
+    name = launch_running(svc)
+    s = svc.get_world(name).settings
+    s.view_distance, s.pause_when_empty_seconds, s.allow_flight = 20, 0, True
+    svc.update_settings(name, s, ME)
+    v = helm.releases[name]
+    assert v["minecraftServer"]["viewDistance"] == 20
+    assert v["extraEnv"]["PAUSE_WHEN_EMPTY_SECONDS"] == "0"
+    assert v["extraEnv"]["ALLOW_FLIGHT"] == "true"
+    assert svc.get_world(name).settings.view_distance == 20
+    for field, bad in (
+        ("view_distance", 1),
+        ("view_distance", 33),
+        ("simulation_distance", 4),
+        ("spawn_protection", -1),
+        ("pause_when_empty_seconds", -5),
+        ("max_players", 0),
+    ):
+        t = svc.get_world(name).settings
+        setattr(t, field, bad)
+        with pytest.raises(MCDashError):
+            svc.update_settings(name, t, ME)
+
+
+def test_old_record_keeps_server_properties(svc: KubeDashboardService) -> None:
+    """A record from before these settings renders none of them."""
+    _, helm, _ = parts(svc)
+    name = launch_running(svc)
+    spec, op, _ = svc._load(name)
+    new = set(WorldSettings.__dataclass_fields__) - {
+        "version", "server_type", "memory", "gamemode", "force_gamemode",
+        "difficulty", "pvp", "enable_command_block", "motd", "max_world_size",
+        "whitelist", "open_to_all", "ops", "seed", "level_type",
+    }  # fmt: skip
+    spec["settings"] = {k: v for k, v in spec["settings"].items() if k not in new}
+    svc._save(name, spec, op)
+    svc.stop(name, ME)
+    complete(svc, "snapshot")
+    svc.start(name, ME)
+    v = helm.releases[name]
+    ms, env = v["minecraftServer"], v["extraEnv"]
+    assert not {"viewDistance", "spawnProtection", "maxPlayers", "hardcore"} & set(ms)
+    assert not {
+        "SIMULATION_DISTANCE",
+        "PAUSE_WHEN_EMPTY_SECONDS",
+        "SYNC_CHUNK_WRITES",
+        "ALLOW_FLIGHT",
+        "BROADCAST_RCON_TO_OPS",
+        "BROADCAST_CONSOLE_TO_OPS",
+    } & set(env)
+    assert env["USE_AIKAR_FLAGS"] == "true"
+    assert svc.get_world(name).settings.view_distance is None

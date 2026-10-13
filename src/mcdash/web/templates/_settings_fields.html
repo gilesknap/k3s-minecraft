@@ -30,3 +30,49 @@
     <label class="check"><input type="checkbox" name="pvp" {% if settings.pvp %}checked{% endif %}> PvP</label>
     <label class="check"><input type="checkbox" name="enable_command_block" {% if settings.enable_command_block %}checked{% endif %}> Command blocks</label>
   </div>
+{# Managed server.properties: None = not managed (a world from before these
+   settings existed); blank / "unchanged" leaves its server.properties value. #}
+{% macro prop_number(name, label, hint, default) -%}
+  {% set lo, hi = SETTING_RANGES[name] %}
+  {% set v = settings[name] %}
+  <label>{{ label }}
+    <input name="{{ name }}" type="number" min="{{ lo }}" max="{{ hi }}" value="{{ '' if v is none else v }}" placeholder="unchanged (default {{ default }})">
+    <small class="muted">{{ hint }}</small>
+  </label>
+{%- endmacro %}
+{% macro prop_check(name, label, title) -%}
+  {% set v = settings[name] %}
+  {% if v is none %}
+  <label class="check" title="{{ title }}">{{ label }}
+    <select name="{{ name }}">
+      <option value="" selected>unchanged</option><option value="on">on</option><option value="off">off</option>
+    </select>
+  </label>
+  {% else %}
+  <label class="check" title="{{ title }}"><input type="checkbox" name="{{ name }}" {% if v %}checked{% endif %}> {{ label }}</label>
+  {% endif %}
+{%- endmacro %}
+  <fieldset class="span2 settings-group">
+    <legend>Players and rules</legend>
+    <div class="form-grid">
+      {{ prop_number("spawn_protection", "Spawn protection", "Blocks around spawn only admins can change; 0 = off", 16) }}
+      {{ prop_number("max_players", "Max players", "Online at once", 20) }}
+    </div>
+    <div class="checks">
+      {{ prop_check("allow_flight", "Allow flight", "Stops survival players being kicked for \"flying\" when lag makes them look airborne") }}
+      {{ prop_check("broadcast_rcon_to_ops", "Show RCON output to admins", "Admins see [Rcon: …] chat when the dashboard or tools run commands") }}
+      {{ prop_check("broadcast_console_to_ops", "Show console output to admins", "Admins see the output of server console commands in chat") }}
+    </div>
+  </fieldset>
+  <fieldset class="span2 settings-group">
+    <legend>Performance</legend>
+    <div class="form-grid">
+      {{ prop_number("view_distance", "View distance", "Chunks sent to players; caps their render distance", 10) }}
+      {{ prop_number("simulation_distance", "Simulation distance", "Chunks around players where mobs, crops and redstone tick (1.18+)", 10) }}
+      {{ prop_number("pause_when_empty_seconds", "Pause when empty (s)", "Stop ticking this long after the last player leaves; 0 = never. RCON builds with nobody online want 0 (1.21.2+)", 60) }}
+    </div>
+    <div class="checks">
+      {{ prop_check("sync_chunk_writes", "Synchronous chunk writes", "Off (recommended on NFS): saves don't wait for the disk; a hard crash can lose the last few seconds (1.16+)") }}
+      <label class="check" title="itzg USE_AIKAR_FLAGS: G1 garbage collector tuning that smooths GC pauses"><input type="checkbox" name="use_aikar_flags" {% if settings.use_aikar_flags %}checked{% endif %}> Aikar's JVM flags</label>
+    </div>
+  </fieldset>

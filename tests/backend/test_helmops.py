@@ -14,12 +14,14 @@ from mcdash.helmops import (
     java_tag_for,
     jvm_memory,
     level_type_for,
+    property_supported,
     render_values,
     settings_from_json,
     settings_to_json,
     startup_rcon_commands,
 )
 from mcdash.models import (
+    SETTING_RANGES,
     MCDashError,
     NotFound,
     ServerType,
@@ -360,3 +362,167 @@ def test_render_rcon_nodeport_against_real_chart(tmp_path: Path) -> None:
 
 def _container(dep: dict) -> dict:
     return dep["spec"]["template"]["spec"]["containers"][0]
+
+
+# every managed server.properties setting, at non-default values
+TUNED = WorldSettings(
+    view_distance=16,
+    simulation_distance=6,
+    spawn_protection=0,
+    pause_when_empty_seconds=0,
+    sync_chunk_writes=False,
+    allow_flight=True,
+    max_players=8,
+    broadcast_rcon_to_ops=False,
+    broadcast_console_to_ops=False,
+    hardcore=True,
+)
+
+
+def test_settings_json_old_record() -> None:
+    """Records from before the server.properties settings leave them alone."""
+    s = settings_from_json({"gamemode": "creative", "pvp": True})
+    for field in [*SETTING_RANGES, "sync_chunk_writes", "allow_flight"]:
+        assert getattr(s, field) is None
+    assert s.broadcast_rcon_to_ops is None and s.broadcast_console_to_ops is None
+    assert s.hardcore is False
+    assert s.use_aikar_flags is True  # the one new default old records get
+    v = render_values("old", s, 30565, Config())
+    for key in ("viewDistance", "spawnProtection", "maxPlayers", "hardcore"):
+        assert key not in v["minecraftServer"]
+    env = v["extraEnv"]
+    for key in (
+        "SIMULATION_DISTANCE",
+        "PAUSE_WHEN_EMPTY_SECONDS",
+        "SYNC_CHUNK_WRITES",
+        "ALLOW_FLIGHT",
+        "BROADCAST_RCON_TO_OPS",
+        "BROADCAST_CONSOLE_TO_OPS",
+    ):
+        assert key not in env
+    assert env["USE_AIKAR_FLAGS"] == "true"
+
+
+def test_settings_json_new_fields() -> None:
+    assert settings_from_json(json.loads(json.dumps(settings_to_json(TUNED)))) == TUNED
+    off = WorldSettings(use_aikar_flags=False)
+    assert settings_from_json(settings_to_json(off)).use_aikar_flags is False
+    # malformed values are dropped, not rendered
+    s = settings_from_json(
+        {"view_distance": "12", "max_players": True, "allow_flight": "yes"}
+    )
+    assert (s.view_distance, s.max_players, s.allow_flight) == (None, None, None)
+
+
+def test_render_server_properties() -> None:
+    v = render_values("tuned", TUNED, 30565, Config())
+    ms, env = v["minecraftServer"], v["extraEnv"]
+    # typed chart values, as ints
+    assert ms["viewDistance"] == 16 and isinstance(ms["viewDistance"], int)
+    assert ms["spawnProtection"] == 0
+    assert ms["maxPlayers"] == 8
+    assert ms["hardcore"] is True
+    # no chart value: itzg env, as strings
+    assert env["SIMULATION_DISTANCE"] == "6"
+    assert env["PAUSE_WHEN_EMPTY_SECONDS"] == "0"
+    assert env["SYNC_CHUNK_WRITES"] == "false"
+    assert env["ALLOW_FLIGHT"] == "true"
+    assert env["BROADCAST_RCON_TO_OPS"] == "false"
+    assert env["BROADCAST_CONSOLE_TO_OPS"] == "false"
+    assert env["USE_AIKAR_FLAGS"] == "true"
+    v = render_values("x", WorldSettings(use_aikar_flags=False), 30565, Config())
+    assert "USE_AIKAR_FLAGS" not in v["extraEnv"]
+    assert "hardcore" not in v["minecraftServer"]
+
+
+@pytest.mark.parametrize(
+    "field,version,want",
+    [
+        ("simulation_distance", "LATEST", True),
+        ("simulation_distance", "26.3", True),
+        ("simulation_distance", "1.18", True),
+        ("simulation_distance", "1.17.1", False),
+        ("pause_when_empty_seconds", "1.21.2", True),
+        ("pause_when_empty_seconds", "1.21.1", False),
+        ("pause_when_empty_seconds", "1.21", False),
+        ("pause_when_empty_seconds", "24w33a", True),  # unparseable = new
+        ("sync_chunk_writes", "1.16", True),
+        ("sync_chunk_writes", "1.15.2", False),
+        ("view_distance", "1.7.10", True),
+        ("allow_flight", None, True),
+    ],
+)
+def test_property_supported(field: str, version: str | None, want: bool) -> None:
+    assert property_supported(field, version) is want
+
+
+def test_render_version_gates() -> None:
+    s = WorldSettings(
+        version="1.12.2",
+        server_type=ServerType.FORGE,
+        view_distance=8,
+        simulation_distance=8,
+        pause_when_empty_seconds=0,
+        sync_chunk_writes=False,
+        allow_flight=True,
+    )
+    v = render_values("forge", s, 30565, Config())
+    env = v["extraEnv"]
+    assert v["minecraftServer"]["viewDistance"] == 8
+    assert env["ALLOW_FLIGHT"] == "true"
+    for key in ("SIMULATION_DISTANCE", "PAUSE_WHEN_EMPTY_SECONDS", "SYNC_CHUNK_WRITES"):
+        assert key not in env
+    s.version = "1.20.1"  # has simulation-distance and sync-chunk-writes, no pause
+    env = render_values("forge", s, 30565, Config())["extraEnv"]
+    assert env["SIMULATION_DISTANCE"] == "8"
+    assert env["SYNC_CHUNK_WRITES"] == "false"
+    assert "PAUSE_WHEN_EMPTY_SECONDS" not in env
+
+
+@pytest.mark.skipif(
+    not (CHART and Path(CHART).is_dir() and shutil.which("helm")),
+    reason="set MCD_TEST_ITZG_CHART to an unpacked itzg chart to run",
+)
+def test_render_server_properties_against_real_chart(tmp_path: Path) -> None:
+    def env_of(s: WorldSettings) -> dict[str, str]:
+        f = tmp_path / "v.json"
+        f.write_text(json.dumps(render_values("king", s, 30565, Config())))
+        out = subprocess.run(
+            ["helm", "template", "king", CHART, "-n", "minecraft", "-f", str(f)],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        docs = [d for d in yaml.safe_load_all(out) if d]
+        (dep,) = [d for d in docs if d["kind"] == "Deployment"]
+        return {e["name"]: e.get("value") for e in _container(dep)["env"]}
+
+    env = env_of(TUNED)
+    assert env["VIEW_DISTANCE"] == "16"
+    assert env["SPAWN_PROTECTION"] == "0"  # zero still rendered
+    assert env["MAX_PLAYERS"] == "8"
+    assert env["HARDCORE"] == "true"
+    assert env["SIMULATION_DISTANCE"] == "6"
+    assert env["PAUSE_WHEN_EMPTY_SECONDS"] == "0"
+    assert env["SYNC_CHUNK_WRITES"] == "false"
+    assert env["ALLOW_FLIGHT"] == "true"
+    assert env["BROADCAST_RCON_TO_OPS"] == "false"
+    assert env["BROADCAST_CONSOLE_TO_OPS"] == "false"
+    assert env["USE_AIKAR_FLAGS"] == "true"
+    # the largest allowed values stay plain integers (no 1e+06)
+    big = WorldSettings()
+    for field, (_, hi) in SETTING_RANGES.items():
+        setattr(big, field, hi)
+    env = env_of(big)
+    for field, key in (
+        ("view_distance", "VIEW_DISTANCE"),
+        ("spawn_protection", "SPAWN_PROTECTION"),
+        ("max_players", "MAX_PLAYERS"),
+        ("simulation_distance", "SIMULATION_DISTANCE"),
+        ("pause_when_empty_seconds", "PAUSE_WHEN_EMPTY_SECONDS"),
+    ):
+        assert env[key] == str(SETTING_RANGES[field][1])
+    # unmanaged (old record): the chart's "default" placeholders render nothing
+    env = env_of(settings_from_json({}))
+    for key in ("VIEW_DISTANCE", "SPAWN_PROTECTION", "MAX_PLAYERS", "HARDCORE"):
+        assert key not in env

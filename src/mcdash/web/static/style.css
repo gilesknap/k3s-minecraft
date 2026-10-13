@@ -154,6 +154,9 @@ label.check { flex-direction: row; align-items: center; gap: .4rem; font-weight:
 label.check.admin { color: var(--muted); }
 fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: .5rem .8rem .8rem; margin: 0; }
 fieldset .checks { margin-bottom: .6rem; }
+.settings-group .form-grid { margin-bottom: .8rem; }
+.settings-group .checks { margin-bottom: 0; }
+label.check select { width: auto; }
 legend { font-size: .9em; font-weight: 600; padding: 0 .3rem; }
 .formactions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .source { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: .6rem .8rem; }

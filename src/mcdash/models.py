@@ -57,6 +57,16 @@ class Backup:
 
 LEVEL_TYPES = ("normal", "flat", "amplified", "large_biomes")
 
+# Inclusive (min, max) for the integer server.properties settings. Upper bounds
+# keep typed chart values below 1e6, which helm would render as floats.
+SETTING_RANGES: dict[str, tuple[int, int]] = {
+    "view_distance": (2, 32),
+    "simulation_distance": (5, 32),
+    "spawn_protection": (0, 100000),
+    "pause_when_empty_seconds": (0, 86400),
+    "max_players": (1, 10000),
+}
+
 
 # server.properties / itzg MODE spellings -> the dashboard's names
 GAMEMODE_ALIASES = {
@@ -108,6 +118,24 @@ class WorldSettings:
     ops: list[str] = field(default_factory=list)
     seed: str = ""  # blank = random
     level_type: str = "normal"
+    # Like seed/level_type, only applies when the server generates the world.
+    hardcore: bool = False
+    # server.properties tunables. ``None`` = not managed: the world's
+    # server.properties keeps whatever it has (the backup's value, else the
+    # vanilla default). Records saved before these existed load as None;
+    # launch_defaults / new_world_defaults fill them in.
+    view_distance: int | None = None  # chunks, 2-32
+    simulation_distance: int | None = None  # chunks, 5-32; 1.18+
+    spawn_protection: int | None = None  # blocks; 0 = off
+    pause_when_empty_seconds: int | None = None  # 0 = never pause; 1.21.2+
+    sync_chunk_writes: bool | None = None  # 1.16+
+    allow_flight: bool | None = None
+    max_players: int | None = None
+    broadcast_rcon_to_ops: bool | None = None
+    broadcast_console_to_ops: bool | None = None
+    # JVM: itzg USE_AIKAR_FLAGS (G1 GC tuning). On by default, also for records
+    # saved before the field existed.
+    use_aikar_flags: bool = True
 
 
 @dataclass

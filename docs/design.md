@@ -128,6 +128,63 @@ adventure maps such as `adventure-of-doom`, `devils-deep`), motd,
 max-world-size. These are passed as itzg env vars rather than copying the old
 properties file blind. Memory defaults to 4 Gi, editable.
 
+### Server tunables
+
+The launch, new-world and world Settings forms also manage these
+`server.properties` keys and one JVM option. Like the settings above they are
+rendered into the release at install time and take effect at the next start.
+
+| Setting | Property | Rendered as | Launch / new-world default |
+|---|---|---|---|
+| View distance (2–32) | `view-distance` | chart `minecraftServer.viewDistance` | backup's value, else 10 |
+| Simulation distance (5–32, 1.18+) | `simulation-distance` | env `SIMULATION_DISTANCE` | backup's value, else 10 |
+| Spawn protection (≥ 0; 0 = off) | `spawn-protection` | chart `minecraftServer.spawnProtection` | backup's value, else 16 |
+| Pause when empty (s, ≥ 0; 0 = never, 1.21.2+) | `pause-when-empty-seconds` | env `PAUSE_WHEN_EMPTY_SECONDS` | backup's value, else 60 |
+| Synchronous chunk writes (1.16+) | `sync-chunk-writes` | env `SYNC_CHUNK_WRITES` | **off** (backup's value ignored) |
+| Allow flight | `allow-flight` | env `ALLOW_FLIGHT` | backup's value, else off |
+| Max players (≥ 1) | `max-players` | chart `minecraftServer.maxPlayers` | backup's value, else 20 |
+| Show RCON / console output to admins | `broadcast-rcon-to-ops`, `broadcast-console-to-ops` | env `BROADCAST_RCON_TO_OPS`, `BROADCAST_CONSOLE_TO_OPS` | backup's value, else on |
+| Hardcore (new worlds only) | `hardcore` | chart `minecraftServer.hardcore`, only when on | off |
+| Aikar's JVM flags | — | env `USE_AIKAR_FLAGS=true`, only when on | **on** |
+
+- **Spawn protection**: non-admins cannot build or break within this many
+  blocks of the world spawn, which surprises people in build worlds. 0 turns
+  it off. Vanilla also disables it when the server has no ops.
+- **Pause when empty**: since 1.21.2 the server stops ticking this many
+  seconds after the last player leaves, so farms and redstone freeze. That
+  saves CPU, but RCON-driven builds (e.g. mciwb) with nobody online then work
+  against a paused world whose chunks are not ticking. Use 0 for such worlds:
+  vanilla only pauses when the value is greater than 0.
+- **Synchronous chunk writes**: worlds live on NFS (`nfs-rwx`), where
+  synchronous writes make every chunk save wait for the disk. Off is much
+  cheaper; the risk is losing the last few seconds of changes if the server
+  crashes hard. A clean stop flushes everything, and snapshots run
+  `save-all flush` first, so they are unaffected. The dashboard therefore
+  defaults it off for every launch and new world, whatever the backup said.
+- **Hardcore** only matters when the server generates the world, so it is on
+  the New world form only, like seed and world type. It is not rendered when
+  off, so a backup's `hardcore=true` is never overwritten.
+- **Aikar's flags** are itzg's G1 GC tuning (`G1HeapRegionSize=8M`,
+  `MaxGCPauseMillis=200`, `AlwaysPreTouch`, …; the >= 12 GiB variant is picked
+  automatically). Every flag still exists in Java 25, and the 4–6 GiB heaps
+  used here are the case the flags were written for. `AlwaysPreTouch` commits
+  the whole heap at start, but itzg already sets `-Xms` = `-Xmx`, and the pod
+  limit is the heap plus 1 GiB, so the steady-state footprint does not change.
+
+Gates: `simulation-distance` (1.18), `pause-when-empty-seconds` (1.21.2) and
+`sync-chunk-writes` (1.16) are not rendered for versions that parse as older,
+e.g. old Forge worlds. `LATEST` and unparseable versions count as new.
+Integer chart values stay below 10^6, where helm would render its float64
+values in e-notation (the `MAX_WORLD_SIZE` problem).
+
+**Older world records** (saved before these settings existed) load with every
+property setting unset (`None`): nothing is rendered, and itzg leaves the
+world's `server.properties` as it is, so these worlds keep today's behaviour,
+including `sync-chunk-writes=true`. Their Settings form shows blank numbers
+and "unchanged/on/off" selects, which stay unset unless changed. The
+exception is Aikar's flags, which old records get as on: they only tune the
+JVM, cannot affect world data, and take effect at the next start.
+
 ### Adventure worlds: spawn chunk force-load
 
 On Minecraft 26.3 (and presumably later 26.x releases), when a player with no personal respawn point respawns on a
