@@ -128,6 +128,36 @@ adventure maps such as `adventure-of-doom`, `devils-deep`), motd,
 max-world-size. These are passed as itzg env vars rather than copying the old
 properties file blind. Memory defaults to 4 Gi, editable.
 
+### Adventure worlds: spawn chunk force-load
+
+On Minecraft 26.3 (and presumably later 26.x releases), when a player with no personal respawn point respawns on a
+server whose **default game type** is adventure, `PlayerSpawnFinder.findSpawn`
+takes a shortcut that reads the spawn height without loading the spawn chunk.
+If nobody is near spawn the chunk is unloaded, the column looks empty, and the
+player is placed at the world floor (Y=-63) and suffocates, often repeatedly.
+Other game types load the chunk first and are unaffected; this includes
+survival or creative worlds that switch individual players to adventure,
+because the check is on the world's default, not the player's mode.
+
+On a dedicated server the default game type is server.properties `gamemode`,
+which the server writes over level.dat `GameType` at every start. The
+dashboard sets `gamemode` from the world settings, so it knows the trigger
+without reading level.dat. When the world's gamemode is `adventure` the release
+gets `RCON_CMDS_STARTUP=forceload add ~ ~`: itzg runs it through RCON once
+the server is listening, on every start. RCON commands run at the overworld
+world spawn, so `~ ~` is the spawn chunk and the dashboard never needs the
+spawn coordinates. Re-adding a forced chunk does nothing, forced chunks
+persist in the world save, and one loaded chunk costs very little.
+
+It is skipped for versions before 1.14, which have no `forceload` command
+(e.g. old Forge worlds). `LATEST`, snapshots and other ids that do not parse
+as `x.y[.z]` count as new. Moving the world spawn later (`setworldspawn`)
+leaves the old chunk forced as well; remove it with `forceload remove` if it
+matters. The command is not retried if it fails (itzg logs the failure); it
+runs again on the next start, and a chunk forced once stays forced in the save.
+A saved spawn that sits inside solid blocks is a separate problem and
+needs a manual `setworldspawn`.
+
 ## Snapshots
 
 RCON `save-off` + `save-all flush` → Job zips the PVC (excluding regenerable

@@ -31,6 +31,9 @@ The worlds this was built for, and the story behind them, are in
 - **Whitelist** editing from a player roster, enforced by default. A world can
   instead be marked **open to everyone** (no whitelist), which applies live.
   `online-mode` is always on.
+- **Adventure worlds** keep their spawn chunk force-loaded, working around a
+  Minecraft 26.3 bug that respawns players at the bottom of the world when the
+  spawn chunk is not loaded.
 
 ## Architecture
 
