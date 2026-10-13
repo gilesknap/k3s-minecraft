@@ -67,6 +67,10 @@ in their report.
   `LATEST` and unparseable versions, and `FLAT|AMPLIFIED|LARGEBIOMES` for
   older versions; `normal` sets nothing (server default). Both only take effect
   when the server generates a world; on a seeded volume they are inert.
+  `settings.gamemode == adventure` → `extraEnv.RCON_CMDS_STARTUP` =
+  `forceload add ~ ~` (keeps the spawn chunk loaded; 26.x adventure respawn
+  bug, see design.md), except for versions that parse as older than 1.14.
+  Other game modes do not set `RCON_CMDS_STARTUP`.
 - Jobs `<w>-seed-<ts>` / `<w>-snap-<ts>` (no seed Job for `create_world`) — image `$MCD_JOB_IMAGE`, run as
   `$MCD_UID`, mount `<w>-data` at `/data`, archive PVC read-only at `/archive`,
   store PVC at `/store`, labels `mcdash/world`, `mcdash/job: seed|snapshot`,

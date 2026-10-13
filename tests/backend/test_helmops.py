@@ -16,6 +16,7 @@ from mcdash.helmops import (
     render_values,
     settings_from_json,
     settings_to_json,
+    startup_rcon_commands,
 )
 from mcdash.models import MCDashError, NotFound, ServerType, WorldSettings
 
@@ -149,6 +150,16 @@ def test_render_against_real_chart(tmp_path: Path) -> None:
     assert "startupProbe:" in out
     assert 'name: SEED\n          value: "12345"' in out
     assert 'name: LEVEL_TYPE\n          value: "minecraft:flat"' in out
+    assert "RCON_CMDS_STARTUP" not in out
+    s = WorldSettings(gamemode="adventure")
+    f.write_text(json.dumps(render_values("doom", s, 30566, Config())))
+    out = subprocess.run(
+        ["helm", "template", "doom", CHART, "-n", "minecraft", "-f", str(f)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert 'name: RCON_CMDS_STARTUP\n          value: "forceload add ~ ~"' in out
 
 
 def _fake_helm(tmp_path: Path, script: str) -> Helm:
@@ -198,3 +209,47 @@ def test_render_values_open_to_all() -> None:
     assert v["mcdash"]["settings"]["open_to_all"] is True
     # a hand-edited string in the stored record is not truthy
     assert settings_from_json({"open_to_all": "false"}).open_to_all is False
+
+
+@pytest.mark.parametrize(
+    "gamemode,version,want",
+    [
+        ("adventure", "LATEST", ["forceload add ~ ~"]),
+        ("adventure", "26.3", ["forceload add ~ ~"]),
+        ("adventure", "26.4-snapshot-1", ["forceload add ~ ~"]),
+        ("adventure", "1.21.4", ["forceload add ~ ~"]),
+        ("adventure", "1.14", ["forceload add ~ ~"]),
+        ("Adventure", "LATEST", ["forceload add ~ ~"]),
+        # no forceload command before 1.14 (e.g. old Forge worlds)
+        ("adventure", "1.13.2", []),
+        ("adventure", "1.12.2", []),
+        # the respawn bug keys on the world's default game type only
+        ("survival", "LATEST", []),
+        ("creative", "26.3", []),
+        ("spectator", "LATEST", []),
+    ],
+)
+def test_startup_rcon_commands(gamemode: str, version: str, want: list[str]) -> None:
+    s = WorldSettings(gamemode=gamemode, version=version)
+    assert startup_rcon_commands(s) == want
+
+
+def test_render_values_forceload_spawn() -> None:
+    s = WorldSettings(gamemode="adventure")
+    env = render_values("doom", s, 30565, Config())["extraEnv"]
+    assert env["RCON_CMDS_STARTUP"] == "forceload add ~ ~"
+
+    plain = render_values("w", WorldSettings(), 30565, Config())["extraEnv"]
+    assert "RCON_CMDS_STARTUP" not in plain
+
+    forge = WorldSettings(
+        gamemode="adventure", version="1.12.2", server_type=ServerType.FORGE
+    )
+    v = render_values("old", forge, 30565, Config(), forge_version="14.23.5")
+    assert "RCON_CMDS_STARTUP" not in v["extraEnv"]
+
+    forge = WorldSettings(
+        gamemode="adventure", version="1.16.5", server_type=ServerType.FORGE
+    )
+    v = render_values("fire-ice2", forge, 30565, Config(), forge_version="36.1.0")
+    assert v["extraEnv"]["RCON_CMDS_STARTUP"] == "forceload add ~ ~"

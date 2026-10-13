@@ -90,6 +90,33 @@ def level_type_for(level_type: str, version: str | None) -> str | None:
     return table.get(level_type)
 
 
+# ``forceload`` exists since 1.14.
+FORCELOAD_MIN_VERSION = (1, 14, 0)
+# RCON commands run at the overworld world spawn, so ``~ ~`` is the spawn chunk.
+FORCELOAD_SPAWN_CMD = "forceload add ~ ~"
+
+
+def startup_rcon_commands(settings: WorldSettings) -> list[str]:
+    """RCON commands itzg runs once the server is up (``RCON_CMDS_STARTUP``).
+
+    Adventure worlds force-load the spawn chunk. On 26.x a dedicated server
+    whose default game type (server.properties ``gamemode``, applied over
+    level.dat ``GameType`` at every start) is adventure finds a respawn
+    position without loading the spawn chunk; if it is unloaded the player
+    lands at the bottom of the world and suffocates. Survival/creative worlds
+    load the chunk before searching, so they are not affected, even for
+    players switched to adventure individually. Skipped where ``forceload``
+    does not exist (< 1.14, e.g. old Forge worlds); ``LATEST`` and versions
+    that do not parse (snapshots, 26.x-style ids) are treated as new.
+    """
+    if settings.gamemode.strip().lower() != "adventure":
+        return []
+    t = _version_tuple(settings.version or "")
+    if t is not None and t < FORCELOAD_MIN_VERSION:
+        return []
+    return [FORCELOAD_SPAWN_CMD]
+
+
 def jvm_memory(k8s_qty: str) -> str:
     """``4Gi`` -> ``4G`` (itzg MEMORY / -Xmx), ``1536Mi`` -> ``1536M``."""
     m = re.fullmatch(r"\s*(\d+)\s*([KMGT]?)i?\s*", k8s_qty, re.IGNORECASE)
@@ -197,6 +224,11 @@ def render_values(
         # renders as 2.9999984e+07 (float64) — pass the env var as a string
         "MAX_WORLD_SIZE": str(int(settings.max_world_size)),
     }
+    startup_cmds = startup_rcon_commands(settings)
+    if startup_cmds:
+        # itzg runs each line via rcon-cli once the server is listening, on
+        # every start; re-adding an already forced chunk is a no-op.
+        extra_env["RCON_CMDS_STARTUP"] = "\n".join(startup_cmds)
 
     values: dict[str, Any] = {
         "fullnameOverride": world,
