@@ -44,6 +44,8 @@ def sample_tree() -> CommandTree:
 
 
 PORT_MIN, PORT_MAX = 30565, 30584
+RCON_PORT_MIN, RCON_PORT_MAX = 30600, 30619
+RCON_HOST = "192.168.1.92"
 
 
 class FakeDashboardService:
@@ -194,6 +196,8 @@ class FakeDashboardService:
         w = World(
             name=name,
             port=port,
+            rcon_port=self._free_rcon_port(),
+            node="nuc2",
             state=WorldState.SEEDING,
             settings=settings,
             source_backup_id=backup_id,
@@ -212,6 +216,15 @@ class FakeDashboardService:
             raise Conflict("No free ports left in the range")
         return port
 
+    def _free_rcon_port(self) -> int:
+        used = {w.rcon_port for w in self.worlds.values()}
+        port = next(
+            (p for p in range(RCON_PORT_MIN, RCON_PORT_MAX + 1) if p not in used), None
+        )
+        if port is None:
+            raise Conflict("No free RCON ports left in the range")
+        return port
+
     def new_world_defaults(self) -> tuple[str, WorldSettings]:
         name, n = "new-world", 2
         while name in self.worlds:
@@ -227,6 +240,9 @@ class FakeDashboardService:
         w = World(
             name=name,
             port=port,
+            rcon_port=self._free_rcon_port(),
+            rcon_host=RCON_HOST,
+            node="nuc2",
             state=WorldState.STARTING,
             settings=settings,
             source_backup_id="",
@@ -244,6 +260,11 @@ class FakeDashboardService:
 
     def get_world(self, name: str) -> World:
         return self._world(name)
+
+    def rcon_password(self, name: str, actor: str) -> str:
+        self._record("rcon_password", name, actor)
+        self._world(name)
+        return f"pw-{name}-s3cret"
 
     def start(self, name: str, actor: str) -> None:
         self._record("start", name, actor)
@@ -506,6 +527,9 @@ def seeded(**kwargs: object) -> FakeDashboardService:
         "noah-james": World(
             name="noah-james",
             port=30565,
+            rcon_port=30600,
+            rcon_host=RCON_HOST,
+            node="nuc2",
             state=WorldState.RUNNING,
             settings=WorldSettings(
                 motd="Noah & James survival",
@@ -524,6 +548,8 @@ def seeded(**kwargs: object) -> FakeDashboardService:
         "fire-ice2": World(
             name="fire-ice2",
             port=30566,
+            rcon_port=30601,
+            node="nuc2",
             state=WorldState.STOPPED,
             settings=WorldSettings(
                 version="1.16.5",
@@ -552,6 +578,8 @@ def seeded(**kwargs: object) -> FakeDashboardService:
         "adventure-of-doom": World(
             name="adventure-of-doom",
             port=30568,
+            rcon_port=30602,
+            node="nuc2",
             state=WorldState.SEEDING,
             settings=WorldSettings(
                 gamemode="adventure",

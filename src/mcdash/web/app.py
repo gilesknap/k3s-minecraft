@@ -377,6 +377,20 @@ def create_app(service: DashboardService) -> FastAPI:
             roster=service.roster(),
         )
 
+    @app.get("/worlds/{name}/rcon-password", response_class=HTMLResponse)
+    def world_rcon_password(request: Request, name: str, actor: Actor) -> Response:
+        """The RCON password, only on request (audited; never in the page).
+
+        htmx-only, so a plain navigation never renders it as a page that ends
+        up in browser history.
+        """
+        if not is_htmx(request):
+            raise MCDashError("Use the Reveal button on the world page")
+        password = service.rcon_password(name, actor)
+        resp = render(request, "_rcon_password.html", password=password)
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
     @app.get("/worlds/{name}/status", response_class=HTMLResponse)
     def world_status(request: Request, name: str) -> Response:
         return render(request, "_world_status.html", world=service.get_world(name))

@@ -4,9 +4,12 @@ World records
 -------------
 Each world has a ConfigMap ``<w>-mcdash`` (label ``mcdash/kind=world``) with:
 
-* ``spec`` — JSON ``{port, sourceBackup, created, settings, forgeVersion,
-  message}``. It exists from the moment of launch (before any Helm release),
-  so it reserves the port while seeding. The same metadata is mirrored into
+* ``spec`` — JSON ``{port, rconPort, sourceBackup, created, settings,
+  forgeVersion, message}``. It exists from the moment of launch (before any
+  Helm release), so it reserves the ports while seeding. ``rconPort`` is
+  absent for worlds launched before RCON NodePorts existed; their next
+  install with the server running (start, end of a restore, a settings save
+  while running) assigns one. The same metadata is mirrored into
   the Helm release values under ``mcdash:`` on every install/upgrade; if the
   ConfigMap is lost it is rebuilt from the release values.
 * ``op`` — JSON pending multi-step operation (or empty). The reconciler
@@ -248,6 +251,11 @@ class KubeDashboardService:
                 specs[w] = self._spec_from_values(values)
                 ops.setdefault(w, None)
                 self._save(w, specs[w], ops[w])  # heal a lost ConfigMap
+            elif not specs[w].get("rconPort"):
+                # installed with a port the record never saw saved: adopt it
+                rp = self._spec_from_values(values)["rconPort"]
+                if rp:
+                    specs[w]["rconPort"] = rp
         return specs, ops, rels
 
     @staticmethod
@@ -255,6 +263,7 @@ class KubeDashboardService:
         md = values.get("mcdash") or {}
         return {
             "port": int(md.get("port") or 0),
+            "rconPort": int(md.get("rconPort") or 0),
             "sourceBackup": md.get("sourceBackup", ""),
             "created": md.get("created", ""),
             "settings": md.get("settings") or {},
@@ -287,8 +296,15 @@ class KubeDashboardService:
         ts = format_compact_timestamp(self.now())
         return ts.lower().rstrip("z"), ts
 
+    @staticmethod
+    def _used_ports(specs: dict[str, dict[str, Any]]) -> set[int]:
+        """Every game and RCON port held by a world record."""
+        return {
+            int(s.get(k) or 0) for s in specs.values() for k in ("port", "rconPort")
+        }
+
     def _allocate_port(self, specs: dict[str, dict[str, Any]]) -> int:
-        used = {int(s.get("port") or 0) for s in specs.values()}
+        used = self._used_ports(specs)
         for p in range(self.cfg.port_min, self.cfg.port_max + 1):
             if p not in used:
                 return p
@@ -297,7 +313,37 @@ class KubeDashboardService:
             "delete a world first"
         )
 
+    def _allocate_rcon_port(self, specs: dict[str, dict[str, Any]]) -> int:
+        used = self._used_ports(specs)
+        lo, hi = self.cfg.rcon_port_min, self.cfg.rcon_port_max
+        for p in range(lo, hi + 1):
+            if p not in used:
+                return p
+        raise Conflict(
+            f"no free RCON ports in {lo}-{hi}; delete a world first "
+            "(or widen the RCON port range)"
+        )
+
+    def _ensure_rcon_port(self, name: str, spec: dict[str, Any]) -> None:
+        """Give a world that predates RCON NodePorts one, and record it.
+
+        Caller holds the lock. Saved straight away (with the op as stored), so
+        the port is reserved even if the install that follows fails.
+        """
+        if spec.get("rconPort"):
+            return
+        specs, ops, _ = self._records()
+        others = {w: s for w, s in specs.items() if w != name}
+        spec["rconPort"] = self._allocate_rcon_port(others)
+        self._save(name, spec, ops.get(name))
+        log.info("%s: assigned RCON port %s", name, spec["rconPort"])
+
     def _install(self, name: str, spec: dict[str, Any], replicas: int) -> None:
+        # Only a running server needs an RCON NodePort. Allocating on the
+        # replicas=0 installs of stop/restore could fail (range full) and turn
+        # a stop into a failure while the server keeps running.
+        if replicas:
+            self._ensure_rcon_port(name, spec)
         values = render_values(
             name,
             settings_from_json(spec.get("settings")),
@@ -307,11 +353,15 @@ class KubeDashboardService:
             source_backup=spec.get("sourceBackup", ""),
             created=_parse_dt(spec.get("created")),
             forge_version=spec.get("forgeVersion") or None,
+            rcon_port=int(spec.get("rconPort") or 0),
         )
-        self.helm.upgrade_install(name, values)
-        self._values_cache.pop(name, None)
-        # an upgrade may replace or stop the server pod
-        self.rcon_pool.evict(name)
+        try:
+            self.helm.upgrade_install(name, values)
+        finally:
+            self._values_cache.pop(name, None)
+            # an upgrade may replace or stop the server pod, even one that
+            # fails part-way (no --atomic)
+            self.rcon_pool.evict(name)
 
     def _rcon_password(self, name: str) -> str:
         pw = self._secret_cache.get(name)
@@ -442,6 +492,7 @@ class KubeDashboardService:
         pods = self.kube.list_server_pods(name) if values else []
         self.rcon_pool.note_target(name, _pod_target(pods))
         state, msg = self._derive(op, values, pods)
+        pod = next((p for p in pods if not p.deleting and p.host_ip), None)
         w = World(
             name=name,
             port=int(spec.get("port") or 0),
@@ -452,6 +503,9 @@ class KubeDashboardService:
             connect_address=f"{self.cfg.public_host}:{spec.get('port')}",
             last_snapshot=self._last_snapshot(name),
             message=msg or str(spec.get("message") or ""),
+            rcon_port=int(spec.get("rconPort") or 0),
+            rcon_host=self.cfg.rcon_host or (pod.host_ip if pod else ""),
+            node=(pod.node if pod else "") or self.cfg.world_node,
         )
         if state is WorldState.RUNNING:
             ready = [p for p in pods if p.ready and not p.deleting]
@@ -553,6 +607,7 @@ class KubeDashboardService:
             raise Conflict(f"world name {name!r} is taken")
         return {
             "port": self._allocate_port(specs),
+            "rconPort": self._allocate_rcon_port(specs),
             "sourceBackup": source,
             "created": self.now().isoformat(timespec="seconds"),
             "settings": settings_to_json(settings),
@@ -607,7 +662,14 @@ class KubeDashboardService:
             self._save(name, spec, op)  # reserves name + port first
             self._create_volume_and_secret(name)
             self.kube.create_job(jspec)
-            self.store.audit(actor, "launch", name, backup=b.id, port=spec["port"])
+            self.store.audit(
+                actor,
+                "launch",
+                name,
+                backup=b.id,
+                port=spec["port"],
+                rcon_port=spec["rconPort"],
+            )
             return self._world(name, spec, op, None, live=False)
 
     def new_world_defaults(self) -> tuple[str, WorldSettings]:
@@ -628,6 +690,7 @@ class KubeDashboardService:
                 "create_world",
                 name,
                 port=spec["port"],
+                rcon_port=spec["rconPort"],
                 seed=settings.seed,
                 level_type=settings.level_type,
             )
@@ -649,6 +712,12 @@ class KubeDashboardService:
     def get_world(self, name: str) -> World:
         spec, op, values = self._load(name)
         return self._world(name, spec, op, values)
+
+    def rcon_password(self, name: str, actor: str) -> str:
+        """The world's RCON password, for direct (NodePort) clients. Audited."""
+        self._load(name)
+        self.store.audit(actor, "rcon_password", name)
+        return self._rcon_password(name)
 
     def _busy(self, name: str, op: dict[str, Any] | None) -> None:
         if op and not op.get("error"):

@@ -57,6 +57,8 @@ class PodInfo:
     started: datetime | None = None
     deleting: bool = False
     image: str = ""  # the server container's image
+    host_ip: str = ""  # status.hostIP: the node's InternalIP
+    node: str = ""  # spec.nodeName
 
 
 @dataclass
@@ -476,6 +478,8 @@ class Kube:
                     started=started,
                     deleting=p.metadata.deletion_timestamp is not None,
                     image=image or "",
+                    host_ip=st.host_ip or "",
+                    node=(p.spec.node_name if p.spec else None) or "",
                 )
             )
         return out

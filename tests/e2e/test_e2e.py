@@ -40,6 +40,8 @@ NEW_WORLD = os.environ.get("E2E_NEW_WORLD", f"{WORLD}-new")
 NEW_SEED = "8675309"
 PORT_MIN = int(os.environ.get("E2E_PORT_MIN", "30565"))
 PORT_MAX = int(os.environ.get("E2E_PORT_MAX", "30584"))
+RCON_PORT_MIN = int(os.environ.get("E2E_RCON_PORT_MIN", "30600"))
+RCON_PORT_MAX = int(os.environ.get("E2E_RCON_PORT_MAX", "30619"))
 MEMORY = os.environ.get("E2E_MEMORY", "1Gi")
 RUN_TIMEOUT = int(os.environ.get("E2E_RUN_TIMEOUT", "900"))
 STATE_RE = re.compile(r"badge state-([a-z]+)")
@@ -211,19 +213,23 @@ def test_world_lifecycle(client: httpx.Client) -> None:
     assert mounts["store"]["readOnly"] is True  # seeding never writes the store
 
     # The game service is a NodePort in the configured range, matching the
-    # connect address the dashboard shows.
+    # connect address the dashboard shows; RCON is a NodePort in its own range,
+    # shown on the world page.
     svcs = json.loads(kubectl("get", "svc", "-o", "json").stdout)["items"]
-    node_ports = [
-        p["nodePort"]
+    node_ports = {
+        p["name"]: p["nodePort"]
         for s in svcs
         if s["spec"]["type"] == "NodePort"
         and s["metadata"].get("labels", {}).get("app.kubernetes.io/instance") == WORLD
         for p in s["spec"]["ports"]
-    ]
-    assert node_ports, f"no NodePort service for release {WORLD}"
-    assert all(PORT_MIN <= p <= PORT_MAX for p in node_ports), node_ports
+    }
+    assert set(node_ports) == {"minecraft", "rcon"}, node_ports
+    assert PORT_MIN <= node_ports["minecraft"] <= PORT_MAX, node_ports
+    assert RCON_PORT_MIN <= node_ports["rcon"] <= RCON_PORT_MAX, node_ports
     status = client.get(f"/worlds/{WORLD}/status").text
-    assert any(f":{p}" in status for p in node_ports), "connect address port mismatch"
+    assert f":{node_ports['minecraft']}" in status, "connect address port mismatch"
+    page = client.get(f"/worlds/{WORLD}").text
+    assert f"127.0.0.1:{node_ports['rcon']}" in page, "RCON address missing"
 
     # A real Minecraft server is up: it finished starting and answers RCON
     # through the dashboard's console.

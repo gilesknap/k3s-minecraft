@@ -12,8 +12,8 @@
 <span class="badge tier-{{ b.tier.value }}">{{ b.tier.value }}</span>
 {%- endmacro %}
 
-{% macro copy_addr(addr) -%}
-<span class="addr"><code>{{ addr }}</code><button type="button" class="icon" data-copy="{{ addr }}" title="Copy address" aria-label="Copy {{ addr }}">⧉</button></span>
+{% macro copy_addr(addr, what="address") -%}
+<span class="addr"><code>{{ addr }}</code><button type="button" class="icon" data-copy="{{ addr }}" title="Copy {{ what }}" aria-label="Copy {{ what if what != 'address' else addr }}">⧉</button></span>
 {%- endmacro %}
 
 {% macro version(s_or_b, is_backup=false) -%}

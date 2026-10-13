@@ -173,10 +173,74 @@ a name and description.
   world's life. `externalTrafficPolicy: Local` to preserve player IPs.
 - Router forwards TCP 30565–30584 → nuc2 (`192.168.1.92`).
 - All worlds are pinned to **nuc2** (`nodeSelector: kubernetes.io/hostname`).
-- RCON: ClusterIP only, per-world random password in a Secret.
+- RCON: per-world random password in a Secret; see
+  [Direct RCON](#direct-rcon-nodeport-and-networkpolicy).
 - `mc.gkcluster.org`: DNS-only (grey-cloud) Cloudflare A record, kept current
   by an in-cluster DDNS CronJob (dynamic WAN IP) using a scoped Cloudflare API
   token stored as a SealedSecret.
+
+### Direct RCON: NodePort and NetworkPolicy
+
+Tools such as [mciwb](https://github.com/gilesknap/mciwb) send one RCON
+command per block change, so round-trip time decides how fast a build runs.
+`kubectl port-forward` costs ~44 ms per command (API-server stream plus a
+delayed-ACK stall); a NodePort on the world's node is ~0.04 ms from that node
+and a few tenths of a millisecond from the LAN.
+
+- **Port**: each world gets an RCON NodePort from a second fixed range,
+  **30600–30619** by default (`worlds.rconPortMin/rconPortMax`), allocated
+  like the game port: lowest free at launch, kept for the world's life,
+  stored as `rconPort` in the world record and the release's `mcdash:`
+  values. Worlds that predate it get one at their next install with the server
+  running (start, end of a restore, settings save while running); stop and
+  the restore drain never allocate. The itzg
+  chart's own RCON Service is switched to `NodePort` with that `nodePort` and
+  `externalTrafficPolicy: Local` (supported by itzg 5.2.0's `rcon-svc.yaml`;
+  no extra Service needed).
+- **Never relay it.** The ranges must not overlap (the dashboard refuses to
+  start and the chart refuses to render if they do) because the game range is
+  what the router and the VPS relay forward to the internet. The RCON range
+  must never be added to a router forward or to tpi-k3s-ansible's
+  `vps_relay.forwards`.
+- **Addresses**: the world page shows `<node-ip>:<rcon-port>` (the pod's
+  `status.hostIP`, or `worlds.rconHost`) and `127.0.0.1:<rcon-port>` on the
+  world's node. The latter works because kube-proxy serves NodePorts on
+  localhost (k3s default; `route_localnet=1`). With `Local`, only the node
+  running the world answers; worlds are pinned to one node anyway.
+- **Password**: not in the page HTML. A **Reveal** button fetches it with
+  `GET /worlds/<w>/rcon-password` (`no-store`), which is audited.
+- **NetworkPolicy** (dashboard chart, `networkPolicy.enabled`, default on):
+  selects world server pods (`app.kubernetes.io/name: minecraft` plus an
+  `mcdash/world` label, which excludes the dashboard and its Jobs), ingress
+  only. TCP 25565 from anywhere (players arrive through NodePort and the
+  relay); TCP 25575 from the dashboard pod (podSelector) and
+  `networkPolicy.rconAllowedCidrs` (default `192.168.1.0/24`); everything else
+  is denied. Egress is not restricted, so the seed/snapshot/commands Jobs and
+  the server's own downloads are unaffected.
+
+What the world pod sees as the source address, verified on k3s (flannel,
+embedded kube-router policy controller, iptables kube-proxy):
+
+| Client | Path | Source seen by the policy |
+|---|---|---|
+| Dashboard pod (any node) | `<w>-rcon` ClusterIP, pod→pod over flannel (not masqueraded) | the dashboard's pod IP → `podSelector` |
+| LAN host → `<node-ip>:<rcon-port>` | `externalTrafficPolicy: Local` → no SNAT | the client's LAN IP → `ipBlock` |
+| Process on the world's node → `127.0.0.1:<rcon-port>` (or its own node IP) | kube-proxy marks LOCAL-source traffic for masquerade; the pod finally sees the node's `cni0` address (e.g. `10.42.5.1`) | allowed **before** any policy: kube-router's per-pod chain accepts `--src-type LOCAL` ("permit traffic to pods when source is the pod's local node"), evaluated in OUTPUT before POSTROUTING SNAT |
+| Pod in another namespace → `<w>-rcon` ClusterIP or pod IP, or a pod on the world's node → `<node-ip>:<rcon-port>` | not masqueraded | its pod IP → denied |
+| Pod on **another** node → `<world-node-ip>:<rcon-port>` | flannel masquerades pod → non-pod traffic to the sending node's IP | that node's LAN IP → **allowed** by a plain LAN `ipBlock` |
+| Host-network process on another LAN node | — | that node's LAN IP → allowed |
+
+So no extra rule is needed for the node-local path on k3s. The last two rows
+are the gap a plain LAN CIDR leaves: list the other cluster nodes' IPs under
+the entry's `except` (`rconAllowedCidrs: [{cidr: 192.168.1.0/24, except:
+[192.168.1.81/32, …]}]`), leaving out any node you run RCON clients on (e.g. a
+workstation that is also a node, at the cost of that node's pods). Another policy
+engine (Calico, Cilium) may not exempt node-local traffic: add the node's
+pod-CIDR gateway (e.g. `10.42.5.1/32`) to `rconAllowedCidrs` there. LAN hosts
+on another subnet (e.g. a second NIC on the node) need their CIDR added too.
+Trusting the node also means **host-network pods on the world's node** (e.g.
+node-exporter, csi-nfs-node) can always reach RCON; the policy cannot narrow
+that, so it is a property of the node, not of the dashboard.
 
 ## Player access and security
 
@@ -207,7 +271,8 @@ logs `X-Auth-Request-Email` against each action. No public status page.
 
 - World list: state, port, version/type, online players (RCON `list`),
   uptime, CPU/memory (metrics-server), last snapshot time.
-- World page: streamed log tail (SSE), RCON console, whitelist editor,
+- World page: streamed log tail (SSE), RCON console, direct-RCON
+  addresses with a reveal-password button, whitelist editor,
   settings, snapshots (launch / promote / delete).
 
 ### RCON console

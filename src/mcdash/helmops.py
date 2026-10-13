@@ -175,8 +175,12 @@ def render_values(
     source_backup: str = "",
     created: datetime | None = None,
     forge_version: str | None = None,
+    rcon_port: int = 0,
 ) -> dict[str, Any]:
-    """itzg chart values for one world (contract: docs/contracts.md)."""
+    """itzg chart values for one world (contract: docs/contracts.md).
+
+    ``rcon_port``: the world's RCON NodePort; 0 keeps RCON cluster-internal.
+    """
     mem = settings.memory or cfg.default_memory
     mib = memory_mib(mem)
     ms: dict[str, Any] = {
@@ -201,6 +205,15 @@ def render_values(
             "serviceType": "ClusterIP",
         },
     }
+    if rcon_port:
+        # The world's node serves it directly (worlds are pinned to one node);
+        # Local keeps the client's IP, which the dashboard chart's
+        # NetworkPolicy filters on.
+        ms["rcon"].update(
+            serviceType="NodePort",
+            nodePort=rcon_port,
+            externalTrafficPolicy="Local",
+        )
     if settings.motd:
         ms["motd"] = settings.motd
     # itzg enables the whitelist whenever WHITELIST is set, so an open world
@@ -262,6 +275,7 @@ def render_values(
         "deploymentLabels": {"mcdash/world": world},
         "mcdash": {
             "port": port,
+            "rconPort": rcon_port,
             "sourceBackup": source_backup,
             "created": created.isoformat() if created else "",
             "settings": settings_to_json(settings),

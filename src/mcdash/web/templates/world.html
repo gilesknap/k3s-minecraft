@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import backup_row, whitelist_fields %}
+{% from "_macros.html" import backup_row, whitelist_fields, copy_addr %}
 {% block title %}{{ world.name }}{% endblock %}
 {% block content %}
 <div class="pagehead">
@@ -34,6 +34,20 @@
   <pre id="log" class="log" data-src="/worlds/{{ world.name }}/logs"></pre>
 </section>
 </div>
+
+<section class="card" id="rcon-direct">
+  <h2>Direct RCON <small class="muted">for mciwb, rcon-cli…</small></h2>
+  {% if world.rcon_port %}
+  <dl class="facts">
+    <div><dt>From the LAN</dt><dd>{% if world.rcon_host %}{{ copy_addr(world.rcon_host ~ ':' ~ world.rcon_port) }}{% else %}<span class="muted small">node address shown while the world runs</span> · port <code>{{ world.rcon_port }}</code>{% endif %}</dd></div>
+    <div><dt>On {{ world.node or "the world's node" }}</dt><dd>{{ copy_addr('127.0.0.1:' ~ world.rcon_port) }}</dd></div>
+    <div><dt>Password</dt><dd id="rcon-password"><button type="button" class="btn" hx-get="/worlds/{{ world.name }}/rcon-password" hx-target="#rcon-password" hx-swap="innerHTML" title="Shows the password (logged in the audit log)">Reveal</button></dd></div>
+  </dl>
+  <p class="small muted">LAN only: never forwarded to the internet. Python example (<a href="https://github.com/gilesknap/mciwb">mciwb</a>): <code>Iwb(server="{{ world.rcon_host or '127.0.0.1' }}", port={{ world.rcon_port }}, passwd="…")</code></p>
+  {% else %}
+  <p class="small muted">This world gets an RCON port at its next start.</p>
+  {% endif %}
+</section>
 
 <div class="grid2">
 <section class="card">
