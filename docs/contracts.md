@@ -36,6 +36,7 @@ in their report.
 | `MCD_RCON_PORT_MIN` / `MCD_RCON_PORT_MAX` | `30600` / `30619` | RCON NodePort range, inclusive; must not overlap the game range (startup fails if it does) |
 | `MCD_RCON_HOST` | "" | LAN address shown for RCON; "" = the world pod's `status.hostIP` (unknown while stopped) |
 | `MCD_PUBLIC_HOST` | `localhost` | host shown in connect addresses |
+| `MCD_VERSION` | chart `image.tag` or `appVersion` | release shown in the page header; "" = `dev` |
 | `MCD_WORLD_NODE` | "" | if set, `nodeSelector kubernetes.io/hostname` for worlds and Jobs |
 | `MCD_STORAGE_CLASS` | `nfs-rwx` | storage class for world PVCs |
 | `MCD_WORLD_SIZE` | `10Gi` | world PVC size |

@@ -16,6 +16,11 @@ def _read_namespace() -> str:
         return "minecraft"
 
 
+def app_version() -> str:
+    """Release shown in the page header: ``MCD_VERSION`` (the image tag), else dev."""
+    return os.environ.get("MCD_VERSION") or "dev"
+
+
 @dataclass(frozen=True)
 class Config:
     namespace: str = "minecraft"

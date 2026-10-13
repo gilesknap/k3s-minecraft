@@ -42,6 +42,7 @@ h1 small, h2 small { font-weight: normal; font-size: .8em; }
   position: sticky; top: 0; z-index: 10;
 }
 .brand { font-weight: 700; color: var(--fg); text-decoration: none; }
+.brand .version { color: var(--muted); font-size: .75em; font-weight: 400; }
 .topbar nav { display: flex; gap: .25rem; }
 .topbar nav a {
   color: var(--muted); text-decoration: none; padding: .3rem .6rem; border-radius: 6px;

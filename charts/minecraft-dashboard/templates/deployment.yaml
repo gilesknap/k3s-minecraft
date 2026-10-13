@@ -45,6 +45,8 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            - name: MCD_VERSION
+              value: {{ default .Chart.AppVersion .Values.image.tag | quote }}
             - name: MCD_NAMESPACE
               valueFrom:
                 fieldRef:
