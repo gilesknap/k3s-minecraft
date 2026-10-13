@@ -14,7 +14,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from mcdash.config import Config
-from mcdash.detect import Detection, detect_zip
+from mcdash.detect import DETECT_VERSION, Detection, detect_zip
 from mcdash.models import Backup, Forbidden, NotFound, Tier
 from mcdash.naming import format_compact_timestamp, parse_backup_name
 from mcdash.store import Store, atomic_write_json, read_json
@@ -106,6 +106,7 @@ class BackupIndex:
             isinstance(entry, dict)
             and entry.get("size") == st.st_size
             and entry.get("mtime") == st.st_mtime
+            and entry.get("detect_version") == DETECT_VERSION
             and isinstance(entry.get("detection"), dict)
         ):
             return Detection.from_json(entry["detection"])
@@ -117,6 +118,7 @@ class BackupIndex:
         index[bid] = {
             "size": st.st_size,
             "mtime": st.st_mtime,
+            "detect_version": DETECT_VERSION,
             "detection": det.to_json(),
         }
         index["__dirty__"] = True

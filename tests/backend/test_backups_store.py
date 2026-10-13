@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from mcdash import backups
 from mcdash.backups import BackupIndex
 from mcdash.config import Config
 from mcdash.models import Forbidden, NotFound, Player, ServerType, Tier
@@ -56,6 +57,21 @@ def test_detection_cache_invalidates(cfg: Config, idx: BackupIndex) -> None:
     make_world_zip(p, version="1.18.2")
     os.utime(p, (1e9, 1e9))
     assert idx.scan()[0].mc_version == "1.18.2"
+
+
+def test_detection_cache_invalidates_on_detect_version(
+    cfg: Config, idx: BackupIndex, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    make_world_zip(cfg.archive_dir / "2021-01-01-a.zip", version="1.12.2")
+    assert idx.scan()[0].mc_version == "1.12.2"
+    calls: list[Path] = []
+    real = backups.detect_zip
+    monkeypatch.setattr(backups, "detect_zip", lambda p: calls.append(p) or real(p))
+    idx.scan()
+    assert calls == []  # cached
+    monkeypatch.setattr(backups, "DETECT_VERSION", backups.DETECT_VERSION + 1)
+    idx.scan()
+    assert len(calls) == 1
 
 
 def test_bad_ids(idx: BackupIndex) -> None:
