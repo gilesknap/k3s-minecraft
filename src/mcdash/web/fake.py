@@ -31,7 +31,7 @@ from mcdash.models import (
     WorldSettings,
     WorldState,
 )
-from mcdash.service import check_ops_change, check_players, next_ops
+from mcdash.service import check_ops_change, check_players, next_ops, same_players
 
 PUBLIC_HOST = "mc.gkcluster.org"
 # An extract of the 26.3 data generator's commands.json and registries.json.
@@ -335,14 +335,16 @@ class FakeDashboardService:
         self._record("set_whitelist", name, players, actor, open_to_all, ops)
         w = self._world(name)
         old = w.settings
-        new_ops = next_ops(
-            old.whitelist, old.ops if ops is None else ops, players, open_to_all
-        )
+        requested = old.ops if ops is None else ops
+        new_ops = next_ops(old.whitelist, requested, players, open_to_all)
         settings = replace(
             old, whitelist=list(players), open_to_all=open_to_all, ops=new_ops
         )
         check_players(settings)
-        check_ops_change(name, old.ops, new_ops, live=w.state is WorldState.RUNNING)
+        if w.state is WorldState.STARTING and not same_players(old.ops, new_ops):
+            raise Conflict(f"{name} is starting; change its admins once it is running")
+        if w.state is not WorldState.RUNNING:
+            check_ops_change(name, old.ops, requested, new_ops)
         w.settings = settings
 
     # -- live --------------------------------------------------------------

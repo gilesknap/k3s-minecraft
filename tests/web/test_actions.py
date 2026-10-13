@@ -120,6 +120,7 @@ def test_set_whitelist(client: TestClient, svc: FakeDashboardService) -> None:
         },
     )
     assert r.status_code == 303
+    assert "msg=Whitelist%3A%204%20players%2C%201%20admins" in r.headers["location"]
     assert svc.calls[-1] == (
         "set_whitelist",
         "noah-james",

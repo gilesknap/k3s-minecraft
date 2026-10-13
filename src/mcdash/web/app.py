@@ -464,8 +464,12 @@ def create_app(service: DashboardService) -> FastAPI:
         service.set_whitelist(
             name, players, actor, open_to_all=open_to_all, ops=ops_from_form(form)
         )
+        # the service may drop admins taken off the whitelist: count what it kept
+        admins = len(service.get_world(name).settings.ops)
         msg = (
-            "Open to everyone" if open_to_all else f"Whitelist: {len(players)} players"
+            f"Open to everyone, {admins} admins"
+            if open_to_all
+            else f"Whitelist: {len(players)} players, {admins} admins"
         )
         return done(request, f"/worlds/{name}", msg)
 
