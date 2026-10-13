@@ -52,24 +52,18 @@ in their report.
   `mcdash/world: <w>`.
 - ConfigMap `<w>-mcdash` (label `mcdash/kind: world`) — the world record
   (`spec`: port, rconPort, source, settings; `op`: pending multi-step
-  operation — `snapshot`, `restore`, `delete`, `launch`, `create`). Stop is
-  not an op: it runs RCON `save-all flush`, then upgrades the release to
-  `replicaCount` 0 at once; it takes no snapshot. Start is not an op either
-  (it upgrades to `replicaCount` 1), except that on a world whose seed
-  failed it retries the `launch` op's seed Job. While a scaled-to-0
-  world's server pod still exists (shutting down), start is refused with
-  `Conflict`, so two servers never share the PVC. An in-flight `{kind:
-  stop, step: snapshot}` op written by an older dashboard is still finished
-  (snapshot, then scale to 0). Exists from launch, before any Helm release, so it reserves the
-  name and both ports while seeding. A record without `rconPort` (world
-  launched before RCON NodePorts) gets one, saved at once, on its next
-  install with the server running (start, end of a restore, settings save
-  while running; stop and the restore drain never allocate). With the RCON
-  range full that install fails with `Conflict`; after a restore the op stays
-  at `step: seed`, so Start re-runs the seed and fails the same way until a
-  world is deleted (or the range widened) to free a port. Rebuilt from the release's `mcdash:` values if lost. `create_world`
-  records op `{kind: create, step: install}` until the release is installed,
-  so an interrupted create is finished by the reconciler.
+  operation — `snapshot`, `restore`, `delete`, `launch`, `create`). Exists
+  from launch, before any Helm release, so it reserves the name and both ports
+  while seeding. A record without `rconPort` (world launched before RCON
+  NodePorts) gets one, saved at once, on its next install with the server
+  running (start, end of a restore, settings save while running; stop and the
+  restore drain never allocate). With the RCON range full that install fails
+  with `Conflict`; after a restore the op stays at `step: seed`, so Start
+  re-runs the seed and fails the same way until a world is deleted (or the
+  range widened) to free a port. Rebuilt from the release's `mcdash:` values
+  if lost. `create_world` records op `{kind: create, step: install}` until the
+  release is installed, so an interrupted create is finished by the
+  reconciler.
 - Secret `<w>-rcon` — key `rcon-password`, random.
 - Helm release `<w>` of the vendored itzg chart: `persistence.dataDir.existingClaim=<w>-data`,
   NodePort game service on the allocated port, RCON service
@@ -238,3 +232,11 @@ password). Served by `GET /worlds/<w>/rcon-password` as an HTML fragment with
   `extraPodSpec`; the chart has no typed value), above itzg's 60 s
   `STOP_DURATION`, so a stop's SIGTERM is not followed by SIGKILL before the
   server has saved and exited.
+- Stop is not an op: it runs RCON `save-all flush`, then upgrades the release
+  to `replicaCount` 0 at once; it takes no snapshot. Start is not an op either
+  (it upgrades to `replicaCount` 1), except that on a world whose seed failed
+  it retries the `launch` op's seed Job. While a scaled-to-0 world's server
+  pod still exists (shutting down; finished pods such as an Evicted one in
+  phase Failed don't count), start is refused with `Conflict`, so two servers
+  never share the PVC. An in-flight `{kind: stop, step: snapshot}` op written
+  by an older dashboard is still finished (snapshot, then scale to 0).

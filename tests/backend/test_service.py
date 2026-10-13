@@ -220,6 +220,17 @@ def test_start_refused_while_old_pod_terminates(svc: KubeDashboardService) -> No
     assert svc.get_world(name).state is WorldState.RUNNING
 
 
+def test_finished_pod_does_not_block_start(svc: KubeDashboardService) -> None:
+    kube, _, _ = parts(svc)
+    name = launch_running(svc)
+    svc.stop(name, ME)
+    # an Evicted pod stays in phase Failed until garbage-collected
+    kube.pods[name] = [PodInfo(name="x", phase="Failed", ready=False)]
+    assert svc.get_world(name).message == ""
+    svc.start(name, ME)
+    assert svc.get_world(name).state is WorldState.RUNNING
+
+
 def test_stop_clears_a_failed_op(svc: KubeDashboardService) -> None:
     _, helm, _ = parts(svc)
     name = launch_running(svc)

@@ -280,6 +280,12 @@ def check_ops_change(
     raise Conflict(f"{name} is not running; start it to remove its last admin")
 
 
+def _live(pods: list[PodInfo]) -> list[PodInfo]:
+    """Server pods that may still hold the volume: finished ones (e.g. an
+    Evicted pod left in phase Failed) never run again, so they don't count."""
+    return [p for p in pods if p.phase not in ("Succeeded", "Failed")]
+
+
 @dataclass(frozen=True)
 class _CommandSource:
     tree: CommandTree | None
@@ -557,7 +563,7 @@ class KubeDashboardService:
         The pod may still be saving and holds the volume: nothing else (a
         new server, a seed Job) may use it yet.
         """
-        return self._replicas(values) == 0 and bool(pods)
+        return self._replicas(values) == 0 and bool(_live(pods))
 
     def _snapshot_paths(self, name: str, file_stamp: str) -> tuple[Path, str]:
         local = self.cfg.snapshots_dir / name / f"{file_stamp}.zip"
@@ -1318,7 +1324,7 @@ class KubeDashboardService:
                     self._save(name, spec, {**op, "step": "teardown"})
                 return True
             if step == "drain":
-                if [p for p in self.kube.list_server_pods(name)]:
+                if _live(self.kube.list_server_pods(name)):
                     return False
                 job, jspec = self._seed_job(
                     name, op["backup"], settings_from_json(spec.get("settings"))

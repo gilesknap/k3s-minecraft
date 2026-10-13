@@ -63,7 +63,7 @@
   {% set settings = world.settings %}
   <form class="form-grid" method="post" action="/worlds/{{ world.name }}/settings" hx-post="/worlds/{{ world.name }}/settings">
     {% include "_settings_fields.html" %}
-    <div class="span2"><button class="btn primary">Save settings</button> <small class="muted">Takes effect at the next start.</small></div>
+    <div class="span2"><button class="btn primary">Save settings</button> <small class="muted">Restarts the world if it is running; otherwise takes effect at the next start.</small></div>
   </form>
 </section>
 </div>
