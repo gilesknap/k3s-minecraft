@@ -21,7 +21,7 @@
   <table class="cards backups">
     {{ backup_head(sort, dir) }}
     <tbody>
-    {% for b in items %}{{ backup_row(b, '/backups') }}{% endfor %}
+    {% for b in items %}{{ backup_row(b, back) }}{% endfor %}
     </tbody>
   </table>
 </section>
@@ -33,7 +33,7 @@
 <table class="cards backups">
   {{ backup_head(sort, dir, show_world=true) }}
   <tbody>
-  {% for b in items %}{{ backup_row(b, '/backups', show_world=true) }}{% endfor %}
+  {% for b in items %}{{ backup_row(b, back, show_world=true) }}{% endfor %}
   </tbody>
 </table>
 {% if not items %}<div class="empty"><p>No backups found. Check the archive and store mounts.</p></div>{% endif %}

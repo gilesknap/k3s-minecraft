@@ -2,6 +2,7 @@
 
 from urllib.parse import quote
 
+import pytest
 from fastapi.testclient import TestClient
 
 from mcdash.models import Player, ServerType, Tier, WorldState
@@ -296,10 +297,11 @@ def test_promote_requires_name(client: TestClient, svc: FakeDashboardService) ->
     assert not any(c[0] == "promote" for c in svc.calls)
 
 
-def test_back_redirect_is_local_only(client: TestClient) -> None:
+@pytest.mark.parametrize("back", ["//evil.example", "/\\evil.example"])
+def test_back_redirect_is_local_only(client: TestClient, back: str) -> None:
     r = client.post(
         "/backups/label",
-        data={"backup_id": ARCHIVE, "label": "x", "back": "//evil.example"},
+        data={"backup_id": ARCHIVE, "label": "x", "back": back},
     )
     assert r.headers["location"].startswith("/?msg=")
 
@@ -316,6 +318,51 @@ def test_delete_snapshot_needs_no_typed_name(
     assert r.status_code == 303  # any typed value is ignored for snapshots
     assert svc.calls[-1] == ("delete_backup", SNAP, ACTOR)
     assert SNAP not in svc.backups
+
+
+def test_delete_snapshot_htmx_removes_row_in_place(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    html = client.get("/backups?sort=date&dir=desc").text
+    assert 'hx-target="closest tr" hx-swap="outerHTML"' in html
+    r = client.post(
+        "/backups/delete", data={"backup_id": SNAP}, headers={"HX-Request": "true"}
+    )
+    assert r.status_code == 200
+    assert "HX-Redirect" not in r.headers  # no reload: sort, filter, scroll kept
+    assert 'id="flash" hx-swap-oob="innerHTML"' in r.text
+    assert f"Deleted {SNAP}" in r.text
+    assert "<tr" not in r.text
+    assert SNAP not in svc.backups
+
+
+def test_delete_snapshot_from_world_page_reloads(
+    client: TestClient, svc: FakeDashboardService
+) -> None:
+    r = client.post(
+        "/backups/delete",
+        data={"backup_id": SNAP, "back": "/worlds/noah-james"},
+        headers={"HX-Request": "true"},
+    )
+    assert r.headers["HX-Redirect"].startswith("/worlds/noah-james?msg=")
+    assert SNAP not in svc.backups
+
+
+@pytest.mark.parametrize("sort, dir", [("date", "desc"), ("world", "desc")])
+def test_backup_actions_return_to_same_sort(
+    client: TestClient, sort: str, dir: str
+) -> None:
+    html = client.get(f"/backups?sort={sort}&dir={dir}").text
+    assert f'name="back" value="/backups?sort={sort}&amp;dir={dir}"' in html
+    r = client.post(
+        "/backups/delete",
+        data={
+            "backup_id": BACKUP,
+            "confirm": "noah-james",
+            "back": f"/backups?sort={sort}&dir={dir}",
+        },
+    )
+    assert r.headers["location"].startswith(f"/backups?sort={sort}&dir={dir}&msg=")
 
 
 def test_delete_backup_tier(client: TestClient, svc: FakeDashboardService) -> None:

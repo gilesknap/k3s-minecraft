@@ -609,13 +609,21 @@ def create_app(service: DashboardService) -> FastAPI:
             sort = "world"
         if dir not in ("asc", "desc"):
             dir = default_dir(sort)
+        # actions on a row return here, keeping the chosen order
+        back = f"/backups?sort={sort}&dir={dir}"
         backups = service.list_backups()
         if sort == "world":
             groups = sort_backups(backups)
             if dir == "desc":
                 groups.reverse()
             return render(
-                request, "backups.html", grouped=True, groups=groups, sort=sort, dir=dir
+                request,
+                "backups.html",
+                grouped=True,
+                groups=groups,
+                sort=sort,
+                dir=dir,
+                back=back,
             )
         return render(
             request,
@@ -624,6 +632,7 @@ def create_app(service: DashboardService) -> FastAPI:
             items=sort_backups_by(backups, sort, dir),
             sort=sort,
             dir=dir,
+            back=back,
         )
 
     @app.post("/backups/label")
@@ -667,7 +676,12 @@ def create_app(service: DashboardService) -> FastAPI:
         if b.tier is not Tier.SNAPSHOT:
             check_confirm(confirm, b.world_name)
         service.delete_backup(backup_id, actor)
-        return done(request, _local(back), f"Deleted {backup_id}")
+        msg = f"Deleted {backup_id}"
+        if is_htmx(request) and b.tier is Tier.SNAPSHOT and back.startswith("/backups"):
+            # the Backups page swaps out the row: an empty body removes it and
+            # keeps the sort, filter and scroll (the world page reloads instead)
+            return render(request, "_oob_flash.html", oob_msg=msg)
+        return done(request, _local(back), msg)
 
     # -- launch ------------------------------------------------------------
     @app.get("/launch", response_class=HTMLResponse)
@@ -759,4 +773,4 @@ def create_app(service: DashboardService) -> FastAPI:
 
 def _local(url: str) -> str:
     """Only allow same-site relative redirects."""
-    return url if url.startswith("/") and not url.startswith("//") else "/"
+    return url if url.startswith("/") and not url.startswith(("//", "/\\")) else "/"
