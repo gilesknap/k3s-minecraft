@@ -1,13 +1,15 @@
 {{- /*
 Static PV + PVC pairs for the archive (read-only) and store (read-write)
-tiers. storageClassName "" + volumeName + claimRef pin each PVC to its PV so
+tiers, and optionally the share root of the worlds' storage class
+(read-only: the dashboard only looks up world folders there).
+storageClassName "" + volumeName + claimRef pin each PVC to its PV so
 nothing else can bind them. reclaimPolicy Retain: deleting the release never
 touches NAS data.
 */}}
-{{- range $tier := list "archive" "store" }}
+{{- range $tier := include "mcdash.tiers" $ | splitList " " }}
 {{- $cfg := index $.Values.storage $tier }}
 {{- if not $cfg.existingClaim }}
-{{- $ro := eq $tier "archive" }}
+{{- $ro := ne $tier "store" }}
 {{- if not (or $cfg.hostPath (and $cfg.nfs.server $cfg.nfs.path)) }}
 {{- fail (printf "storage.%s: set nfs.server + nfs.path, hostPath, or existingClaim" $tier) }}
 {{- end }}

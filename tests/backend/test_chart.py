@@ -148,3 +148,57 @@ def test_overlapping_ranges_rejected() -> None:
     res = template("--set", "worlds.rconPortMin=30580", check=False)
     assert res.returncode != 0
     assert "must not overlap" in res.stderr
+
+
+VOLUMES = [
+    "--set",
+    "storage.volumes.nfs.server=192.0.2.1",
+    "--set",
+    "storage.volumes.nfs.path=/k8s-dynamic/stable",
+]
+
+
+def test_world_share_is_optional() -> None:
+    kinds = [(d["kind"], d["metadata"]["name"]) for d in docs()]
+    assert not [k for k in kinds if k[1].endswith("-volumes")]
+    env = env_of()
+    assert "MCD_VOLUMES_DIR" not in env
+    assert env["MCD_RESTORE_WORLDS"] == "false"
+
+
+def test_world_share_mounted_read_only() -> None:
+    out = docs(*VOLUMES, "--set", "worlds.restore=true")
+    (pv,) = [
+        d
+        for d in out
+        if d["kind"] == "PersistentVolume"
+        and d["metadata"]["name"].endswith("-volumes")
+    ]
+    assert pv["spec"]["nfs"] == {
+        "server": "192.0.2.1",
+        "path": "/k8s-dynamic/stable",
+        "readOnly": True,
+    }
+    assert "ro" in pv["spec"]["mountOptions"]
+    assert pv["spec"]["accessModes"] == ["ReadOnlyMany"]
+    (dep,) = [d for d in out if d["kind"] == "Deployment"]
+    (c,) = dep["spec"]["template"]["spec"]["containers"]
+    (mount,) = [m for m in c["volumeMounts"] if m["name"] == "volumes"]
+    assert mount == {"name": "volumes", "mountPath": "/volumes", "readOnly": True}
+    env = {e["name"]: e.get("value", "") for e in c["env"]}
+    assert env["MCD_VOLUMES_DIR"] == "/volumes"
+    assert env["MCD_RESTORE_WORLDS"] == "true"
+
+
+@pytest.mark.parametrize("key", ["server", "path"])
+def test_half_set_world_share_fails(key: str) -> None:
+    res = template("--set", f"storage.volumes.nfs.{key}=x", check=False)
+    assert res.returncode != 0
+    assert "storage.volumes: set both nfs.server and nfs.path" in res.stderr
+
+
+@pytest.mark.parametrize("tier", ["archive", "store", "volumes"])
+def test_schema_rejects_unknown_tier_keys(tier: str) -> None:
+    res = template("--set", f"storage.{tier}.archivedDir=x", check=False)
+    assert res.returncode != 0
+    assert "archivedDir" in res.stderr
