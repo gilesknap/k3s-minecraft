@@ -32,6 +32,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import FormData
+from starlette.types import Scope
 
 from mcdash.config import app_version
 from mcdash.models import (
@@ -314,10 +315,37 @@ def sse_event(data: str, event: str | None = None) -> str:
     return "\n".join(lines) + "\n\n"
 
 
+class VersionedStaticFiles(StaticFiles):
+    """Static files: cache forever when the URL carries this release's ``?v=``.
+
+    Templates append ``?v=<app_version>`` to every asset, so a new release
+    changes the URL and busts any browser or CDN (Cloudflare) cache.
+    Unversioned or mismatched requests must revalidate.
+    """
+
+    def __init__(self, *, version: str, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.version = version
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        resp = await super().get_response(path, scope)
+        v = Request(scope).query_params.get("v")
+        if resp.status_code == 200 and v == self.version and v != "dev":
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
 # -- app ---------------------------------------------------------------------
 def create_app(service: DashboardService) -> FastAPI:
     app = FastAPI(title="Minecraft dashboard", docs_url=None, redoc_url=None)
-    app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+    version = app_version()
+    app.mount(
+        "/static",
+        VersionedStaticFiles(directory=HERE / "static", version=version),
+        name="static",
+    )
     templates = Jinja2Templates(directory=HERE / "templates")
     env = templates.env
     env.filters.update(
@@ -332,7 +360,7 @@ def create_app(service: DashboardService) -> FastAPI:
         SETTING_RANGES=SETTING_RANGES,
         ServerType=ServerType,
         default_dir=default_dir,
-        app_version=app_version(),
+        app_version=version,
     )
 
     def render(
@@ -340,9 +368,11 @@ def create_app(service: DashboardService) -> FastAPI:
     ) -> HTMLResponse:
         ctx.setdefault("actor", get_actor(request))
         ctx.setdefault("msg", request.query_params.get("msg", ""))
-        return templates.TemplateResponse(
+        resp = templates.TemplateResponse(
             request, template, ctx, status_code=status_code
         )
+        resp.headers.setdefault("Cache-Control", "no-cache")
+        return resp
 
     def done(request: Request, url: str, msg: str = "") -> Response:
         """Success → navigate (HX-Redirect for HTMX, 303 otherwise)."""

@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark">
   <meta name="htmx-config" content='{"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true}]}'>
   <title>{% block title %}Minecraft{% endblock %} · mcdash</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v={{ app_version | urlencode }}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%235a8f3c'/><rect y='10' width='16' height='6' fill='%23866043'/></svg>">
-  <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
-  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+  <script src="{{ url_for('static', path='htmx.min.js') }}?v={{ app_version | urlencode }}" defer></script>
+  <script src="{{ url_for('static', path='app.js') }}?v={{ app_version | urlencode }}" defer></script>
 </head>
 <body>
   <header class="topbar">

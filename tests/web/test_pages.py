@@ -51,6 +51,26 @@ def test_static_htmx_is_vendored(client: TestClient) -> None:
     assert "unpkg.com" not in client.get("/").text
 
 
+def test_static_assets_are_versioned(client: TestClient) -> None:
+    r = client.get("/")
+    assert "style.css?v=" in r.text
+    assert "app.js?v=" in r.text
+    assert "htmx.min.js?v=" in r.text
+    assert r.headers["cache-control"] == "no-cache"
+
+
+def test_static_cache_control(
+    svc: FakeDashboardService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MCD_VERSION", "1.2.3")
+    c = TestClient(create_app(svc))
+    assert "style.css?v=1.2.3" in c.get("/").text
+    versioned = c.get("/static/style.css?v=1.2.3")
+    assert versioned.headers["cache-control"] == ("public, max-age=31536000, immutable")
+    assert c.get("/static/style.css").headers["cache-control"] == "no-cache"
+    assert c.get("/static/style.css?v=old").headers["cache-control"] == "no-cache"
+
+
 def test_actor_shown_in_header(client: TestClient) -> None:
     assert ACTOR in client.get("/").text
 
