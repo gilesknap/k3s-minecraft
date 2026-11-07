@@ -47,6 +47,28 @@ storage:
     size: 1Ti
     mountOptions:
       - nfsvers=4
+  # Optional, read-only: the NFS share root of worlds.storageClass. That
+  # class must keep each PVC in <namespace>/<pvc> and archive a deleted one
+  # as archived-<namespace>/<pvc> (NFS CSI subDir
+  # ${pvc.metadata.namespace}/${pvc.metadata.name} with onDelete: archive).
+  # Give the class a share of its own, used only by worlds: the dashboard
+  # can read everything under it. When set, a new world is refused while a
+  # deleted world's folder of the same name is still there (a second archive
+  # of one name fails), and a world is restored only if its folder exists.
+  # The share root must exist (the class needs it too), or the pod cannot
+  # start; the folders under it may be missing, but <namespace>/ only while
+  # there is no world: without it, new names are refused and a restore waits
+  # (a wrong path, or the NAS not mounted yet).
+  volumes:
+    nfs:
+      server: ""
+      path: ""
+    hostPath: ""
+    existingClaim: ""
+    size: 1Ti
+    mountOptions:
+      - nfsvers=4
+      - ro
 
 worlds:
   # Game NodePorts, one per world (players; the VPS relay may forward these).
@@ -63,10 +85,24 @@ worlds:
   publicHost: ""
   # Hostname to pin worlds and Jobs to (nodeSelector kubernetes.io/hostname).
   node: ""
+  # The registry records each world's class. Changing it does not move any
+  # data: a restore skips (to dashboard/registry/skipped/) every world whose
+  # PVC was on another class, "storage class changed (<old> → <new>):
+  # migrate its data first".
   storageClass: nfs-rwx
   size: 10Gi
   defaultMemory: 4Gi
   snapshotKeep: 10
+  # When the dashboard starts (once per start), re-create worlds from the
+  # registry on the store (dashboard/registry/) that the cluster has lost,
+  # e.g. after a rebuild: same name, ports, settings and running/stopped
+  # state. A world that cannot be restored as it was (another storageClass,
+  # a port clash, or no data folder when storage.volumes is set) is moved to
+  # dashboard/registry/skipped/ and logged. Enable only when storageClass maps a
+  # PVC name to a fixed folder (e.g. NFS CSI subDir
+  # ${pvc.metadata.namespace}/${pvc.metadata.name}); with any other class the
+  # re-created world gets an empty volume.
+  restore: false
   # uid/gid the itzg server runs as; seed/snapshot Jobs chown to this.
   uid: 1000
   gid: 1000

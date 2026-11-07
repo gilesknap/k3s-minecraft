@@ -44,6 +44,15 @@ class Config:
     default_memory: str = "4Gi"
     itzg_chart: Path = Path("/opt/charts/minecraft")
     snapshot_keep: int = 10
+    # Re-create worlds from the registry on the store when their record and
+    # release are both gone (a cluster rebuild). Only for a storage class that
+    # maps a PVC name to a fixed folder: elsewhere a re-created PVC is empty.
+    restore_worlds: bool = False
+    # Read-only view of the worlds' storage class share root, which keeps a
+    # PVC in ``<ns>/<pvc>`` and archives a deleted one as ``archived-<ns>/<pvc>``.
+    # When set, a new world is refused while either folder of its PVC exists,
+    # and a world is restored only if its folder exists. None = no checks.
+    volumes_dir: Path | None = None
     uid: int = 1000
     gid: int = 1000
 
@@ -79,6 +88,10 @@ class Config:
             default_memory=s("MCD_DEFAULT_MEMORY", "4Gi"),
             itzg_chart=Path(s("MCD_ITZG_CHART", "/opt/charts/minecraft")),
             snapshot_keep=int(s("MCD_SNAPSHOT_KEEP", "10")),
+            restore_worlds=s("MCD_RESTORE_WORLDS", "false").lower() in ("true", "1"),
+            volumes_dir=(
+                Path(e["MCD_VOLUMES_DIR"]) if e.get("MCD_VOLUMES_DIR") else None
+            ),
             uid=int(s("MCD_UID", "1000")),
             gid=int(s("MCD_GID", "1000")),
         )

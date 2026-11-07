@@ -36,7 +36,8 @@
       "type": "object",
       "properties": {
         "archive": {"$ref": "#/definitions/tier"},
-        "store": {"$ref": "#/definitions/tier"}
+        "store": {"$ref": "#/definitions/tier"},
+        "volumes": {"$ref": "#/definitions/tier"}
       },
       "required": ["archive", "store"]
     },
@@ -54,6 +55,7 @@
         "size": {"type": "string"},
         "defaultMemory": {"type": "string"},
         "snapshotKeep": {"type": "integer", "minimum": 1},
+        "restore": {"type": "boolean"},
         "uid": {"type": "integer"},
         "gid": {"type": "integer"}
       },

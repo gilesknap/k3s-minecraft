@@ -28,6 +28,25 @@ either, except that it retries a failed ``launch`` seed; it is refused while
 a scaled-to-0 world's old pod is still shutting down. A ``stop`` op persisted
 by an older dashboard (snapshot -> scale 0) is still finished by the
 reconciler.
+
+World registry
+--------------
+ConfigMaps and releases live in etcd, which a cluster rebuild wipes. So the
+reconciler also keeps ``$MCD_STORE_DIR/dashboard/registry/<w>.json`` =
+``{spec, op, replicas, storageClass}`` in step with each record (written
+only on change), and deletes it at the start of a delete's teardown. With
+``MCD_RESTORE_WORLDS`` set, one restore pass runs after the first successful
+sync after the dashboard starts: it re-creates each registered world that has
+neither a ConfigMap nor a release: Secret (a new RCON password) and PVC
+``<w>-data`` (same name, so a class with a fixed folder per PVC name finds the
+old data), then the release with its old replica count and ports, then the
+record. An operation that was in flight resumes, except a plain snapshot,
+which is dropped. A record that cannot be restored as it is (another storage
+class, a port clash, no data folder, not a world) is moved to
+``registry/skipped/`` and never retried. If the world share is mounted but
+has no ``<ns>/`` folder, the pass is postponed to the next tick (the mount is
+wrong or not ready: every world would look like it had lost its data). Ports
+of registered worlds not (yet) restored stay reserved.
 """
 
 from __future__ import annotations
@@ -352,6 +371,14 @@ class KubeDashboardService:
         self._stop_evt = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_reconcile_error = ""
+        # world -> registry record last written (or read back) this process
+        self._registry_seen: dict[str, dict[str, Any]] | None = None
+        # restore runs once, after the first successful sync after start
+        self._restore_done = False
+        self._last_registry_error = ""
+        self._last_restore_error = ""
+        # registry files a write failed for, warned once per process
+        self._registry_write_warned: set[str] = set()
 
     @classmethod
     def from_config(cls, cfg: Config) -> KubeDashboardService:
@@ -465,28 +492,53 @@ class KubeDashboardService:
     def _used_ports(specs: dict[str, dict[str, Any]]) -> set[int]:
         """Every game and RCON port held by a world record."""
         return {
-            int(s.get(k) or 0) for s in specs.values() for k in ("port", "rconPort")
+            v
+            for s in specs.values()
+            for k in ("port", "rconPort")
+            if type(v := s.get(k)) is int and v > 0
         }
 
-    def _allocate_port(self, specs: dict[str, dict[str, Any]]) -> int:
-        used = self._used_ports(specs)
+    def _held_ports(
+        self, specs: dict[str, dict[str, Any]], live: set[str] | None = None
+    ) -> set[int]:
+        """Ports of ``specs``, and of registered worlds not in ``live``
+        (default: ``specs``): a lost world not restored yet (pending, failed
+        part-way, or restore off) keeps its ports for when it comes back."""
+        live = set(specs) if live is None else live
+        recs = self._registry_seen
+        if recs is None:
+            try:
+                recs = self.store.registry()
+            except OSError as e:
+                raise MCDashError(f"cannot read the world registry: {e}") from e
+        lost = {w: r["spec"] for w, r in recs.items() if w not in live}
+        return self._used_ports(specs) | self._used_ports(lost)
+
+    def _allocate_port(
+        self, specs: dict[str, dict[str, Any]], live: set[str] | None = None
+    ) -> int:
+        used = self._held_ports(specs, live)
         for p in range(self.cfg.port_min, self.cfg.port_max + 1):
             if p not in used:
                 return p
         raise Conflict(
             f"no free ports in {self.cfg.port_min}-{self.cfg.port_max}; "
-            "delete a world first"
+            "delete a world first (worlds in dashboard/registry/ that the "
+            "cluster has lost keep theirs)"
         )
 
-    def _allocate_rcon_port(self, specs: dict[str, dict[str, Any]]) -> int:
-        used = self._used_ports(specs)
+    def _allocate_rcon_port(
+        self, specs: dict[str, dict[str, Any]], live: set[str] | None = None
+    ) -> int:
+        used = self._held_ports(specs, live)
         lo, hi = self.cfg.rcon_port_min, self.cfg.rcon_port_max
         for p in range(lo, hi + 1):
             if p not in used:
                 return p
         raise Conflict(
             f"no free RCON ports in {lo}-{hi}; delete a world first "
-            "(or widen the RCON port range)"
+            "(or widen the RCON port range; worlds in dashboard/registry/ "
+            "that the cluster has lost keep theirs)"
         )
 
     def _ensure_rcon_port(self, name: str, spec: dict[str, Any]) -> None:
@@ -499,7 +551,7 @@ class KubeDashboardService:
             return
         specs, ops, _ = self._records()
         others = {w: s for w, s in specs.items() if w != name}
-        spec["rconPort"] = self._allocate_rcon_port(others)
+        spec["rconPort"] = self._allocate_rcon_port(others, set(specs) | {name})
         self._save(name, spec, ops.get(name))
         log.info("%s: assigned RCON port %s", name, spec["rconPort"])
 
@@ -721,8 +773,114 @@ class KubeDashboardService:
 
     # ================================================================ worlds
     def _taken_names(self) -> set[str]:
+        """Names a suggestion must avoid (see ``_check_volume_free`` and
+        ``_check_registry`` for why)."""
         specs, _, _ = self._records()
-        return set(specs)
+        taken = set(specs) | self._leftover_names(specs)
+        with contextlib.suppress(OSError):  # suggestions only: _reserve checks
+            taken |= self.store.registry_names() | self.store.skipped_names()
+        return taken
+
+    def _volume_dirs(self, name: str) -> tuple[Path, Path] | None:
+        """(live, archived) folder of ``<w>-data`` on the world share, if mounted.
+
+        The worlds' storage class keeps a PVC in ``<ns>/<pvc>`` and archives it
+        as ``archived-<ns>/<pvc>`` (NFS CSI ``subDir: ${ns}/${pvc}``,
+        ``onDelete: archive``).
+        """
+        root = self.cfg.volumes_dir
+        if root is None:
+            return None
+        ns, pvc = self.cfg.namespace, pvc_name(name)
+        return root / ns / pvc, root / f"archived-{ns}" / pvc
+
+    def _worlds_known(self, specs: dict[str, dict[str, Any]]) -> bool:
+        """Any world in the cluster or the registry (an unreadable registry
+        counts as yes)?"""
+        if specs:
+            return True
+        try:
+            return bool(self.store.registry_names() | self.store.skipped_names())
+        except OSError:
+            return True
+
+    def _check_share(self, specs: dict[str, dict[str, Any]]) -> None:
+        """Refuse while the world share looks wrong: mounted, but no ``<ns>/``.
+
+        The storage class makes ``<ns>/`` with the first PVC, so it may be
+        missing only while there is no world at all. Missing with worlds
+        around means ``storage.volumes`` is not the class's share root, or
+        the NAS has not mounted the dataset yet: every folder lookup would
+        then say "none", so neither name checks nor a restore can be trusted.
+        """
+        root = self.cfg.volumes_dir
+        if root is None or self._exists(root / self.cfg.namespace):
+            return
+        if self._worlds_known(specs):
+            raise MCDashError(
+                f"the world share ({root}) has no {self.cfg.namespace}/ folder "
+                "although worlds exist: check that storage.volumes is the share "
+                "root of worlds.storageClass and that the NAS has it mounted"
+            )
+
+    def _leftover_names(self, specs: dict[str, dict[str, Any]]) -> set[str]:
+        """Worlds with a volume folder left on the world share (suggestions)."""
+        root = self.cfg.volumes_dir
+        if root is None:
+            return set()
+        self._check_share(specs)
+        suffix = pvc_name("")
+        out: set[str] = set()
+        for d in (root / self.cfg.namespace, root / f"archived-{self.cfg.namespace}"):
+            with contextlib.suppress(OSError):  # none yet, or unreadable
+                out |= {
+                    p.name[: -len(suffix)]
+                    for p in d.iterdir()
+                    if p.name.endswith(suffix) and len(p.name) > len(suffix)
+                }
+        return out
+
+    @staticmethod
+    def _exists(path: Path) -> bool:
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            return False
+        except OSError as e:
+            raise MCDashError(f"cannot check the world share for {path}: {e}") from e
+        return True
+
+    def _check_volume_free(self, name: str, specs: dict[str, dict[str, Any]]) -> None:
+        """Refuse a name whose deleted world still has a folder on the share.
+
+        A new ``<w>-data`` PVC would get the folder still in ``<ns>/`` (a
+        delete not yet archived, or an archive that failed), and deleting it
+        later would archive it under a name the NFS CSI driver already holds,
+        which it refuses: the volume would stay for the next world of that
+        name. The live folder is checked first: the class renames it into the
+        archive, so one of the two lookups sees it. Called without the lock
+        (an NFS lookup): once neither exists, a folder of that name only
+        appears for a new PVC, which needs a world record, and ``_reserve``
+        refuses a name with a record under the lock.
+        """
+        dirs = self._volume_dirs(name)
+        if dirs is None:
+            return
+        self._check_share(specs)
+        live, archived = dirs
+        rel = f"{live.parent.name}/{live.name}"
+        if self._exists(live):
+            raise Conflict(
+                f"world name {name!r} still has a volume folder ({rel} on the "
+                "world share) from a deleted world; wait a minute for the "
+                "storage class to archive it, or move it away"
+            )
+        if self._exists(archived):
+            raise Conflict(
+                f"a deleted world named {name!r} still has archived data "
+                f"({archived.parent.name}/{archived.name} on the world share); "
+                "pick another name, or remove or rename the archive first"
+            )
 
     def launch_defaults(self, backup_id: str) -> tuple[str, WorldSettings]:
         b = self.backups.get(backup_id)
@@ -787,8 +945,7 @@ class KubeDashboardService:
     ) -> dict[str, Any]:
         """New world spec with a free port; caller holds the lock and saves it."""
         specs, _, _ = self._records()
-        if name in specs or self.kube.pvc_exists(pvc_name(name)):
-            raise Conflict(f"world name {name!r} is taken")
+        self._check_taken(name, specs)
         return {
             "port": self._allocate_port(specs),
             "rconPort": self._allocate_rcon_port(specs),
@@ -798,6 +955,54 @@ class KubeDashboardService:
             "forgeVersion": forge_version,
             "message": "",
         }
+
+    def _check_taken(self, name: str, specs: dict[str, dict[str, Any]]) -> None:
+        """Refuse a name held by a world, its PVC or the registry.
+
+        Run before the world share checks too, whose message is about a
+        deleted world (a live world has a folder on the share as well).
+        """
+        if name in specs:
+            raise Conflict(f"world name {name!r} is taken")
+        pvc = pvc_name(name)
+        if self.kube.pvc_exists(pvc):
+            # e.g. a restore that stopped between the PVC and the record:
+            # the next start retries it (and reuses the PVC). Not removed
+            # automatically: deleting it may archive or delete the data.
+            raise Conflict(
+                f"world name {name!r} is taken: PVC {pvc} exists without a world "
+                "record (a restore that stopped part-way is retried when the "
+                "dashboard next starts). To free the name, delete "
+                f"dashboard/registry/{name}.json if there is one, then the PVC "
+                f"{pvc} and Secret {rcon_secret_name(name)} (the storage class "
+                "may archive or delete the PVC's data)"
+            )
+        self._check_registry(name)
+
+    def _check_registry(self, name: str) -> None:
+        """Refuse the name of a world the cluster lost but the registry has.
+
+        A new world of that name would take the lost world's place, and its
+        PVC its data folder. Caller holds the lock and has refused live names.
+        """
+        try:
+            lost = self.store.registry_names()
+            skipped = self.store.skipped_names()
+        except OSError as e:
+            raise MCDashError(f"cannot read the world registry: {e}") from e
+        where = (
+            f"dashboard/registry/{name}.json"
+            if name in lost
+            else f"dashboard/registry/skipped/{name}.json"
+            if name in skipped
+            else ""
+        )
+        if where:
+            raise Conflict(
+                f"world name {name!r} is taken by a world the cluster no longer "
+                f"has ({where} on the store); to free the name, delete that "
+                "file and the old world's data"
+            )
 
     def _create_volume_and_secret(self, name: str) -> None:
         with contextlib.suppress(Conflict):
@@ -841,6 +1046,9 @@ class KubeDashboardService:
         det = self.backups.detection(backup_id)
         detected = det.forge_version or ""
         stored = replace(settings, forge_version=forge_override(settings, detected))
+        specs, _, _ = self._records()
+        self._check_taken(name, specs)  # re-checked under the lock
+        self._check_volume_free(name, specs)
         with self._lock:
             spec = self._reserve(name, stored, b.id, detected)
             job, jspec = self._seed_job(name, b.id, settings)
@@ -868,6 +1076,9 @@ class KubeDashboardService:
         """A fresh world: no seed Job, itzg generates it on the empty volume."""
         self._check_name(name)
         self._check_settings(settings)
+        specs, _, _ = self._records()
+        self._check_taken(name, specs)  # re-checked under the lock
+        self._check_volume_free(name, specs)
         with self._lock:
             stored = replace(settings, forge_version=forge_override(settings, ""))
             spec = self._reserve(name, stored, "", "")
@@ -1275,6 +1486,263 @@ class KubeDashboardService:
     def set_roster(self, players: list[Player]) -> None:
         self.store.set_roster(players)
 
+    # ================================================================ registry
+    def _drop_registry(self, name: str) -> None:
+        try:
+            self.store.drop_registry(name)
+        except OSError as e:
+            raise MCDashError(
+                f"cannot remove {name} from the world registry: {e}"
+            ) from e
+        if self._registry_seen is not None:
+            self._registry_seen.pop(name, None)
+
+    def _registry_write(self, name: str, fn: Callable[[], None]) -> bool:
+        """Write or drop one world's registry file; False (warned once per
+        file per process) if that fails, e.g. EACCES on that one file."""
+        try:
+            fn()
+        except OSError as e:
+            if name not in self._registry_write_warned:
+                self._registry_write_warned.add(name)
+                log.warning(
+                    "registry: cannot write %s.json (retried quietly every tick): %s",
+                    name,
+                    e,
+                )
+            return False
+        return True
+
+    def sync_registry(
+        self,
+        specs: dict[str, dict[str, Any]],
+        ops: dict[str, dict[str, Any] | None],
+        rels: dict[str, dict[str, Any]],
+        classes: dict[str, str] | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Copy every world record to the store; return the lost worlds to
+        restore, if the restore pass is due (see ``_restore_pass``).
+
+        Caller holds the lock and passes a fresh ``_records()`` and the PVCs'
+        storage classes. A file that cannot be written is skipped (and
+        retried); an unreadable registry is logged once and retried on the
+        next tick: the cluster stays the source of truth while it has the
+        world. The pass is due after the first sync that reads the registry
+        (with ``restore_worlds``), from what is on the store at that moment.
+        """
+        classes = classes or {}
+        try:
+            if self._registry_seen is None:
+                self._registry_seen = self.store.registry()
+        except OSError as e:
+            msg = str(e)
+            if msg != self._last_registry_error:
+                log.warning("registry: cannot read the store: %s", e)
+                self._last_registry_error = msg
+            return {}
+        if self._last_registry_error:
+            log.info("registry: the store is readable again")
+            self._last_registry_error = ""
+        seen = self._registry_seen
+        for name, spec in specs.items():
+            op = ops.get(name)
+            if op and op.get("step") == "teardown":
+                if name in seen and self._registry_write(
+                    name, lambda n=name: self.store.drop_registry(n)
+                ):
+                    seen.pop(name)
+                continue
+            old = seen.get(name) or {}
+            values = rels.get(name)
+            # no release (seeding, failed): keep the count last seen
+            replicas = (
+                self._replicas(values)
+                if values is not None
+                else int(old.get("replicas") or 0)
+            )
+            rec = {
+                "spec": spec,
+                "op": op,
+                "replicas": replicas,
+                # no PVC (yet, or lost): keep the class last seen
+                "storageClass": classes.get(pvc_name(name))
+                or str(old.get("storageClass") or ""),
+            }
+            if old != rec and self._registry_write(
+                name, lambda n=name, r=rec: self.store.save_registry(n, r)
+            ):
+                seen[name] = rec
+        if self._restore_done:
+            return {}
+        lost = {w: dict(r) for w, r in seen.items() if w not in specs}
+        if not (self.cfg.restore_worlds and lost):
+            self._restore_done = True
+            return {}
+        return lost
+
+    def _restore_lookups(
+        self, lost: dict[str, dict[str, Any]]
+    ) -> dict[str, bool | MCDashError]:
+        """Does each lost world's data folder exist? Without the lock (NFS).
+
+        ``{}`` without ``MCD_VOLUMES_DIR``. A world on another storage class
+        is not looked up (it is skipped anyway). Raises ``MCDashError`` if
+        the share has no ``<ns>/`` (see ``_check_share``).
+        """
+        if self.cfg.volumes_dir is None:
+            return {}
+        names = [w for w, r in lost.items() if not self._class_changed(r)]
+        if not names:
+            return {}
+        self._check_share(lost)
+        out: dict[str, bool | MCDashError] = {}
+        for name in names:
+            if not is_valid_world_name(name):
+                continue  # skipped as not a world
+            dirs = self._volume_dirs(name)
+            assert dirs is not None
+            try:
+                out[name] = self._exists(dirs[0])
+            except MCDashError as e:  # that world fails, retried next start
+                out[name] = e
+        return out
+
+    def _restore_pass(self, lost: dict[str, dict[str, Any]]) -> None:
+        """Restore ``lost`` (from ``sync_registry``), once per start.
+
+        The folder lookups run first, without the lock; then, under it, the
+        worlds are listed afresh, and a world that is back (or whose record
+        has gone) since is left alone. A share without ``<ns>/`` postpones
+        the whole pass to the next tick (logged once): nothing is touched,
+        so a late NAS mount heals by itself, without a restart.
+        """
+        try:
+            folders = self._restore_lookups(lost)
+        except MCDashError as e:
+            msg = f"restore postponed (retried every few seconds): {e}"
+            if msg != self._last_restore_error:
+                log.error("registry: %s", msg)
+                self._last_restore_error = msg
+            return
+        self._last_restore_error = ""
+        with self._lock:
+            specs, _, _ = self._records()
+            seen = self._registry_seen
+            if seen is None:  # the store failed since: the next sync retries
+                return
+            self._restore_done = True
+            for name in sorted(lost):
+                if name in specs or name not in seen:
+                    continue
+                try:
+                    self._restore_world(name, seen[name], specs, folders.get(name))
+                except Exception as e:  # one bad record must not stall the others
+                    log.warning(
+                        "%s: cannot restore from the registry (retried when the "
+                        "dashboard next starts): %s",
+                        name,
+                        e,
+                        exc_info=not isinstance(e, (HelmError, MCDashError, OSError)),
+                    )
+
+    def _skip_restore(self, name: str, reason: str) -> None:
+        """Set a record aside for good: a later start must not restore it."""
+        self.store.skip_registry(name)
+        if self._registry_seen is not None:
+            self._registry_seen.pop(name, None)
+        log.warning(
+            "%s: not restored: %s (record moved to dashboard/registry/skipped/)",
+            name,
+            reason,
+        )
+        self.store.audit("mcdash", "skip_restore", name, reason=reason)
+
+    def _class_changed(self, rec: dict[str, Any]) -> str:
+        """``"<old> → <new>"`` if the record's PVC had another storage class
+        than ``MCD_STORAGE_CLASS``, else "" (also for a record without one)."""
+        old = rec.get("storageClass") or ""
+        if isinstance(old, str) and old and old != self.cfg.storage_class:
+            return f"{old} → {self.cfg.storage_class}"
+        return ""
+
+    def _restore_world(
+        self,
+        name: str,
+        rec: dict[str, Any],
+        specs: dict[str, dict[str, Any]],
+        folder: bool | MCDashError | None = None,
+    ) -> None:
+        """Re-create a registered world that the cluster has lost.
+
+        Caller holds the lock. ``folder``: whether the data folder exists
+        (``_restore_lookups``; None = not checked). ``specs`` (the worlds
+        that exist) gains ``name`` once it is recorded.
+        """
+        spec = dict(rec["spec"])
+        port, rcon_port = spec.get("port"), spec.get("rconPort") or 0
+        if not (
+            is_valid_world_name(name)
+            and type(port) is int
+            and port > 0
+            and type(rcon_port) is int
+        ):
+            self._skip_restore(name, "the record is not a valid world")
+            return
+        changed = self._class_changed(rec)
+        if changed:
+            self._skip_restore(
+                name, f"storage class changed ({changed}): migrate its data first"
+            )
+            return
+        clash = ({port, rcon_port} - {0}) & self._used_ports(specs)
+        if clash:
+            ports = ", ".join(map(str, sorted(clash)))
+            self._skip_restore(name, f"port {ports} is held by another world")
+            return
+        if isinstance(folder, MCDashError):
+            raise folder
+        if folder is False:
+            dirs = self._volume_dirs(name)
+            assert dirs is not None
+            self._skip_restore(
+                name,
+                f"no data folder {dirs[0].parent.name}/{dirs[0].name} on the "
+                "world share",
+            )
+            return
+        op: dict[str, Any] | None = rec.get("op") or None
+        replicas = 1 if int(rec.get("replicas") or 0) else 0
+        step = op.get("step") if op else None
+        if op and op.get("kind") in ("snapshot", "stop") and step == "snapshot":
+            # the snapshot was lost with the cluster; a stop still stops
+            replicas = 0 if op["kind"] == "stop" else replicas
+            op = None
+        elif op and op.get("error") and step not in ("seed", "install"):
+            op = None  # back as it was last installed; the admin may retry
+        log.info("%s: restoring from the registry (replicas %s)", name, replicas)
+        self._create_volume_and_secret(name)
+        spec["message"] = "restored after the cluster lost it"
+        if op is None:
+            # install first: a release without a record is healed from its
+            # values, but a record without a release would just show FAILED
+            try:
+                self._install(name, spec, replicas=replicas)
+            except HelmError as e:  # "Start" retries the install
+                op = {"kind": "recover", "step": "install", "error": str(e)}
+        # an in-flight op resumes from here (seed, drain, install, a snapshot
+        # before a restore or delete); the registry never holds a teardown
+        self._save(name, spec, op)
+        specs[name] = spec
+        self.store.audit(
+            "mcdash",
+            "restore_world",
+            name,
+            port=spec.get("port"),
+            rcon_port=spec.get("rconPort"),
+            replicas=replicas,
+            op=(op or {}).get("kind", ""),
+        )
+
     # ================================================================ reconcile
     def _job_status(
         self, name: str, spec: dict[str, Any], op: dict[str, Any]
@@ -1396,6 +1864,8 @@ class KubeDashboardService:
                 self._save(name, spec, None)
                 return True
             if step == "teardown":
+                # first: a rebuild from here on must not bring the world back
+                self._drop_registry(name)
                 self.helm.uninstall(name)
                 self._values_cache.pop(name, None)
                 for j in self.kube.list_jobs(name):
@@ -1416,7 +1886,11 @@ class KubeDashboardService:
         for name in self.rcon_pool.sweep_idle():
             log.debug("%s: closed idle RCON connection", name)
         try:
-            _, ops, _ = self._records()
+            with self._lock:  # a teardown must not interleave with the sync
+                specs, ops, rels = self._records()
+                lost = self.sync_registry(specs, ops, rels, self.kube.pvc_classes())
+            if lost:
+                self._restore_pass(lost)
         except MCDashError as e:  # e.g. no cluster: say so once, not every tick
             if str(e) != self._last_reconcile_error:
                 log.warning("reconcile: cannot list worlds: %s", e)

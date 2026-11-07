@@ -64,3 +64,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $tier := index . 1 }}
 {{- printf "%s-%s-%s" $root.Release.Namespace (include "mcdash.fullname" $root) $tier | trunc 63 | trimSuffix "-" }}
 {{- end }}
+
+{{/* Storage tiers to mount: archive, store, and volumes when it is set.
+A half-set volumes (nfs.server without nfs.path, or the reverse) fails, rather
+than leaving the dashboard silently without its checks. */}}
+{{- define "mcdash.tiers" -}}
+{{- $v := .Values.storage.volumes }}
+{{- if and (not (and $v.nfs.server $v.nfs.path)) (or $v.nfs.server $v.nfs.path) }}
+{{- fail "storage.volumes: set both nfs.server and nfs.path, or neither" }}
+{{- end }}
+{{- if or $v.existingClaim $v.hostPath (and $v.nfs.server $v.nfs.path) -}}
+archive store volumes
+{{- else -}}
+archive store
+{{- end }}
+{{- end }}

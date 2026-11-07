@@ -85,6 +85,13 @@ spec:
               value: /opt/charts/minecraft
             - name: MCD_SNAPSHOT_KEEP
               value: {{ .Values.worlds.snapshotKeep | quote }}
+            - name: MCD_RESTORE_WORLDS
+              value: {{ .Values.worlds.restore | quote }}
+            {{- if has "volumes" (include "mcdash.tiers" . | splitList " ") }}
+            # the worlds' class share root: <ns>/<pvc>, archived-<ns>/<pvc>
+            - name: MCD_VOLUMES_DIR
+              value: /volumes
+            {{- end }}
             - name: MCD_UID
               value: {{ .Values.worlds.uid | quote }}
             - name: MCD_GID
@@ -110,6 +117,11 @@ spec:
               readOnly: true
             - name: store
               mountPath: /store
+            {{- if has "volumes" (include "mcdash.tiers" . | splitList " ") }}
+            - name: volumes
+              mountPath: /volumes
+              readOnly: true
+            {{- end }}
             - name: tmp
               mountPath: /tmp
           livenessProbe:
@@ -140,6 +152,12 @@ spec:
         - name: store
           persistentVolumeClaim:
             claimName: {{ include "mcdash.pvcName" (list . "store") }}
+        {{- if has "volumes" (include "mcdash.tiers" . | splitList " ") }}
+        - name: volumes
+          persistentVolumeClaim:
+            claimName: {{ include "mcdash.pvcName" (list . "volumes") }}
+            readOnly: true
+        {{- end }}
         - name: tmp
           emptyDir: {}
       {{- with .Values.nodeSelector }}

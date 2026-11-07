@@ -59,7 +59,9 @@ between components in [docs/contracts.md](docs/contracts.md). In brief:
 - The Python app (FastAPI with HTMX, rendered on the server) runs as one pod.
   It drives `helm` against a copy of the itzg chart baked into the image. The
   Helm releases are the source of truth for which worlds exist. There is no
-  database: other state is JSON on the store volume.
+  database: other state is JSON on the store volume, including a registry of
+  the worlds, from which the dashboard re-creates them after a cluster
+  rebuild (`worlds.restore`).
 - **Storage tiers** on an NFS server:
   - **archive**: the precious original backups. The NAS directory is
     `a-w`, the PersistentVolume is mounted with `ro` mount options, and the
@@ -99,16 +101,22 @@ helm install minecraft-dashboard oci://ghcr.io/gilesknap/charts/minecraft-dashbo
 storage:
   archive: {nfs: {server: 192.168.1.3, path: /bigdisk/minecraft-archive}}
   store:   {nfs: {server: 192.168.1.3, path: /bigdisk/k8s-cluster/minecraft}}
+  volumes: {nfs: {server: 192.168.1.3, path: /k8s-dynamic/stable}}  # optional, read-only:
+           # the worlds' class share root; refuses names a deleted world still holds
 worlds:
   publicHost: mc.example.org   # shown in connect addresses
   node: nuc2                   # pin worlds to the node your router forwards to
-  storageClass: nfs-rwx        # RWX class for per-world PVCs
+  storageClass: nfs-stable     # RWX class for per-world PVCs, here NFS CSI with
+                               # its own share, subDir ${pvc.metadata.namespace}/
+                               # ${pvc.metadata.name} and onDelete: archive
   portMin: 30565
   portMax: 30584
   rconPortMin: 30600           # RCON NodePorts: LAN only, never forward these
   rconPortMax: 30619
   defaultMemory: 4Gi
   snapshotKeep: 10
+  restore: true                # at start, re-create worlds a rebuild lost; needs
+                               # a class with a fixed folder per PVC name
 networkPolicy:
   enabled: true                # needs a CNI that enforces policies (k3s does)
   rconAllowedCidrs:            # your LAN, minus the other cluster nodes

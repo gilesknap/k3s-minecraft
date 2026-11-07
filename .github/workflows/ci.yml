@@ -72,6 +72,15 @@ jobs:
             --set storage.archive.nfs.path=/archive \
             --set storage.store.nfs.server=192.0.2.1 \
             --set storage.store.nfs.path=/store
+          # with the optional read-only world share and restore
+          helm lint --strict charts/minecraft-dashboard \
+            --set storage.archive.nfs.server=192.0.2.1 \
+            --set storage.archive.nfs.path=/archive \
+            --set storage.store.nfs.server=192.0.2.1 \
+            --set storage.store.nfs.path=/store \
+            --set storage.volumes.nfs.server=192.0.2.1 \
+            --set storage.volumes.nfs.path=/k8s-dynamic/stable \
+            --set worlds.restore=true
 
       - name: Template (NFS and hostPath variants)
         run: |
