@@ -1,33 +1,26 @@
+/* Palette from the cluster's landing page ("home"), which is dark-only:
+   slate background and surfaces, teal accent. Status hues are the
+   matching Tailwind 300/400 tones, all at least WCAG AA on --bg, --card and --code. */
 :root {
-  --bg: #f6f7f4; --fg: #1d211b; --muted: #677062; --card: #ffffff;
-  --line: #dde1d8; --accent: #3f7d2b; --accent-fg: #fff; --danger: #b3261e;
-  --ok-bg: #e5f3dd; --err-bg: #fbe4e2; --code: #eef0ea; --input: #fff;
-  --radius: 8px; --shadow: 0 1px 2px rgb(0 0 0 / .06);
-  --s-run: #2e7d32; --s-start: #1565c0; --s-seed: #6a4fb0; --s-snap: #00838f;
-  --s-stop: #6b7280; --s-fail: #b3261e;
-  --t-archive: #8a5a00; --t-backup: #1565c0; --t-snapshot: #6b7280;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #14170f; --fg: #e4e8de; --muted: #9aa392; --card: #1d2118;
-    --line: #333a2c; --accent: #6db04f; --accent-fg: #0f130b; --danger: #ef6b61;
-    --ok-bg: #22361a; --err-bg: #42201d; --code: #262b20; --input: #171a12;
-    --shadow: none;
-    --s-run: #66bb6a; --s-start: #64b5f6; --s-seed: #b39ddb; --s-snap: #4dd0e1;
-    --s-stop: #9ca3af; --s-fail: #ef6b61;
-    --t-archive: #e0b25a; --t-backup: #64b5f6; --t-snapshot: #9ca3af;
-  }
+  color-scheme: dark;
+  --bg: #0f172a; --fg: #e0e0e0; --heading: #ffffff; --muted: #94a3b8; --card: #1e293b;
+  --line: #334155; --accent: #2dd4bf; --accent-fg: #0f172a; --danger: #fca5a5;
+  --ok-bg: #134e4a; --err-bg: #3f1d24; --code: #1e3a4a; --input: #0f172a;
+  --radius: 8px; --shadow: none;
+  --s-run: #4ade80; --s-start: #7dd3fc; --s-seed: #c4b5fd; --s-snap: #67e8f9;
+  --s-stop: #94a3b8; --s-fail: #fca5a5;
+  --t-archive: #fbbf24; --t-backup: #7dd3fc; --t-snapshot: #94a3b8;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--fg);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 a { color: var(--accent); }
 code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .9em; }
 code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
-h1 { font-size: 1.5rem; margin: .2rem 0 1rem; }
+h1 { font-size: 1.5rem; margin: .2rem 0 1rem; color: var(--heading); }
 h2 { font-size: 1.1rem; margin: 0 0 .75rem; }
 h1 small, h2 small { font-weight: normal; font-size: .8em; }
 .muted { color: var(--muted); }
@@ -41,7 +34,7 @@ h1 small, h2 small { font-weight: normal; font-size: .8em; }
   padding: .6rem 1rem; background: var(--card); border-bottom: 1px solid var(--line);
   position: sticky; top: 0; z-index: 10;
 }
-.brand { font-weight: 700; color: var(--fg); text-decoration: none; }
+.brand { font-weight: 700; color: var(--heading); text-decoration: none; }
 .brand .version { color: var(--muted); font-size: .75em; font-weight: 400; }
 .topbar nav { display: flex; gap: .25rem; }
 .topbar nav a {
@@ -129,7 +122,7 @@ details.pop[open] > summary { background: var(--code); }
 details.pop > form {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; width: min(22rem, 85vw);
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: .75rem; box-shadow: 0 6px 24px rgb(0 0 0 / .18); text-align: left; white-space: normal;
+  padding: .75rem; box-shadow: 0 6px 24px rgb(0 0 0 / .45); text-align: left; white-space: normal;
 }
 
 /* forms */
@@ -194,7 +187,7 @@ p.alert { display: block; }
 .suggest {
   position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 5; margin: 0; padding: .2rem 0;
   list-style: none; max-height: 15rem; overflow: auto; background: var(--card); border: 1px solid var(--line);
-  border-radius: 6px; box-shadow: 0 6px 24px rgb(0 0 0 / .18);
+  border-radius: 6px; box-shadow: 0 6px 24px rgb(0 0 0 / .45);
   font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85em;
 }
 .suggest li { display: flex; justify-content: space-between; gap: 1rem; padding: .15rem .6rem; cursor: pointer; }
