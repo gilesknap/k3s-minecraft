@@ -30,8 +30,8 @@ anything in the cluster.
 | **Archive** (precious) | `/bigdisk/minecraft-archive/` | nobody — `a-w` on the NAS **and** `readOnly` mount | never | no |
 | **Backups** (promoted) | `/bigdisk/k8s-cluster/minecraft/backups/` | "Promote" of a snapshot | never | yes, typed-name confirm |
 | **Snapshots** (rolling) | `/bigdisk/k8s-cluster/minecraft/snapshots/<world>/` | manual / before delete / before restore | keep last 10 per world | yes |
-| Dashboard state | `/bigdisk/k8s-cluster/minecraft/dashboard/` | dashboard | — | — |
-| Live world data | dynamic `nfs-rwx` PVC per world (`/k8s-dynamic`) | the server | — | via world delete |
+| Dashboard state | `/bigdisk/k8s-cluster/minecraft/dashboard/` (incl. the world registry) | dashboard | — | — |
+| Live world data | dynamic PVC per world (`worlds.storageClass`) | the server | — | via world delete |
 
 - The archive sits **outside** `k8s-cluster/` so no cluster-wide tooling ever
   targets it. Graduating a promoted backup into the archive is a deliberate
@@ -39,8 +39,8 @@ anything in the cluster.
 - Promoted backups carry a sidecar `<name>.json` with a name and description.
 - Dashboard state (JSON): player roster, per-backup display labels and
   descriptions, backup index cache. No database.
-- Because `nfs-rwx` has `reclaimPolicy: Delete`, deleting a world always takes
-  a snapshot first.
+- Deleting a world deletes its PVC, which the storage class may delete or
+  archive, so deleting a world always takes a snapshot first.
 
 ## Archive ingestion
 
@@ -72,6 +72,28 @@ To be recovered from Drive and ingested later.
   namespace, with a ServiceAccount whose Role is limited to that namespace.
   Helm release secrets are the source of truth for which worlds exist; port and
   world metadata are stored as release labels/values.
+- Both live in etcd, so the dashboard also keeps a **world registry** on the
+  store (`dashboard/registry/<world>.json`). When it starts after a cluster
+  rebuild, it re-creates each registered world once (`worlds.restore`): same
+  name, ports, settings and running/stopped state, with a new RCON password.
+  A world it cannot restore as it was (its PVC was on another storage
+  class, a port clash, no data folder) is set aside in
+  `dashboard/registry/skipped/` and never restored by itself; its name stays
+  taken. Until a lost world is restored, its ports stay reserved. If the
+  world share is mounted without its `<namespace>/` folder, the restore
+  waits for it rather than take every world for lost. A world deleted by hand rather than in the dashboard
+  comes back at the next start unless its registry file is deleted first. The world's
+  data comes back only if the storage class gives each PVC name a fixed folder
+  (e.g. NFS CSI `subDir: ${pvc.metadata.namespace}/${pvc.metadata.name}`), so
+  the re-created `<world>-data` PVC finds it. See contracts.md, World
+  registry.
+- Such a class archives a deleted world's PVC under the same name, and the
+  NFS CSI driver keeps only one archive per name. With the class's share
+  root mounted read-only (`storage.volumes`), the dashboard refuses a new
+  world whose name still has a folder there, live (not yet archived) or
+  archived, rather than hand it the old data or leave the next delete stuck.
+  The mount is that one share, so give the worlds' class a share of its own.
+  See contracts.md, World share.
 
 ## Worlds
 

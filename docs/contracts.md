@@ -11,7 +11,7 @@ streams share. `src/mcdash/models.py` is the Python contract and is
 | `models.py` | contract (read-only) | dataclasses, errors, `DashboardService` Protocol |
 | `config.py` | backend | `Config.from_env()` — env vars below |
 | `backups.py`, `detect.py`, `naming.py` | backend | backup indexing, filename parsing, vanilla/Forge + version detection, server.properties parse |
-| `store.py` | backend | JSON state in `$MCD_STORE_DIR/dashboard/` (roster, labels, index cache, audit log) |
+| `store.py` | backend | JSON state in `$MCD_STORE_DIR/dashboard/` (roster, labels, index cache, audit log, world registry) |
 | `k8s.py`, `helmops.py`, `rcon.py` | backend | Kubernetes client, `helm` CLI wrapper, RCON protocol client and per-world connection pool (`RconPool`, see design.md "RCON connections") |
 | `service.py` | backend | `KubeDashboardService` implementing `DashboardService` + reconciler thread |
 | `completion.py` | backend | console completion: Brigadier tree walker over the generator reports, and the commands Job script |
@@ -43,6 +43,8 @@ in their report.
 | `MCD_DEFAULT_MEMORY` | `4Gi` | launch form default |
 | `MCD_ITZG_CHART` | `/opt/charts/minecraft` | vendored itzg chart directory baked into the image |
 | `MCD_SNAPSHOT_KEEP` | `10` | snapshots kept per world |
+| `MCD_VOLUMES_DIR` | "" | read-only share root of `$MCD_STORAGE_CLASS`, which keeps a PVC in `<ns>/<pvc>` and archives a deleted one as `archived-<ns>/<pvc>` (chart: `storage.volumes`, at `/volumes`). See World share. "" = no checks |
+| `MCD_RESTORE_WORLDS` | `false` | at start, re-create registered worlds the cluster has lost (see World registry); only with a storage class that maps a PVC name to a fixed folder |
 | `MCD_UID` / `MCD_GID` | `1000` / `1000` | itzg runtime uid/gid; Jobs run as this and chown to it |
 
 ## Kubernetes objects per world `<w>`
@@ -65,6 +67,8 @@ in their report.
   release is installed, so an interrupted create is finished by the
   reconciler.
 - Secret `<w>-rcon` — key `rcon-password`, random.
+- Registry file `$MCD_STORE_DIR/dashboard/registry/<w>.json` — see World
+  registry below. `registry/skipped/<w>.json` once a restore set it aside.
 - Helm release `<w>` of the vendored itzg chart: `persistence.dataDir.existingClaim=<w>-data`,
   NodePort game service on the allocated port, RCON service
   (`minecraftServer.rcon`) `serviceType: NodePort`, `nodePort: <rconPort>`,
@@ -162,6 +166,8 @@ image: {repository: ghcr.io/gilesknap/k3s-minecraft, tag: ""}  # tag defaults to
 storage:
   archive: {nfs: {server: "", path: ""}}   # chart creates RO PV (mountOptions ro) + PVC
   store:   {nfs: {server: "", path: ""}}   # chart creates RW PV + PVC
+  volumes: {nfs: {server: "", path: ""}}   # optional: share root of worlds.storageClass,
+           # RO PV + PVC at /volumes (MCD_VOLUMES_DIR); half-set nfs fails
 worlds:
   portMin: 30565
   portMax: 30584
@@ -174,6 +180,7 @@ worlds:
   size: 10Gi
   defaultMemory: 4Gi
   snapshotKeep: 10
+  restore: false      # MCD_RESTORE_WORLDS
 securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
 networkPolicy:
   enabled: true
@@ -190,6 +197,125 @@ only: TCP 25565 from anywhere; TCP 25575 from this release's dashboard pod
 (selector labels) and `rconAllowedCidrs` (each a CIDR string or an ipBlock
 `{cidr, except}`); everything else denied. Rendering
 fails if the RCON and game port ranges overlap. It does **not** create an Ingress (tpi-k3s-ansible owns ingress/auth).
+
+## World registry
+
+The ConfigMaps and releases are in etcd, so a cluster rebuild loses them. The
+reconciler therefore copies each world to
+`$MCD_STORE_DIR/dashboard/registry/<w>.json` =
+`{spec, op, replicas, storageClass}` (`spec`/`op` as in the ConfigMap;
+`replicas` from the release, kept while there is none; `storageClass` the
+`storageClassName` of PVC `<w>-data`, kept while there is none). It writes a
+file only when it changes, and deletes it as the first step of a delete's
+teardown, so a deleted world never comes back. An unreadable registry folder
+is logged once (until it is readable again) and retried on the next tick. A
+single file that cannot be read (e.g. EACCES) is left out, or cannot be
+written is skipped, with one warning per file per dashboard process; the
+others are still copied, and that world is retried every tick. If the
+teardown cannot delete the file, the delete fails (FAILED, Delete retries)
+before anything is torn down.
+
+With `MCD_RESTORE_WORLDS`, restore runs **once per dashboard start**: after
+the first tick that lists the worlds and reads the registry successfully (an
+unreadable registry is retried, never taken for an empty one). It reads
+`registry/*.json` afresh at that point, and re-creates each registered world
+that has neither a ConfigMap nor a release. The world share lookups (see
+World share) run first, without the service lock; then, under the lock, the
+worlds are listed again, and a world that is back by then is left alone. If
+the world share is mounted but has no `<ns>/` folder (e.g. `storage.volumes`
+is not the class's share root, or the NAS has not mounted its dataset yet),
+the pass is **postponed**: one error is logged, nothing is touched or set
+aside, and it is retried every tick until the folder is there (no restart
+needed). For each world:
+
+1. Secret `<w>-rcon` with a **new** password (passwords are never written to
+   the store), and PVC `<w>-data`.
+2. The release, with the recorded ports and settings and `replicas` (0 or 1).
+   If the install fails, the record gets op `{kind: recover, step: install,
+   error}` (FAILED; Start retries).
+3. The ConfigMap, with `message` "restored after the cluster lost it" until
+   the next start or stop.
+
+An op that was in flight is kept and resumes (seed, drain, install, a
+restore's or delete's snapshot, teardown), except a plain `snapshot` (or an
+old `stop`), which is dropped; an op that had failed is dropped too, unless
+it failed at `seed` or `install`, which Start retries. The PVC binds to the
+old data only if `$MCD_STORAGE_CLASS` gives each PVC name a fixed folder.
+
+A record that cannot be restored as it is goes to
+`registry/skipped/<w>.json`, with one warning in the log and a
+`skip_restore` entry (with the reason) in the audit log; it is never
+restored again. The reasons, in the order checked: a record that is not a
+valid world; "storage class changed (`<old>` → `<new>`): migrate its data
+first" (its `storageClass` is not `$MCD_STORAGE_CLASS`; a record without one
+is restored); a port held by another world (restored earlier in name order,
+or still in the cluster); no data folder `<ns>/<w>-data` on the world share
+(only checked with `MCD_VOLUMES_DIR`). To bring one back, free its ports (or
+move its data to the new class and set `storageClass` in the file), move the
+file back to `registry/`, and restart the dashboard. Registry files that are
+not JSON or not a record (`spec` an object, `op` an object or null,
+`replicas` an integer, `storageClass` a string if present) are ignored with
+a warning. Any other error while restoring one world is logged, and that
+world is retried at the next start; the others are still restored. Such a
+world may be left with its PVC and Secret but no record; they are not
+removed (deleting the PVC can archive or delete its data), and the retry
+reuses them.
+
+The ports of a registered world that the cluster does not have (restore
+pending, failed, or `MCD_RESTORE_WORLDS` off) stay reserved: new worlds and
+RCON port assignments skip them. Records in `registry/skipped/` hold no
+ports.
+
+A world removed outside the dashboard (ConfigMap and release deleted by hand)
+comes back at the next start. Delete worlds in the dashboard, or delete
+`registry/<w>.json` before the dashboard next starts.
+
+A registered world's name stays taken while it has a file in `registry/` or
+`registry/skipped/`: `launch` and `create_world` refuse it (`Conflict`
+"taken by a world the cluster no longer has (…)"), and name suggestions skip
+it. Delete the file (and the old world's data) to free the name. A name whose
+PVC `<w>-data` exists without a world record is refused with how to free it
+(delete the registry file, if any, then the PVC and Secret `<w>-rcon`).
+These "taken" checks (a world, its PVC, the registry) run before the world
+share checks, so a live world's name gets "is taken", not the deleted-world
+message.
+
+## World share
+
+With `storage.volumes` set to the share root of `$MCD_STORAGE_CLASS`
+(mounted read-only at `/volumes`, `MCD_VOLUMES_DIR`), the dashboard expects
+the NFS CSI layout `subDir: ${pvc.metadata.namespace}/${pvc.metadata.name}`
+with `onDelete: archive`, which csi-driver-nfs archives to
+`archived-` + subDir:
+
+```text
+/volumes/<ns>/<w>-data             a world's live folder
+/volumes/archived-<ns>/<w>-data    the folder of a deleted world
+```
+
+- `launch` and `create_world` refuse a name while either folder exists. The
+  live folder of a deleted world stays until the driver archives it (the
+  teardown does not wait), or for good if that archive fails because an
+  archive of the same name exists: `Conflict` "… still has a volume folder
+  …; wait a minute …". An archived one: `Conflict` "a deleted world named …
+  still has archived data …; pick another name, or remove or rename the
+  archive first". Either way the new PVC would get the old folder, or its
+  delete would get stuck. The checks run before the service lock is taken.
+- Name suggestions skip names with either folder (`new-world-2`).
+- A restore needs the live folder: without it the world would come back
+  empty, so the record is set aside (see World registry).
+- A folder under the share that does not exist yet means none; one that
+  cannot be read refuses the name. The share root itself must exist, or the
+  pod cannot start (the storage class needs it anyway).
+- `<ns>/` may be missing only while there is no world at all (the class
+  makes it with the first PVC). Missing while a world exists in the cluster
+  or the registry, the mount is taken to be wrong or not ready: new names
+  and name suggestions are refused (`MCDashError` "the world share … has no
+  `<ns>/` folder although worlds exist: …") and a restore is postponed,
+  rather than every lookup reading "none".
+
+Give that class a share of its own, used only by worlds: the dashboard can
+read everything under it.
 
 ## New worlds (`create_world`)
 
