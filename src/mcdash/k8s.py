@@ -102,6 +102,7 @@ class KubeApi(Protocol):
     def delete_secret(self, name: str) -> None: ...
     def create_pvc(self, name: str, world: str) -> None: ...
     def pvc_exists(self, name: str) -> bool: ...
+    def pvc_classes(self) -> dict[str, str]: ...
     def delete_pvc(self, name: str) -> None: ...
     def create_job(self, spec: JobSpec) -> None: ...
     def get_job(self, name: str) -> JobInfo | None: ...
@@ -291,6 +292,18 @@ class Kube:
             self.core.read_namespaced_persistent_volume_claim, name, self.ns
         )
         return r is not None
+
+    def pvc_classes(self) -> dict[str, str]:
+        """``{pvc: storageClassName}`` of the dashboard's PVCs ("" = none)."""
+        res = self._api(
+            self.core.list_namespaced_persistent_volume_claim,
+            self.ns,
+            label_selector="app.kubernetes.io/managed-by=mcdash",
+        )
+        items: list[Any] = list(res.items)
+        return {
+            str(i.metadata.name): str(i.spec.storage_class_name or "") for i in items
+        }
 
     def delete_pvc(self, name: str) -> None:
         self._ignore_404(

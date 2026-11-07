@@ -80,6 +80,9 @@ class FakeKube:
         self.configmaps: dict[str, tuple[str, dict[str, str]]] = {}
         self.secrets: dict[str, dict[str, str]] = {}
         self.pvcs: set[str] = set()
+        # storage class a PVC is created with (as the real one: cfg's class)
+        self.storage_class = "nfs-rwx"
+        self.pvc_class: dict[str, str] = {}
         self.jobs: dict[str, FakeJob] = {}
         self.pods: dict[str, list[PodInfo]] = {}
         self.metrics: dict[str, tuple[int, int]] = {}
@@ -118,6 +121,10 @@ class FakeKube:
         if name in self.pvcs:
             raise Conflict(name)
         self.pvcs.add(name)
+        self.pvc_class[name] = self.storage_class
+
+    def pvc_classes(self) -> dict[str, str]:
+        return {p: self.pvc_class.get(p, "") for p in self.pvcs}
 
     def pvc_exists(self, name: str) -> bool:
         return name in self.pvcs

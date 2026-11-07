@@ -221,3 +221,18 @@ def test_unavailable_cluster_raises_mcdash_error(cfg: Config) -> None:
     k.core.list_namespaced_config_map.side_effect = OSError("connection refused")
     with pytest.raises(MCDashError, match="cannot reach"):
         k.list_configmaps("world")
+
+
+def test_pvc_classes(cfg: Config) -> None:
+    k = make_kube(cfg)
+    k.unavailable = ""
+
+    def pvc(n: str, c: str | None) -> NS:
+        return NS(metadata=NS(name=n), spec=NS(storage_class_name=c))
+
+    k.core.list_namespaced_persistent_volume_claim.return_value = NS(
+        items=[pvc("w-data", "nfs-rwx"), pvc("x-data", None)]
+    )
+    assert k.pvc_classes() == {"w-data": "nfs-rwx", "x-data": ""}
+    _, kw = k.core.list_namespaced_persistent_volume_claim.call_args
+    assert kw["label_selector"] == "app.kubernetes.io/managed-by=mcdash"

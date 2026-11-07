@@ -1,14 +1,18 @@
 """JSON state under ``$MCD_STORE_DIR/dashboard/`` — no database.
 
-Files: ``roster.json``, ``labels.json``, ``index.json`` (detection cache) and
-``audit.jsonl`` (append-only). Every write is tmp + rename, and every write
-path is checked against the archive guard: nothing may ever be written under
-the archive directory.
+Files: ``roster.json``, ``labels.json``, ``index.json`` (detection cache),
+``audit.jsonl`` (append-only), ``registry/<world>.json`` (a copy of each
+world record, so worlds outlive the cluster: see the service's
+``sync_registry``) and ``registry/skipped/<world>.json`` (records a restore
+set aside). Every write is tmp + rename, and every write path is
+checked against the archive guard: nothing may ever be written under the
+archive directory.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 import threading
@@ -19,6 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from mcdash.models import Forbidden, Player
+
+log = logging.getLogger(__name__)
 
 
 class ArchiveWriteError(Forbidden):
@@ -69,6 +75,18 @@ def read_json(path: Path, default: Any) -> Any:
         return default
 
 
+def _is_record(rec: Any) -> bool:
+    """A world registry record: ``{spec: {...}, op: {...} | null, replicas,
+    storageClass}`` (``storageClass`` a string, absent in older records)."""
+    return (
+        isinstance(rec, dict)
+        and isinstance(rec.get("spec"), dict)
+        and (rec.get("op") is None or isinstance(rec.get("op"), dict))
+        and type(rec.get("replicas", 0)) is int
+        and isinstance(rec.get("storageClass", ""), str)
+    )
+
+
 class Store:
     """Dashboard state files. Thread-safe within one process."""
 
@@ -76,6 +94,8 @@ class Store:
         self.dir = dashboard_dir
         self.guard = WriteGuard(archive_dir)
         self._lock = threading.RLock()
+        # registry files already warned about as unreadable (once per process)
+        self._unreadable: set[str] = set()
 
     # paths
     @property
@@ -149,6 +169,90 @@ class Store:
 
     def save_index(self, index: dict[str, Any]) -> None:
         self.write_json(self.index_path, index)
+
+    # world registry: one file per world, written only when it changes
+    @property
+    def registry_dir(self) -> Path:
+        return self.dir / "registry"
+
+    @property
+    def skipped_dir(self) -> Path:
+        """Records a restore set aside (e.g. a port clash): never restored."""
+        return self.registry_dir / "skipped"
+
+    def _registry_files(self, d: Path) -> list[Path]:
+        """``<world>.json`` files in ``d``; [] if ``d`` does not exist yet.
+
+        Any other ``OSError`` (e.g. the store is down) propagates: an
+        unreadable registry must not pass for an empty one.
+        """
+        try:
+            entries = sorted(d.iterdir())
+        except FileNotFoundError:
+            return []
+        return [
+            p
+            for p in entries
+            # not atomic-write temp files (".<name>.json.<x>.tmp")
+            if p.suffix == ".json" and not p.name.startswith(".")
+        ]
+
+    def registry(self) -> dict[str, dict[str, Any]]:
+        """``{world: record}`` of ``registry/<world>.json``.
+
+        A file that is not JSON, or not a record (``spec`` a dict, ``op`` a
+        dict or null, ``replicas`` an int), is logged and skipped, and so is
+        one that cannot be read (e.g. EACCES; warned once per file per
+        process, its name stays taken: see ``registry_names``). An
+        ``OSError`` listing the folder propagates (see ``_registry_files``).
+        """
+        out: dict[str, dict[str, Any]] = {}
+        for p in self._registry_files(self.registry_dir):
+            try:
+                rec = json.loads(p.read_text())
+            except FileNotFoundError:  # gone since the listing
+                continue
+            except OSError as e:
+                if p.name not in self._unreadable:
+                    self._unreadable.add(p.name)
+                    log.warning("registry: cannot read %s; ignored: %s", p.name, e)
+                continue
+            except ValueError as e:
+                log.warning("registry: %s is not JSON; ignored: %s", p.name, e)
+                continue
+            if not _is_record(rec):
+                log.warning("registry: %s is not a world record; ignored", p.name)
+                continue
+            out[p.stem] = rec
+        return out
+
+    def registry_names(self) -> set[str]:
+        """Names with a file in ``registry/``, read from the file names only
+        (so a malformed record still counts). ``OSError`` propagates."""
+        return {p.stem for p in self._registry_files(self.registry_dir)}
+
+    def skipped_names(self) -> set[str]:
+        """Names with a file in ``registry/skipped/``. ``OSError`` propagates."""
+        return {p.stem for p in self._registry_files(self.skipped_dir)}
+
+    def save_registry(self, world: str, record: dict[str, Any]) -> None:
+        self.write_json(self.registry_dir / f"{world}.json", record)
+
+    def drop_registry(self, world: str) -> None:
+        path = self.registry_dir / f"{world}.json"
+        with self._lock:
+            self.guard.check(path)
+            path.unlink(missing_ok=True)
+
+    def skip_registry(self, world: str) -> None:
+        """Move ``registry/<world>.json`` to ``registry/skipped/``."""
+        src = self.registry_dir / f"{world}.json"
+        dest = self.skipped_dir / f"{world}.json"
+        with self._lock:
+            self.guard.check(src)
+            self.guard.check(dest)
+            self.skipped_dir.mkdir(parents=True, exist_ok=True)
+            os.replace(src, dest)
 
     # audit log
     def audit(self, actor: str, action: str, target: str, **detail: Any) -> None:
