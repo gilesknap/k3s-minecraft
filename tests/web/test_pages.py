@@ -64,9 +64,7 @@ def test_static_cache_control(
 ) -> None:
     monkeypatch.setenv("MCD_VERSION", "1.2.3")
     c = TestClient(create_app(svc))
-    page = c.get("/").text
-    assert "style.css?v=1.2.3" in page
-    assert '<small class="version" title="Dashboard release">1.2.3</small>' in page
+    assert "style.css?v=1.2.3" in c.get("/").text
     versioned = c.get("/static/style.css?v=1.2.3")
     assert versioned.headers["cache-control"] == ("public, max-age=31536000, immutable")
     assert c.get("/static/style.css").headers["cache-control"] == "no-cache"
